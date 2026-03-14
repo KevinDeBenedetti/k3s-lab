@@ -1,4 +1,4 @@
-# Module: makefiles/30-k3s.mk (k3s-homelab)
+# Module: makefiles/30-k3s.mk (k3s-lab)
 # ──────────────────────────────────────────────────────────────────────────────
 # k3s Installation
 # ──────────────────────────────────────────────────────────────────────────────
@@ -8,7 +8,7 @@
 k3s-master: ## Install k3s server on master (requires MASTER_IP)
 	@[ -n "$(MASTER_IP)" ] || (echo "$(RED)❌ MASTER_IP is not set$(RESET)"; exit 1)
 	@echo "$(YELLOW)→ Installing k3s master on $(MASTER_IP)...$(RESET)"
-	@scp -i $(SSH_KEY) -P $(SSH_PORT) $(K3S_HOMELAB)/k3s/install-master.sh $(SSH_USER)@$(MASTER_IP):/tmp/k3s-install-master.sh
+	@scp -i $(SSH_KEY) -P $(SSH_PORT) $(K3S_LAB)/k3s/install-master.sh $(SSH_USER)@$(MASTER_IP):/tmp/k3s-install-master.sh
 	@ssh -i $(SSH_KEY) -p $(SSH_PORT) $(SSH_USER)@$(MASTER_IP) \
 		"sudo K3S_VERSION=$(K3S_VERSION) PUBLIC_IP=$(MASTER_IP) WORKER_IP=$(WORKER_IP) bash /tmp/k3s-install-master.sh \
 		 && rm -f /tmp/k3s-install-master.sh"
@@ -30,7 +30,7 @@ k3s-worker: ## Install k3s agent on worker (requires WORKER_IP, MASTER_IP, K3S_N
 	@echo "$(YELLOW)→ Opening master firewall for new worker $(WORKER_IP)...$(RESET)"
 	@$(MAKE) k3s-open-master-firewall WORKER_IP=$(WORKER_IP)
 	@echo "$(YELLOW)→ Installing k3s worker on $(WORKER_IP)...$(RESET)"
-	@scp -i $(SSH_KEY) -P $(SSH_PORT) $(K3S_HOMELAB)/k3s/install-worker.sh $(SSH_USER)@$(WORKER_IP):/tmp/k3s-install-worker.sh
+	@scp -i $(SSH_KEY) -P $(SSH_PORT) $(K3S_LAB)/k3s/install-worker.sh $(SSH_USER)@$(WORKER_IP):/tmp/k3s-install-worker.sh
 	@ssh -i $(SSH_KEY) -p $(SSH_PORT) $(SSH_USER)@$(WORKER_IP) \
 		"sudo K3S_VERSION=$(K3S_VERSION) MASTER_IP=$(MASTER_IP) K3S_NODE_TOKEN=$(K3S_NODE_TOKEN) bash /tmp/k3s-install-worker.sh \
 		 && rm -f /tmp/k3s-install-worker.sh"
@@ -49,13 +49,13 @@ k3s-open-master-firewall: ## Open master UFW for a new worker (requires WORKER_I
 k3s-uninstall-master: ## Remove k3s from master (DESTRUCTIVE)
 	@[ -n "$(MASTER_IP)" ] || (echo "$(RED)❌ MASTER_IP is not set$(RESET)"; exit 1)
 	@echo "$(RED)⚠️  Removing k3s from master $(MASTER_IP)...$(RESET)"
-	@scp -i $(SSH_KEY) -P $(SSH_PORT) $(K3S_HOMELAB)/k3s/uninstall.sh $(SSH_USER)@$(MASTER_IP):/tmp/k3s-uninstall.sh
+	@scp -i $(SSH_KEY) -P $(SSH_PORT) $(K3S_LAB)/k3s/uninstall.sh $(SSH_USER)@$(MASTER_IP):/tmp/k3s-uninstall.sh
 	@ssh -i $(SSH_KEY) -p $(SSH_PORT) $(SSH_USER)@$(MASTER_IP) \
 		"sudo bash /tmp/k3s-uninstall.sh && rm -f /tmp/k3s-uninstall.sh"
 
 k3s-uninstall-worker: ## Remove k3s from worker (DESTRUCTIVE)
 	@[ -n "$(WORKER_IP)" ] || (echo "$(RED)❌ WORKER_IP is not set$(RESET)"; exit 1)
 	@echo "$(RED)⚠️  Removing k3s from worker $(WORKER_IP)...$(RESET)"
-	@scp -i $(SSH_KEY) -P $(SSH_PORT) $(K3S_HOMELAB)/k3s/uninstall.sh $(SSH_USER)@$(WORKER_IP):/tmp/k3s-uninstall.sh
+	@scp -i $(SSH_KEY) -P $(SSH_PORT) $(K3S_LAB)/k3s/uninstall.sh $(SSH_USER)@$(WORKER_IP):/tmp/k3s-uninstall.sh
 	@ssh -i $(SSH_KEY) -p $(SSH_PORT) $(SSH_USER)@$(WORKER_IP) \
 		"sudo bash /tmp/k3s-uninstall.sh && rm -f /tmp/k3s-uninstall.sh"

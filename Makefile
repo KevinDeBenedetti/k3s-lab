@@ -6,18 +6,18 @@ SHELL         := /bin/bash
 export
 
 # Defaults (overridable via .env or environment)
-SSH_USER            ?= kevin
+SSH_USER            ?= debian
 SSH_PORT            ?= 22
 SSH_KEY             ?= $(HOME)/.ssh/id_ed25519
 SSH_KEY             := $(subst ~,$(HOME),$(SSH_KEY))
 INITIAL_USER        ?= root
 MASTER_IP           ?=
 WORKER_IP           ?=
-KUBECONFIG_CONTEXT  ?= k3s-homelab
+KUBECONFIG_CONTEXT  ?= k3s-lab
 K3S_VERSION         ?= v1.32.2+k3s1
 
 # Root of this repo (works whether used standalone or as a submodule)
-K3S_HOMELAB := $(abspath $(dir $(MAKEFILE_LIST)))
+K3S_LAB := $(abspath $(dir $(MAKEFILE_LIST)))
 
 # Terminal colors
 GREEN  := \033[0;32m

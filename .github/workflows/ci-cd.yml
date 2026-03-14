@@ -1,5 +1,5 @@
 # =============================================================================
-# CI — k3s-homelab lint, tests & security
+# CI — k3s-lab lint, tests & security
 #
 # Runs on every push and PR to main.
 # Does NOT require a real cluster — all checks are static/offline.
