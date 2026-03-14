@@ -1,13 +1,14 @@
 # =============================================================================
-# CI — k3s-lab lint, tests & security
+# CI / CD — k3s-lab lint, tests, security & docs dispatch
 #
 # Runs on every push and PR to main.
 # Does NOT require a real cluster — all checks are static/offline.
 #
 # Jobs (reusable workflows from KevinDeBenedetti/github-workflows):
-#   shell-ci    — shellcheck + yamllint + bats (via ci-shell.yml)
+#   shell-ci    — shellcheck + actionlint + bats (via ci-shell.yml)
 #   kubernetes  — kubeconform + .env.example check (via ci-kubernetes.yml)
 #   security    — Gitleaks secret scanning (via security.yml)
+#   docs        — trigger kevindebenedetti.github.io rebuild (push to main only)
 # =============================================================================
 name: CI / CD
 
@@ -16,6 +17,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+
+concurrency:
+  group: ci-cd-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
 
@@ -63,3 +68,13 @@ jobs:
       run-python-audit: false
       run-secret-scan: true
       run-codeql: false
+
+  # ─── Docs dispatch (push to main only) ───────────────────────────────────
+  # Triggers a rebuild of kevindebenedetti.github.io after all CI jobs pass.
+  # Requires PAT_TOKEN secret (fine-grained PAT with actions:write on the hub repo).
+  docs:
+    needs: [shell-ci, kubernetes, security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/dispatch-docs.yml@main
+    secrets:
+      PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
