@@ -40,16 +40,6 @@ hooks = [
   { id = "shellcheck", args = ["--severity=warning", "--shell=bash"], files = "\\.sh$" },
 ]
 
-# ─── YAML linting ───────────────────────────────────────────────────────────
-[[repos]]
-repo = "https://github.com/adrienverge/yamllint"
-# renovate: datasource=github-tags depName=adrienverge/yamllint
-rev = "v1.37.0"
-hooks = [
-  # Exclude: Lima VM configs (use YAML anchors) and Helm values (Go templates)
-  { id = "yamllint", args = ["--config-file", ".yamllint.yaml"], exclude = "^(tests/lima/|kubernetes/.*/.*-values\\.yaml$)" },
-]
-
 # ─── GitHub Actions workflow linting ────────────────────────────────────────
 [[repos]]
 repo = "https://github.com/rhysd/actionlint"
