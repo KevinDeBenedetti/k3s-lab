@@ -39,3 +39,10 @@ include makefiles/70-ssh.mk
 
 test: ## Run BATS unit tests (offline — no cluster needed)
 	@bats tests/bats/
+
+# ── Hooks ────────────────────────────────────────────────────────────────────
+
+.PHONY: hooks-update
+
+hooks-update: ## Update prek hook revisions to latest (prek autoupdate)
+	@prek autoupdate
