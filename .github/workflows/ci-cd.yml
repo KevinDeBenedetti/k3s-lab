@@ -9,7 +9,7 @@
 #   kubernetes  — kubeconform + .env.example check (via ci-kubernetes.yml)
 #   security    — Gitleaks secret scanning (via security.yml)
 # =============================================================================
-name: CI
+name: CI / CD
 
 on:
   push:
