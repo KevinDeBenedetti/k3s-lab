@@ -1,0 +1,7 @@
+{
+  "title": "k3s-homelab",
+  "description": "Reusable GitHub automation scripts, stack makefile fragments, Docker templates, and a Rust CLI for developer workflows.",
+  "icon": "🛠️",
+  "order": 5,
+  "repo": "KevinDeBenedetti/k3s-homelab"
+}
