@@ -1,5 +1,5 @@
 {
-  "title": "k3s-lab",
+  "title": "K3s-lab",
   "description": "Production-ready k3s cluster on VPS — automated setup with Traefik, cert-manager, Prometheus, Grafana, Loki, and Promtail.",
   "icon": "☸️",
   "order": 5,
