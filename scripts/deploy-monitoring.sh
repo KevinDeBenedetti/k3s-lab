@@ -14,16 +14,20 @@ set -euo pipefail
 #   - Grafana IngressRoute + TLS certificate
 # =============================================================================
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INFRA_ROOT="$(dirname "${SCRIPT_DIR}")"
+K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
 
-# --- Shared helpers ---
-source "${SCRIPT_DIR}/../lib/log.sh"
-source "${SCRIPT_DIR}/../lib/load-env.sh"
+_run_src="${BASH_SOURCE[0]:-}"
+if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
+  source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"
+else
+  # shellcheck source=/dev/null
+  source <(curl -fsSL "${K3S_LAB_RAW}/lib/run-mode.sh")
+fi
 
-# --- Load .env — only sets variables not already in the environment ---
-# This lets Makefile targets override .env values at call time.
-load_env "${INFRA_ROOT}/.env"
+_lib log.sh
+_lib load-env.sh
+
+load_env "${_RUN_REPO:-.}/.env"
 
 # --- Context (overridable via env for Lima / alternate clusters) ---
 KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-infra}"
@@ -65,7 +69,7 @@ helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheu
   --version "${KUBE_PROMETHEUS_VERSION}" \
   --namespace monitoring \
   --create-namespace \
-  --values "${INFRA_ROOT}/kubernetes/monitoring/kube-prometheus-values.yaml" \
+  --values "$(_k8s_file monitoring/kube-prometheus-values.yaml)" \
   --set "grafana.grafana\.ini.server.root_url=https://${GRAFANA_DOMAIN}" \
   --wait \
   --timeout 600s
@@ -82,7 +86,7 @@ helm upgrade --install loki grafana/loki \
   --version "${LOKI_VERSION}" \
   --namespace monitoring \
   --create-namespace \
-  --values "${INFRA_ROOT}/kubernetes/monitoring/loki-values.yaml" \
+  --values "$(_k8s_file monitoring/loki-values.yaml)" \
   --wait \
   --timeout 600s
 
@@ -92,14 +96,14 @@ helm upgrade --install promtail grafana/promtail \
   --version "${PROMTAIL_VERSION}" \
   --namespace monitoring \
   --create-namespace \
-  --values "${INFRA_ROOT}/kubernetes/monitoring/promtail-values.yaml" \
+  --values "$(_k8s_file monitoring/promtail-values.yaml)" \
   --wait \
   --timeout 600s
 
 # --- 5. Grafana IngressRoute + TLS + Logs Dashboard ---
 log_step "[5/5] Grafana IngressRoute + TLS Certificate + Logs Dashboard..."
-GRAFANA_DOMAIN="${GRAFANA_DOMAIN}" envsubst < "${INFRA_ROOT}/kubernetes/monitoring/grafana-ingress.yaml" | kubectl apply -f -
-kubectl apply -f "${INFRA_ROOT}/kubernetes/monitoring/grafana-logs-dashboard.yaml"
+GRAFANA_DOMAIN="${GRAFANA_DOMAIN}" envsubst < "$(_k8s_file monitoring/grafana-ingress.yaml)" | kubectl apply -f -
+kubectl apply -f "$(_k8s monitoring/grafana-logs-dashboard.yaml)"
 
 echo ""
 log_ok "Observability stack deployed!"

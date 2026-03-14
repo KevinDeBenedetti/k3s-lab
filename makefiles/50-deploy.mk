@@ -1,13 +1,14 @@
 # Module: makefiles/50-deploy.mk
 # ──────────────────────────────────────────────────────────────────────────────
 # Stack Deployment
+# Uses run-local-script from 00-lib.mk (local bash or remote curl, transparent).
 # ──────────────────────────────────────────────────────────────────────────────
 
 .PHONY: deploy deploy-dashboard-secret deploy-monitoring deploy-grafana-secret deploy-logging
 
 deploy: ## Deploy base stack (Traefik, cert-manager, ClusterIssuers)
 	@echo "$(YELLOW)→ Deploying base stack on $(shell kubectl config current-context 2>/dev/null)...$(RESET)"
-	@bash $(K3S_LAB)/scripts/deploy-stack.sh
+	@$(call run-local-script,scripts/deploy-stack.sh)
 	@echo "$(GREEN)✅ Stack deployed$(RESET)"
 
 deploy-dashboard-secret: ## Create Traefik dashboard BasicAuth secret (requires DASHBOARD_PASSWORD)
@@ -23,7 +24,7 @@ deploy-monitoring: ## Deploy observability stack (Prometheus + Grafana + Loki + 
 	@[ -n "$(GRAFANA_DOMAIN)" ] || (echo "$(RED)❌ GRAFANA_DOMAIN not set — add to .env$(RESET)"; exit 1)
 	@[ -n "$(GRAFANA_PASSWORD)" ] || (echo "$(RED)❌ GRAFANA_PASSWORD not set — run make deploy-grafana-secret first$(RESET)"; exit 1)
 	@echo "$(YELLOW)→ Deploying observability stack...$(RESET)"
-	@bash $(K3S_LAB)/scripts/deploy-monitoring.sh
+	@$(call run-local-script,scripts/deploy-monitoring.sh)
 	@echo "$(YELLOW)→ Syncing Grafana admin password (grafana-cli reset)...$(RESET)"
 	@kubectl --context $(KUBECONFIG_CONTEXT) exec -n monitoring deployment/kube-prometheus-stack-grafana \
 		-- grafana-cli admin reset-admin-password "$(GRAFANA_PASSWORD)"
@@ -31,7 +32,7 @@ deploy-monitoring: ## Deploy observability stack (Prometheus + Grafana + Loki + 
 
 deploy-logging: ## Deploy centralized logs stack (Loki + Promtail + Grafana dashboard)
 	@echo "$(YELLOW)→ Deploying centralized logging stack...$(RESET)"
-	@bash $(K3S_LAB)/scripts/deploy-monitoring.sh
+	@$(call run-local-script,scripts/deploy-monitoring.sh)
 	@echo "$(GREEN)✅ Centralized logging deployed$(RESET)"
 
 deploy-grafana-secret: ## Create Grafana admin secret (requires GRAFANA_PASSWORD)

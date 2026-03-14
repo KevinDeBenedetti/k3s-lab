@@ -16,10 +16,18 @@ CONTEXT_NAME="${3:-${KUBECONFIG_CONTEXT:-k3s-infra}}"
 SSH_KEY="${SSH_KEY:-}"
 SSH_PORT="${SSH_PORT:-22}"
 
-# --- Shared helpers ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../lib/log.sh"
-source "${SCRIPT_DIR}/../lib/ssh-opts.sh"
+K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
+
+_run_src="${BASH_SOURCE[0]:-}"
+if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
+  source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"
+else
+  # shellcheck source=/dev/null
+  source <(curl -fsSL "${K3S_LAB_RAW}/lib/run-mode.sh")
+fi
+
+_lib log.sh
+_lib ssh-opts.sh
 
 TMP_KUBECONFIG="$(mktemp)"
 TARGET="${HOME}/.kube/config"

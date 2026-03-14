@@ -7,17 +7,24 @@ set -euo pipefail
 # Usage: ./scripts/deploy-stack.sh
 # =============================================================================
 
-# --- Resolve script directory so relative paths always work ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INFRA_ROOT="$(dirname "${SCRIPT_DIR}")"
+K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
 
-# --- Shared helpers ---
-source "${SCRIPT_DIR}/../lib/log.sh"
-source "${SCRIPT_DIR}/../lib/load-env.sh"
+# Source run-mode preamble: detects local vs curl-pipe, exposes _lib / _k8s / _k8s_file
+_run_src="${BASH_SOURCE[0]:-}"
+if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
+  source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"
+else
+  # shellcheck source=/dev/null
+  source <(curl -fsSL "${K3S_LAB_RAW}/lib/run-mode.sh")
+fi
 
-# --- Load .env if present — only sets variables not already in the environment.
-# This lets Makefile targets (e.g. vm-k3s-deploy) override .env values at call time.
-load_env "${INFRA_ROOT}/.env"
+_lib log.sh
+_lib load-env.sh
+
+# Load .env — only sets variables not already in the environment.
+# When invoked via Make, all vars are already exported; this is a fallback for
+# running the script directly from the k3s-lab repo root.
+load_env "${_RUN_REPO:-.}/.env"
 
 # --- Pinned versions (can be overridden via .env) ---
 TRAEFIK_CHART_VERSION="${TRAEFIK_CHART_VERSION:-34.4.0}"
@@ -32,7 +39,7 @@ log_info "Deploying base stack on cluster: $(kubectl config current-context)"
 
 # --- 1. Namespaces ---
 log_step "[1/4] Namespaces..."
-kubectl apply -f "${INFRA_ROOT}/kubernetes/namespaces/namespaces.yaml"
+kubectl apply -f "$(_k8s namespaces/namespaces.yaml)"
 
 # --- 2. Traefik (Ingress Controller) ---
 log_step "[2/4] Traefik ${TRAEFIK_CHART_VERSION}..."
@@ -48,7 +55,7 @@ helm upgrade --install traefik traefik/traefik \
   --version "${TRAEFIK_CHART_VERSION}" \
   --namespace ingress \
   --create-namespace \
-  --values "${INFRA_ROOT}/kubernetes/ingress/traefik-values.yaml" \
+  --values "$(_k8s_file ingress/traefik-values.yaml)" \
   ${EXTERNAL_IP_FLAG} \
   ${TRAEFIK_EXTRA_ARGS:-} \
   --wait \
@@ -78,7 +85,7 @@ sleep 10
 
 # --- 4. ClusterIssuers ---
 log_step "[4/4] ClusterIssuers..."
-envsubst < "${INFRA_ROOT}/kubernetes/cert-manager/clusterissuer.yaml" | kubectl apply -f -
+envsubst < "$(_k8s_file cert-manager/clusterissuer.yaml)" | kubectl apply -f -
 
 # --- 5. Traefik dashboard (optional) ---
 # Skip on local Lima testing — the domain/cert requires real internet reachability.
@@ -87,7 +94,7 @@ if [[ "${SKIP_DASHBOARD:-false}" == "true" ]]; then
   log_info "Traefik dashboard IngressRoute... (skipped — SKIP_DASHBOARD=true)"
 else
   log_info "Traefik dashboard IngressRoute..."
-  envsubst < "${INFRA_ROOT}/kubernetes/ingress/traefik-dashboard.yaml" | kubectl apply -f -
+  envsubst < "$(_k8s_file ingress/traefik-dashboard.yaml)" | kubectl apply -f -
 fi
 
 echo ""
