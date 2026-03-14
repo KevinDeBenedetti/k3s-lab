@@ -1,0 +1,115 @@
+#!/bin/bash
+set -euo pipefail
+
+# =============================================================================
+# deploy-monitoring.sh — Deploy the observability stack (Phase 1)
+# Run FROM YOUR LOCAL MACHINE with kubectl + helm already configured.
+# Prerequisites: base stack deployed (make deploy)
+#
+# What this deploys:
+#   - kube-prometheus-stack (Prometheus + Grafana + Alertmanager + exporters)
+#   - Loki (centralized logs storage)
+#   - Promtail (Kubernetes logs collector)
+#   - Grafana logs dashboard (error-focused)
+#   - Grafana IngressRoute + TLS certificate
+# =============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INFRA_ROOT="$(dirname "${SCRIPT_DIR}")"
+
+# --- Shared helpers ---
+source "${SCRIPT_DIR}/../lib/log.sh"
+source "${SCRIPT_DIR}/../lib/load-env.sh"
+
+# --- Load .env — only sets variables not already in the environment ---
+# This lets Makefile targets override .env values at call time.
+load_env "${INFRA_ROOT}/.env"
+
+# --- Context (overridable via env for Lima / alternate clusters) ---
+KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-infra}"
+
+# --- Pinned versions (overridable via .env) ---
+KUBE_PROMETHEUS_VERSION="${KUBE_PROMETHEUS_VERSION:-82.10.3}"
+LOKI_VERSION="${LOKI_VERSION:-6.35.1}"
+PROMTAIL_VERSION="${PROMTAIL_VERSION:-6.17.1}"
+
+# --- Validate ---
+[ -n "${GRAFANA_DOMAIN:-}" ] || { log_error "GRAFANA_DOMAIN not set — add it to .env (e.g. GRAFANA_DOMAIN=grafana.kevindb.dev)"; exit 1; }
+
+log_info "Deploying observability stack on cluster: $(kubectl config current-context)"
+
+# --- Pre-flight: cluster must be reachable ---
+if ! kubectl --context "${KUBECONFIG_CONTEXT}" cluster-info --request-timeout=5s >/dev/null 2>&1; then
+  log_error "Cannot reach cluster '${KUBECONFIG_CONTEXT}' API server (timeout)."
+  echo "   k3s may have crashed. On your VPS run: sudo systemctl restart k3s"
+  exit 1
+fi
+
+# --- Pre-flight: grafana-admin-secret must exist ---
+if ! kubectl --context "${KUBECONFIG_CONTEXT}" get secret grafana-admin-secret -n monitoring &>/dev/null 2>&1; then
+  log_warn "grafana-admin-secret not found in monitoring namespace."
+  echo "   Run first:  make deploy-grafana-secret GRAFANA_PASSWORD=<your-password>"
+  exit 1
+fi
+
+# --- 1. Helm repo ---
+log_step "[1/5] Helm repos..."
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
+helm repo add grafana https://grafana.github.io/helm-charts --force-update
+helm repo update prometheus-community
+helm repo update grafana
+
+# --- 2. kube-prometheus-stack ---
+log_step "[2/5] kube-prometheus-stack ${KUBE_PROMETHEUS_VERSION}..."
+helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --version "${KUBE_PROMETHEUS_VERSION}" \
+  --namespace monitoring \
+  --create-namespace \
+  --values "${INFRA_ROOT}/kubernetes/monitoring/kube-prometheus-values.yaml" \
+  --set "grafana.grafana\.ini.server.root_url=https://${GRAFANA_DOMAIN}" \
+  --wait \
+  --timeout 600s
+
+log_info "Waiting for Grafana to be ready..."
+kubectl rollout status deployment/kube-prometheus-stack-grafana -n monitoring --timeout=120s
+
+log_info "Waiting for Prometheus to be ready..."
+kubectl rollout status statefulset/prometheus-kube-prometheus-stack-prometheus -n monitoring --timeout=120s
+
+# --- 3. Loki ---
+log_step "[3/5] Loki ${LOKI_VERSION}..."
+helm upgrade --install loki grafana/loki \
+  --version "${LOKI_VERSION}" \
+  --namespace monitoring \
+  --create-namespace \
+  --values "${INFRA_ROOT}/kubernetes/monitoring/loki-values.yaml" \
+  --wait \
+  --timeout 600s
+
+# --- 4. Promtail ---
+log_step "[4/5] Promtail ${PROMTAIL_VERSION}..."
+helm upgrade --install promtail grafana/promtail \
+  --version "${PROMTAIL_VERSION}" \
+  --namespace monitoring \
+  --create-namespace \
+  --values "${INFRA_ROOT}/kubernetes/monitoring/promtail-values.yaml" \
+  --wait \
+  --timeout 600s
+
+# --- 5. Grafana IngressRoute + TLS + Logs Dashboard ---
+log_step "[5/5] Grafana IngressRoute + TLS Certificate + Logs Dashboard..."
+GRAFANA_DOMAIN="${GRAFANA_DOMAIN}" envsubst < "${INFRA_ROOT}/kubernetes/monitoring/grafana-ingress.yaml" | kubectl apply -f -
+kubectl apply -f "${INFRA_ROOT}/kubernetes/monitoring/grafana-logs-dashboard.yaml"
+
+echo ""
+log_ok "Observability stack deployed!"
+echo ""
+echo "   Grafana:       https://${GRAFANA_DOMAIN}  (cert issues in ~30s)"
+echo "   Prometheus:    kubectl port-forward svc/prometheus-operated -n monitoring 9090:9090"
+echo "   Loki (svc):    http://loki.monitoring.svc.cluster.local:3100"
+echo "   Explore logs:  Grafana -> Explore -> Loki"
+echo ""
+echo "   Certificate status:"
+kubectl get certificate -n monitoring
+echo ""
+kubectl get pods -n monitoring

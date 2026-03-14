@@ -1,0 +1,65 @@
+# =============================================================================
+# CI — k3s-homelab lint, tests & security
+#
+# Runs on every push and PR to main.
+# Does NOT require a real cluster — all checks are static/offline.
+#
+# Jobs (reusable workflows from KevinDeBenedetti/github-workflows):
+#   shell-ci    — shellcheck + yamllint + bats (via ci-shell.yml)
+#   kubernetes  — kubeconform + .env.example check (via ci-kubernetes.yml)
+#   security    — Gitleaks secret scanning (via security.yml)
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  # ─── Shell linting + BATS tests ───────────────────────────────────────────
+  # shellcheck  → all .sh files at warning severity
+  # actionlint  → .github/workflows/
+  # bats        → tests/bats/ (env, scripts, kubernetes — offline)
+  shell-ci:
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@main
+    with:
+      run-shellcheck: true
+      shellcheck-severity: warning
+      run-actionlint: true
+      actionlint-paths: .github/workflows/
+      run-bats: true
+      bats-tests-dir: tests/bats/
+      bats-submodules: false
+      run-docker: false
+
+  # ─── Kubernetes validation + .env.example check ──────────────────────────
+  kubernetes:
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-kubernetes.yml@main
+    with:
+      run-kubeconform: true
+      kubeconform-paths: kubernetes/
+      kubeconform-exclude: '*-values.yaml'
+      kubeconform-include-crds-catalog: true
+      run-env-example: true
+      env-example-required-keys: >-
+        MASTER_IP WORKER_IP DOMAIN EMAIL
+        DASHBOARD_DOMAIN DASHBOARD_PASSWORD
+        GRAFANA_DOMAIN GRAFANA_PASSWORD
+        KUBECONFIG_CONTEXT K3S_VERSION K3S_NODE_TOKEN
+
+  # ─── Secret scanning ──────────────────────────────────────────────────────
+  security:
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/security.yml@main
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+      pull-requests: read
+    with:
+      run-node-audit: false
+      run-python-audit: false
+      run-secret-scan: true
+      run-codeql: false

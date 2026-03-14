@@ -1,0 +1,126 @@
+# =============================================================================
+# Example Application — Deployment
+# Replace example-app / nginx:alpine with your actual app.
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-app
+  namespace: apps
+  labels:
+    app: example-app
+    version: "1.0.0"
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: example-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: example-app
+        version: "1.0.0"
+    spec:
+      # Spread replicas across the two nodes whenever possible
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: example-app
+
+      # Do not mount service-account token unless required
+      automountServiceAccountToken: false
+
+      # Graceful shutdown
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: example-app
+          image: nginx:alpine
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+          # --- Probes ---
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: 10
+            periodSeconds: 5
+
+          # --- Resources ---
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+
+          # --- Security ---
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 101          # nginx default non-root UID
+            capabilities:
+              drop:
+                - ALL
+
+          # nginx needs a writable /tmp and cache dir
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: run
+              mountPath: /var/run
+
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+
+# --- PodDisruptionBudget: keep at least 1 replica during node drain
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: example-app-pdb
+  namespace: apps
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: example-app

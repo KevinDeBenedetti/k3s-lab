@@ -1,0 +1,52 @@
+# =============================================================================
+# Example Application — Service & Ingress
+# Replace example-app / app.example.com with your actual app / domain.
+# =============================================================================
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-app
+  namespace: apps
+  labels:
+    app: example-app
+spec:
+  selector:
+    app: example-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: example-app
+  namespace: apps
+  annotations:
+    # Traefik entrypoint + TLS via cert-manager
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    # Use the production issuer; switch to letsencrypt-staging for first tests
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: example-app
+                port:
+                  name: http
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: example-app-tls

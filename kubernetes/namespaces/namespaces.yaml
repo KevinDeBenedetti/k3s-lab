@@ -1,0 +1,36 @@
+# =============================================================================
+# Namespaces
+# =============================================================================
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apps
+  labels:
+    kubernetes.io/metadata.name: apps
+    environment: production
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress
+  labels:
+    kubernetes.io/metadata.name: ingress
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    kubernetes.io/metadata.name: cert-manager
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    kubernetes.io/metadata.name: monitoring

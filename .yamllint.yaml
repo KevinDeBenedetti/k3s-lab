@@ -1,0 +1,33 @@
+# =============================================================================
+# yamllint — Kubernetes-specific overrides
+#
+# The reusable yamllint action (github-workflows) ships a sensible default
+# config. This file overrides only what Kubernetes multi-document YAML needs.
+# =============================================================================
+
+extends: default
+
+rules:
+  # Kubernetes manifests use long lines (image tags, annotations, base64 data)
+  line-length:
+    max: 150
+    level: warning
+
+  # Multi-document files don't need --- at the start
+  document-start:
+    present: false
+
+  # Allow inline comments
+  comments:
+    min-spaces-from-content: 1
+
+  # Kubernetes uses boolean strings widely
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: false
+
+  # Standard 2-space Kubernetes convention
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false

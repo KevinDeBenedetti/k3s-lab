@@ -1,0 +1,125 @@
+# =============================================================================
+# kube-prometheus-stack Helm Values — Single Node VPS
+# Chart: prometheus-community/kube-prometheus-stack
+# Tuned for a 2GB RAM + 2GB swap single-node k3s VPS.
+#
+# What this deploys:
+#   - Prometheus (metrics collection + storage)
+#   - Grafana (dashboards UI)
+#   - node-exporter (host metrics: CPU, RAM, disk, network)
+#   - kube-state-metrics (k8s object state metrics: pods, deployments, etc.)
+#   - Prometheus Operator (manages Prometheus via CRDs)
+#
+# Alertmanager: disabled — re-enable once the cluster has headroom.
+# =============================================================================
+
+# ─── Grafana ────────────────────────────────────────────────────────────────
+grafana:
+  # Admin credentials from a pre-created Secret
+  # Run: make deploy-grafana-secret GRAFANA_PASSWORD=<your-password>
+  admin:
+    existingSecret: grafana-admin-secret
+    userKey: username
+    passwordKey: password
+
+  # Persistent storage for dashboards, plugins, data sources
+  persistence:
+    enabled: true
+    size: 2Gi
+
+  # Skip the initChownData init-container (permission fix) — saves startup time
+  initChownData:
+    enabled: false
+
+  # Grafana has its own login — no BasicAuth needed at the Ingress level
+  ingress:
+    enabled: false
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 200Mi
+
+  # Dashboard sidecar: auto-discovers ConfigMaps labelled grafana_dashboard=1
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+    datasources:
+      enabled: true
+
+  # Default data source (Prometheus) is added automatically by the chart
+  additionalDataSources:
+    - name: Loki
+      uid: loki
+      type: loki
+      access: proxy
+      url: http://loki.monitoring.svc.cluster.local:3100
+      isDefault: false
+
+  # root_url is injected at deploy time via --set in deploy-monitoring.sh
+
+# ─── Prometheus ─────────────────────────────────────────────────────────────
+prometheus:
+  prometheusSpec:
+    # 7 days / 5GB — conservative for a 2GB VPS
+    retention: 7d
+    retentionSize: "5GB"
+
+    # WAL compression saves ~30% RAM vs uncompressed default
+    walCompression: true
+
+    # Scrape every 60s — halves per-scrape memory overhead vs 30s default
+    scrapeInterval: "60s"
+
+    # Discover ALL ServiceMonitors and PodMonitors across ALL namespaces
+    # (needed so Traefik, cert-manager, etc. can be scraped)
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+    ruleSelectorNilUsesHelmValues: false
+
+    # Persistent storage for metrics (uses k3s default 'local-path' StorageClass)
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 8Gi
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 400Mi
+
+# ─── Alertmanager ───────────────────────────────────────────────────────────
+# Disabled to save ~100MB RAM on this 2GB VPS. Re-enable when cluster has
+# more headroom (upgrade VPS or after Alertmanager configs are defined).
+alertmanager:
+  enabled: false
+
+# ─── Node Exporter (host metrics — runs as DaemonSet) ───────────────────────
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# ─── Kube State Metrics (k8s object state) ──────────────────────────────────
+# Disabled to save ~64MB RAM on this 2GB VPS. Re-enable on a larger node.
+kube-state-metrics:
+  enabled: false

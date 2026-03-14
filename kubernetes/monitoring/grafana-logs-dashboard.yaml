@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-logs-errors-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  logs-errors-overview.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+          "id": 1,
+          "options": {
+            "legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true},
+            "tooltip": {"mode": "single", "sort": "none"}
+          },
+          "targets": [
+            {
+              "expr": "sum by (namespace) (count_over_time({namespace=~\".+\"} |~ \"(?i)error|exception|traceback|fatal|panic\" [5m]))",
+              "legendFormat": "{{namespace}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Error Log Rate by Namespace (5m)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"h": 14, "w": 24, "x": 0, "y": 8},
+          "id": 2,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "expr": "{namespace=~\".+\"} |~ \"(?i)error|exception|traceback|fatal|panic\"",
+              "refId": "A"
+            }
+          ],
+          "title": "Live Error Logs",
+          "type": "logs"
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 39,
+      "style": "dark",
+      "tags": ["logs", "errors", "loki"],
+      "templating": {
+        "list": [
+          {
+            "current": {"selected": false, "text": "All", "value": ".+"},
+            "datasource": {"type": "loki", "uid": "loki"},
+            "definition": "label_values(namespace)",
+            "hide": 0,
+            "includeAll": true,
+            "label": "Namespace",
+            "multi": false,
+            "name": "namespace",
+            "options": [],
+            "query": "label_values(namespace)",
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": {"from": "now-6h", "to": "now"},
+      "timezone": "",
+      "title": "Cluster Error Logs",
+      "uid": "cluster-error-logs",
+      "version": 1,
+      "weekStart": ""
+    }

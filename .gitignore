@@ -1,0 +1,21 @@
+# Environment — never commit real credentials
+.env
+.env.local
+
+# Kubeconfig files fetched from the cluster
+kubeconfig
+kubeconfig-*
+*.yaml.bak
+
+# TLS / private keys
+*.key
+*.pem
+*.crt
+*.p12
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
