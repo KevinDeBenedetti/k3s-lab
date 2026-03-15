@@ -64,8 +64,9 @@ bash <(curl -fsSL $(K3S_LAB_RAW)/$(1)) $(2)
 endef
 
 # Run a script inside a Lima VM by curling from GitHub.
+# Uses a pipe instead of process substitution — Lima VMs lack /dev/fd support.
 define lima-run-script
-bash <(curl -fsSL '$(K3S_LAB_RAW)/$(1)')
+bash -c 'curl -fsSL "$(K3S_LAB_RAW)/$(1)" | bash'
 endef
 
 endif
