@@ -1,0 +1,14 @@
+title = "k3s-lab gitleaks config"
+
+# ---------------------------------------------------------------------------
+# Rule-specific allowlists
+# ---------------------------------------------------------------------------
+# Extend the built-in curl-auth-user rule to ignore lines where the
+# "password" field is a Makefile loop variable ($$TRY), not a real secret.
+[[rules]]
+id = "curl-auth-user"
+
+    [[rules.allowlists]]
+    description = "Makefile loop variable — not a real credential"
+    regexTarget = "line"
+    regexes = ['''\$\$TRY''']
