@@ -168,7 +168,7 @@ KUBECONFIG_CONTEXT=k3s-infra
 
 > ⚠️ `.env` is in `.gitignore`. It is **never committed**. Add `.env.example` with placeholder values instead.
 
-See the [Configuration reference](../configuration.md) for every variable.
+See the [Configuration reference](./configuration.md) for every variable.
 
 ---
 
@@ -198,7 +198,7 @@ make deploy-grafana-secret
 make deploy-monitoring     # Prometheus + Grafana + Loki + Promtail
 ```
 
-See [Getting Started](../getting-started.md) for the full step-by-step walkthrough.
+See [Getting Started](./getting-started.md) for the full step-by-step walkthrough.
 
 ---
 
@@ -366,7 +366,7 @@ make vm-k3s-clean         # tear down when done
 
 The Lima targets read the same `.env` but override environment-specific values (`MASTER_IP=127.0.0.1`, self-signed TLS, NodePort instead of externalIPs).
 
-See the [Local Testing guide](../operations/local-testing.md) for the complete walkthrough.
+See the [Local Testing guide](./operations/local-testing.md) for the complete walkthrough.
 
 ---
 

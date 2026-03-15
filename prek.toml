@@ -46,6 +46,14 @@ hooks = [
   { id = "actionlint" },
 ]
 
+# ─── Docs link safety ────────────────────────────────────────────────────────
+[[repos]]
+repo = "https://github.com/KevinDeBenedetti/github-workflows"
+rev = "bfa0ca537a45e0d359ed3050005fe06a5ea11cbc"
+hooks = [
+  { id = "check-docs-links" },
+]
+
 # ─── Local hooks ────────────────────────────────────────────────────────────
 [[repos]]
 repo = "local"

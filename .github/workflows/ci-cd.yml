@@ -28,6 +28,7 @@ jobs:
   # shellcheck  → all .sh files at warning severity
   # actionlint  → .github/workflows/
   # bats        → tests/bats/ (env, scripts, kubernetes — offline)
+  # docs-link-check → relative links in docs/ don't escape docs/
   shell-ci:
     uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@main
     with:
@@ -39,6 +40,7 @@ jobs:
       bats-tests-dir: tests/bats/
       bats-submodules: false
       run-docker: false
+      run-docs-link-check: true
 
   # ─── Kubernetes validation + .env.example check ──────────────────────────
   kubernetes:
