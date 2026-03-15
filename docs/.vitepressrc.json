@@ -1,7 +1,0 @@
-{
-  "title": "k3s-lab",
-  "description": "Production-ready k3s cluster on VPS — automated setup with Traefik, cert-manager, Prometheus, Grafana, Loki, and Promtail.",
-  "icon": "☸️",
-  "order": 5,
-  "repo": "KevinDeBenedetti/k3s-lab"
-}
