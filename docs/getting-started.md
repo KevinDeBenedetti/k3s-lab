@@ -2,6 +2,17 @@
 
 This guide walks you through provisioning a production-ready k3s cluster from two fresh VPS nodes.
 
+## Two ways to use k3s-lab
+
+| Mode | When to use |
+|------|-------------|
+| **Direct** (this guide) | Evaluate the toolkit, test locally, or you don't need a private config repo |
+| **Infra repo** | Production use — private repo holds your `.env`, secrets, and custom apps; k3s-lab is fetched on-demand |
+
+> For the infra repo pattern, see **[Using with a private infra repo](./using-with-infra.md)** once you've read this guide.
+
+---
+
 ## Prerequisites
 
 ### Local machine

@@ -42,7 +42,6 @@ kubectl get nodes
 | `make deploy-dashboard-secret` | `DASHBOARD_PASSWORD`                                       | Create the `traefik-dashboard-auth` BasicAuth secret in the `ingress` namespace.                             |
 | `make deploy-monitoring`       | `GRAFANA_DOMAIN`, `GRAFANA_PASSWORD`, `KUBECONFIG_CONTEXT` | Deploy observability stack: kube-prometheus-stack, Loki, Promtail, Grafana IngressRoute.                     |
 | `make deploy-grafana-secret`   | `GRAFANA_PASSWORD`, `KUBECONFIG_CONTEXT`                   | Create the `grafana-admin-secret` in the `monitoring` namespace (prerequisite for `make deploy-monitoring`). |
-| `make deploy-logging`          | —                                                          | Re-run monitoring script (Loki + Promtail).                                                                  |
 
 ---
 
@@ -68,15 +67,36 @@ kubectl get nodes
 
 ## Testing
 
-| Target      | Description                                        |
-| ----------- | -------------------------------------------------- |
-| `make test` | Run BATS unit tests (offline, no cluster required) |
+| Target             | Description                                               |
+| ------------------ | --------------------------------------------------------- |
+| `make test`        | Run BATS unit tests (offline, no cluster required)        |
+| `make test-watch`  | Re-run tests on every file change (requires `entr`)       |
+
+---
+
+## Dev tools
+
+| Target                | Description                                                           |
+| --------------------- | --------------------------------------------------------------------- |
+| `make lint`           | Run `prek` linter on staged git changes                               |
+| `make lint-install`   | Install `prek` via Homebrew (`brew install j178/tap/prek`)            |
+| `make hooks-update`   | Install / update git pre-commit hooks managed by `prek`               |
+
+---
+
+## Provision (one-shot)
+
+| Target           | Description                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------- |
+| `make provision` | Full cluster lifecycle: VPS setup → k3s master → k3s worker → kubeconfig → deploy → monitoring   |
+
+This is equivalent to running all individual targets in order and is the recommended entry point for a fresh cluster.
 
 ---
 
 ## Lima VM (local testing)
 
-Requires the [`infra`](https://github.com/KevinDeBenedetti/infra) parent repo, which embeds this repo as a submodule and adds Lima targets in `makefiles/99-lima.mk`.
+Lima targets are bundled directly in k3s-lab (`makefiles/99-lima.mk`) — no parent repo or submodule required.
 
 | Target                          | Description                                                |
 | ------------------------------- | ---------------------------------------------------------- |
@@ -128,18 +148,22 @@ make status
 
 ---
 
-## Submodule usage
+## Using from a private infra repo
 
-When this repo is embedded as a git submodule in a parent infra repo:
+k3s-lab can be consumed from a **private repo** containing only your personal configuration (`.env`, app manifests). No clone or submodule needed — makefiles are fetched on-demand via curl.
+
+Set these variables in your consumer Makefile:
 
 ```makefile
-K3S_LAB := $(ROOT_DIR)/k3s-lab
-
-include $(K3S_LAB)/makefiles/30-k3s.mk
-include $(K3S_LAB)/makefiles/40-kubeconfig.mk
-include $(K3S_LAB)/makefiles/50-deploy.mk
-include $(K3S_LAB)/makefiles/60-status.mk
-include $(K3S_LAB)/makefiles/70-ssh.mk
+K3S_LAB     :=       # empty → remote mode (curl from GitHub)
+K3S_LAB_RAW := https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main
 ```
 
-All targets resolve paths relative to `K3S_LAB` so they work correctly from any parent directory.
+All targets resolve scripts via `K3S_LAB_RAW` automatically.
+
+| Target           | Description                                                           |
+| ---------------- | --------------------------------------------------------------------- |
+| `make mk-update` | Force re-fetch all shared makefiles from k3s-lab into `.mk-cache/`   |
+| `make mk-clean`  | Remove `.mk-cache/` (files are re-fetched on the next `make` run)    |
+
+See the [Using with infra guide](../using-with-infra.md) for the complete step-by-step walkthrough.
