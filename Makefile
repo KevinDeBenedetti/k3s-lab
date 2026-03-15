@@ -35,17 +35,6 @@ include makefiles/40-kubeconfig.mk
 include makefiles/50-deploy.mk
 include makefiles/60-status.mk
 include makefiles/70-ssh.mk
-
-# ── Testing ──────────────────────────────────────────────────────────────────
-
-.PHONY: test
-
-test: ## Run BATS unit tests (offline — no cluster needed)
-	@bats tests/bats/
-
-# ── Hooks ────────────────────────────────────────────────────────────────────
-
-.PHONY: hooks-update
-
-hooks-update: ## Update prek hook revisions to latest (prek autoupdate)
-	@prek autoupdate
+include makefiles/80-dev.mk
+include makefiles/90-provision.mk
+include makefiles/99-lima.mk

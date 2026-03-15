@@ -1,0 +1,122 @@
+# =============================================================================
+# Lima Monitoring Smoke Test — Exercises the monitoring TLS pipeline locally
+#
+# Tests:  SelfSigned ClusterIssuer → Certificate → TLS Secret → Traefik TLS
+#         Minimal Grafana responds HTTP 200 at https://grafana.local:8443/api/health
+# Usage:  make vm-k3s-smoke-monitoring   (applies, verifies, then cleans up)
+# Manual: kubectl --context k3s-lima apply  -f tests/lima/smoke-monitoring.yaml
+#         kubectl --context k3s-lima delete -f tests/lima/smoke-monitoring.yaml
+#
+# Why a minimal Grafana instead of the full kube-prometheus-stack?
+#   The full chart is too heavy (~1GB images, CRDs) for a local Lima VM.
+#   This test exercises the identical IngressRoute + cert-manager TLS pattern
+#   used in production (grafana-ingress.yaml) without the Prometheus overhead.
+# =============================================================================
+
+# --- SelfSigned ClusterIssuer (Lima-only, shared with smoke-test.yaml) ---
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+
+# --- Namespace ---
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+
+# --- Certificate (mirrors grafana-ingress.yaml pattern) ---
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-smoke-tls
+  namespace: monitoring
+spec:
+  secretName: grafana-smoke-tls
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  dnsNames:
+    - grafana.local
+
+# --- Deployment: minimal Grafana (anonymous access, health endpoint only) ---
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-smoke
+  namespace: monitoring
+  labels:
+    app: grafana-smoke
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana-smoke
+  template:
+    metadata:
+      labels:
+        app: grafana-smoke
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: Viewer
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+# --- Service ---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-smoke
+  namespace: monitoring
+  labels:
+    app: grafana-smoke
+spec:
+  selector:
+    app: grafana-smoke
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+  type: ClusterIP
+
+# --- IngressRoute (mirrors production grafana-ingress.yaml pattern) ---
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grafana-smoke
+  namespace: monitoring
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grafana.local`)
+      kind: Rule
+      services:
+        - name: grafana-smoke
+          namespace: monitoring
+          port: 3000
+  tls:
+    secretName: grafana-smoke-tls

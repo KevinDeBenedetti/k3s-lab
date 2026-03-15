@@ -1,0 +1,72 @@
+# Lima VM — Debian 13 (trixie) VPS simulation
+# Tests VPS setup scripts locally: dotfiles kubernetes profile (kernel modules,
+# sysctl, kubectl, helm) before running k3s. Mirrors the real VPS environment.
+#
+# Usage (via Makefile):
+#   make vm-vps-create    → create VM (Debian 13, 2 CPU, 2 GB)
+#   make vm-vps-install   → run dotfiles kubernetes profile inside VM
+#   make vm-vps-test      → verify kernel modules, sysctl, kubectl
+#   make vm-vps-shell     → open interactive shell
+#   make vm-vps-clean     → delete VM
+#   make vm-vps-full      → create → install → test in one shot
+#
+# Hint: if stuck on first boot, run: softwareupdate --install-rosetta
+
+images:
+  - location: "https://cloud.debian.org/images/cloud/trixie/daily/latest/debian-13-generic-arm64-daily.qcow2"
+    arch: "aarch64"
+  - location: "https://cloud.debian.org/images/cloud/trixie/daily/latest/debian-13-generic-amd64-daily.qcow2"
+    arch: "x86_64"
+
+cpus: 2
+memory: "2GiB"
+disk: "20GiB"
+
+# Apple Virtualization framework — best performance on Apple Silicon
+vmType: "vz"
+vmOpts:
+  vz:
+    rosetta:
+      # Run Intel binaries via Rosetta on Apple Silicon
+      enabled: true
+      binfmt: true
+
+mounts:
+  # Mount local home read-only — gives access to dotfiles + infra repos at
+  # the same paths as on the host (/Users/<you>/dev/dotfiles, /Users/<you>/dev/infra)
+  - location: "~"
+    writable: false
+  - location: "/tmp/lima"
+    writable: true
+
+# Suppress systemd-resolved mDNS/LLMNR ports — macOS already owns 127.0.0.1:5353/5355.
+# Rules require guestIP:"0.0.0.0" + proto:any because systemd-resolved binds on all
+# interfaces (0.0.0.0); Lima's default guestIP (127.0.0.1) does not match those bindings.
+portForwards:
+  - guestIP: "0.0.0.0"
+    guestPort: 5353
+    proto: any
+    ignore: true
+  - guestIP: "0.0.0.0"
+    guestPort: 5355
+    proto: any
+    ignore: true
+
+# No container runtime — pure Debian VM for infra script testing
+containerd:
+  system: false
+  user: false
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -qq
+      # Install bare essentials needed before dotfiles kubernetes profile runs
+      # gnupg: required by setup-kubernetes.sh for 'gpg --dearmor' (Kubernetes apt keyring)
+      # jq: required by setup-kubernetes.sh to parse GitHub API for k9s latest release
+      # Debian 13 (trixie) does not include gnupg or jq by default
+      apt-get install -y -qq sudo curl ca-certificates git gnupg jq
+      echo "✅ Base packages ready"

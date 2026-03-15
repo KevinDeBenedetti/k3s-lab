@@ -1,0 +1,37 @@
+# =============================================================================
+# Lima — Grafana TLS Certificate (selfsigned)
+#
+# Applied by: make vm-k3s-deploy-monitoring
+# Produces:   grafana-tls Secret in monitoring namespace
+#             consumed by: kubernetes/monitoring/grafana-ingress.yaml
+#
+# Why selfsigned? Lima has no public ingress — ACME HTTP-01 challenge cannot
+# complete. This certificate exercises the identical code path as production
+# (cert-manager → Secret → Traefik TLS); only the issuer type differs.
+#
+# Access: https://grafana.local:8443  (accept browser warning for self-signed)
+# =============================================================================
+
+# --- SelfSigned ClusterIssuer ---
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+
+# --- Certificate → grafana-tls Secret in monitoring namespace ---
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-tls
+  namespace: monitoring
+spec:
+  secretName: grafana-tls
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  dnsNames:
+    - grafana.local

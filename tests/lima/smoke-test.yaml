@@ -1,0 +1,110 @@
+# =============================================================================
+# Lima Smoke Test — Exercises the full TLS pipeline locally
+#
+# Tests:  SelfSigned ClusterIssuer → Certificate → TLS Secret → Traefik TLS
+# Usage:  make vm-k3s-smoke     (applies, verifies, then cleans up)
+# Manual: kubectl --context k3s-lima apply  -f tests/lima/smoke-test.yaml
+#         kubectl --context k3s-lima delete -f tests/lima/smoke-test.yaml
+#
+# Why SelfSigned instead of Let's Encrypt?
+#   The Lima VM has no public internet ingress so ACME HTTP-01 challenges
+#   cannot complete. SelfSigned exercises the identical code path in Traefik
+#   and cert-manager; only the issuer type differs from production.
+# =============================================================================
+
+# --- SelfSigned ClusterIssuer (Lima-only) ---
+# Production has letsencrypt-staging / letsencrypt-production.
+# This issuer is the local equivalent — cert-manager issues the cert the same way.
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+
+# --- Certificate (mirrors production pattern: cert-manager → Secret → Traefik) ---
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: whoami-tls
+  namespace: apps
+spec:
+  secretName: whoami-tls
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  dnsNames:
+    - whoami.local
+
+# --- Deployment: traefik/whoami — minimal test app (same image used in Traefik docs) ---
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+  namespace: apps
+  labels:
+    app: whoami
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whoami
+  template:
+    metadata:
+      labels:
+        app: whoami
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: whoami
+          image: traefik/whoami:latest
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+
+# --- Service ---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami
+  namespace: apps
+  labels:
+    app: whoami
+spec:
+  selector:
+    app: whoami
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  type: ClusterIP
+
+# --- IngressRoute (Traefik CRD) — same pattern as production dashboard ---
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: whoami
+  namespace: apps
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`whoami.local`)
+      kind: Rule
+      services:
+        - name: whoami
+          port: 80
+  tls:
+    secretName: whoami-tls

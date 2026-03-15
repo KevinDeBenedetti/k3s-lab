@@ -34,6 +34,10 @@ setup() {
     [ -f "$REPO_ROOT/scripts/get-kubeconfig.sh" ]
 }
 
+@test "scripts/setup-vps.sh exists" {
+    [ -f "$REPO_ROOT/scripts/setup-vps.sh" ]
+}
+
 @test "lib/load-env.sh exists" {
     [ -f "$REPO_ROOT/lib/load-env.sh" ]
 }
@@ -44,6 +48,10 @@ setup() {
 
 @test "lib/ssh-opts.sh exists" {
     [ -f "$REPO_ROOT/lib/ssh-opts.sh" ]
+}
+
+@test "lib/run-mode.sh exists" {
+    [ -f "$REPO_ROOT/lib/run-mode.sh" ]
 }
 
 # ── All .sh files have shebangs ───────────────────────────────────────────────
@@ -94,6 +102,10 @@ setup() {
 
 @test "get-kubeconfig.sh sets -euo pipefail" {
     grep -q "set -euo pipefail" "$REPO_ROOT/scripts/get-kubeconfig.sh"
+}
+
+@test "setup-vps.sh sets -euo pipefail" {
+    grep -q "set -euo pipefail" "$REPO_ROOT/scripts/setup-vps.sh"
 }
 
 # ── lib helpers are sourceable ────────────────────────────────────────────────

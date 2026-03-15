@@ -4,7 +4,7 @@
 # Uses run-local-script from 00-lib.mk (local bash or remote curl, transparent).
 # ──────────────────────────────────────────────────────────────────────────────
 
-.PHONY: deploy deploy-dashboard-secret deploy-monitoring deploy-grafana-secret deploy-logging
+.PHONY: deploy deploy-dashboard-secret deploy-monitoring deploy-grafana-secret
 
 deploy: ## Deploy base stack (Traefik, cert-manager, ClusterIssuers)
 	@echo "$(YELLOW)→ Deploying base stack on $(shell kubectl config current-context 2>/dev/null)...$(RESET)"
@@ -30,20 +30,16 @@ deploy-monitoring: ## Deploy observability stack (Prometheus + Grafana + Loki + 
 		-- grafana-cli admin reset-admin-password "$(GRAFANA_PASSWORD)"
 	@echo "$(GREEN)✅ Observability stack deployed$(RESET)"
 
-deploy-logging: ## Deploy centralized logs stack (Loki + Promtail + Grafana dashboard)
-	@echo "$(YELLOW)→ Deploying centralized logging stack...$(RESET)"
-	@$(call run-local-script,scripts/deploy-monitoring.sh)
-	@echo "$(GREEN)✅ Centralized logging deployed$(RESET)"
-
 deploy-grafana-secret: ## Create Grafana admin secret (requires GRAFANA_PASSWORD)
 	@[ -n "$(GRAFANA_PASSWORD)" ] || (echo "$(RED)❌ GRAFANA_PASSWORD is not set$(RESET)"; exit 1)
 	@kubectl --context $(KUBECONFIG_CONTEXT) cluster-info --request-timeout=5s >/dev/null 2>&1 || \
 		(echo "$(RED)❌ Cannot reach cluster $(KUBECONFIG_CONTEXT) — is k3s running? Try: ssh kevin@<VPS> 'sudo systemctl restart k3s'$(RESET)"; exit 1)
 	@echo "$(YELLOW)→ Creating monitoring namespace + Grafana admin secret...$(RESET)"
-	@kubectl --context $(KUBECONFIG_CONTEXT) create namespace monitoring --dry-run=client -o yaml | kubectl --context $(KUBECONFIG_CONTEXT) apply --validate=false -f -
+	@kubectl --context $(KUBECONFIG_CONTEXT) create namespace monitoring --dry-run=client -o yaml \
+		| kubectl --context $(KUBECONFIG_CONTEXT) apply -f -
 	@kubectl --context $(KUBECONFIG_CONTEXT) create secret generic grafana-admin-secret \
 		--from-literal=username=admin \
 		--from-literal=password="$(GRAFANA_PASSWORD)" \
 		-n monitoring \
-		--dry-run=client -o yaml | kubectl --context $(KUBECONFIG_CONTEXT) apply --validate=false -f -
+		--dry-run=client -o yaml | kubectl --context $(KUBECONFIG_CONTEXT) apply -f -
 	@echo "$(GREEN)✅ Grafana admin secret created$(RESET)"
