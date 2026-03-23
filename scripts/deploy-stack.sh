@@ -41,8 +41,14 @@ log_info "Deploying base stack on cluster: $(kubectl config current-context)"
 log_step "[1/4] Namespaces..."
 kubectl apply -f "$(_k8s namespaces/namespaces.yaml)"
 
-# --- 2. Traefik (Ingress Controller) ---
-log_step "[2/4] Traefik ${TRAEFIK_CHART_VERSION}..."
+# --- 2. Prometheus Operator CRDs (required by Traefik ServiceMonitor) ---
+log_step "[2/5] Prometheus Operator CRDs..."
+PROM_OPERATOR_VERSION="${PROM_OPERATOR_VERSION:-v0.82.0}"
+kubectl apply --server-side -f \
+  "https://github.com/prometheus-operator/prometheus-operator/releases/download/${PROM_OPERATOR_VERSION}/stripped-down-crds.yaml"
+
+# --- 3. Traefik (Ingress Controller) ---
+log_step "[3/5] Traefik ${TRAEFIK_CHART_VERSION}..."
 helm repo add traefik https://helm.traefik.io/traefik --force-update
 helm repo update traefik
 # Kubernetes forbids loopback addresses as externalIPs; skip the flag for local Lima testing.
@@ -64,8 +70,8 @@ helm upgrade --install traefik traefik/traefik \
 log_info "Waiting for Traefik to be ready..."
 kubectl rollout status deployment/traefik -n ingress --timeout=120s
 
-# --- 3. cert-manager ---
-log_step "[3/4] cert-manager ${CERT_MANAGER_VERSION}..."
+# --- 4. cert-manager ---
+log_step "[4/5] cert-manager ${CERT_MANAGER_VERSION}..."
 helm repo add jetstack https://charts.jetstack.io --force-update
 helm repo update jetstack
 helm upgrade --install cert-manager jetstack/cert-manager \
@@ -84,7 +90,7 @@ kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout
 sleep 10
 
 # --- 4. ClusterIssuers ---
-log_step "[4/4] ClusterIssuers..."
+log_step "[5/5] ClusterIssuers..."
 envsubst < "$(_k8s_file cert-manager/clusterissuer.yaml)" | kubectl apply -f -
 
 # --- 5. Traefik dashboard (optional) ---
