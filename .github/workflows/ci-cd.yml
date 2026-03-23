@@ -73,10 +73,10 @@ jobs:
 
   # ─── Docs dispatch (push to main only) ───────────────────────────────────
   # Triggers a rebuild of kevindebenedetti.github.io after all CI jobs pass.
-  # Requires PAT_TOKEN secret (fine-grained PAT with actions:write on the hub repo).
+  # Requires PAT_TOKEN secret (fine-grained PAT with contents:write on the hub repo).
   docs:
     needs: [shell-ci, kubernetes, security]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/dispatch-docs.yml@main
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/cd-docs.yml@main
     secrets:
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
