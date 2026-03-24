@@ -53,6 +53,11 @@ chmod 600 "${TMP_KUBECONFIG}"
 # Merge into existing kubeconfig (or create it if it doesn't exist)
 if [[ -f "${TARGET}" ]]; then
   log_info "Merging into existing ${TARGET}..."
+  # Remove stale context/cluster/user first so the new credentials always win
+  # (re-installs generate a new CA — old creds cause x509/Unauthorized errors)
+  kubectl config --kubeconfig="${TARGET}" delete-context "${CONTEXT_NAME}" 2>/dev/null || true
+  kubectl config --kubeconfig="${TARGET}" delete-cluster "${CONTEXT_NAME}" 2>/dev/null || true
+  kubectl config --kubeconfig="${TARGET}" delete-user "${CONTEXT_NAME}" 2>/dev/null || true
   KUBECONFIG="${TARGET}:${TMP_KUBECONFIG}" kubectl config view --flatten > "${TARGET}.merged"
   mv "${TARGET}.merged" "${TARGET}"
 else
