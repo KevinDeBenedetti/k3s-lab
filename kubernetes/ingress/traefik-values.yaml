@@ -76,10 +76,10 @@ metrics:
     addEntryPointsLabels: true
     addRoutersLabels: true
     addServicesLabels: true
-    # ServiceMonitor: auto-discovered by kube-prometheus-stack's Prometheus Operator
+    # ServiceMonitor: enabled by deploy-monitoring.sh once kube-prometheus-stack CRDs exist
     disableAPICheck: true
     serviceMonitor:
-      enabled: true
+      enabled: false
       namespace: ingress
       jobLabel: traefik
       interval: 30s

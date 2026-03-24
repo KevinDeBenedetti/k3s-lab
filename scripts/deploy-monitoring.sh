@@ -80,6 +80,18 @@ kubectl rollout status deployment/kube-prometheus-stack-grafana -n monitoring --
 log_info "Waiting for Prometheus to be ready..."
 kubectl rollout status statefulset/prometheus-kube-prometheus-stack-prometheus -n monitoring --timeout=120s
 
+# Enable Traefik ServiceMonitor now that kube-prometheus-stack CRDs exist
+log_step "Enabling Traefik ServiceMonitor..."
+helm upgrade traefik traefik/traefik \
+  --namespace ingress \
+  --reuse-values \
+  --set "metrics.prometheus.serviceMonitor.enabled=true" \
+  --set "metrics.prometheus.serviceMonitor.namespace=ingress" \
+  --set "metrics.prometheus.serviceMonitor.jobLabel=traefik" \
+  --set "metrics.prometheus.serviceMonitor.interval=30s" \
+  --wait \
+  --timeout 60s
+
 # --- 3. Loki ---
 log_step "[3/5] Loki ${LOKI_VERSION}..."
 helm upgrade --install loki grafana/loki \
