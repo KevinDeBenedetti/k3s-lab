@@ -116,5 +116,6 @@ persistence:
 additionalArguments:
   - "--api.insecure=false"
   - "--providers.kubernetesingress.allowemptyservices=true"
+  - "--providers.kubernetescrd.allowcrossnamespace=true"
   - "--global.checknewversion=false"
   - "--global.sendanonymoususage=false"

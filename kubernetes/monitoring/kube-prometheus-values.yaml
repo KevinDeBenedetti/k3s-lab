@@ -31,7 +31,7 @@ grafana:
   initChownData:
     enabled: false
 
-  # Grafana has its own login — no BasicAuth needed at the Ingress level
+  # Ingress handled by Traefik IngressRoute (grafana-ingress.yaml) with Grafana native OIDC
   ingress:
     enabled: false
 
@@ -61,6 +61,24 @@ grafana:
       isDefault: false
 
   # root_url is injected at deploy time via --set in deploy-monitoring.sh
+
+  # OAuth2 / SSO — provider-agnostic via Kubernetes Secret
+  #
+  # All GF_AUTH_GENERIC_OAUTH_* configuration is injected from the
+  # grafana-oauth-secret Secret. The secret is optional so Grafana starts
+  # normally (admin/password) when OAuth is not configured.
+  #
+  # To enable OAuth2 from your infra repo:
+  #   make deploy-grafana-oauth-secret   # creates the secret with provider URLs + credentials
+  #   make deploy-grafana-oauth          # restarts Grafana to pick up the secret
+  #
+  # Required secret keys (GF_AUTH_GENERIC_OAUTH_* env vars):
+  #   CLIENT_ID, CLIENT_SECRET, AUTH_URL, TOKEN_URL, API_URL,
+  #   SCOPES, NAME, ENABLED, USE_PKCE, USE_REFRESH_TOKEN,
+  #   AUTO_LOGIN, ALLOW_SIGN_UP, GF_AUTH_DISABLE_LOGIN_FORM
+  envFromSecrets:
+    - name: grafana-oauth-secret
+      optional: true
 
 # ─── Prometheus ─────────────────────────────────────────────────────────────
 prometheus:

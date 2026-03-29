@@ -22,7 +22,7 @@ It watches your `infra` repo and automatically applies any changes to Kubernetes
 ```
 GitHub (infra repo)
       │  push
-      │  webhook → https://argocd.kevindb.dev/api/webhook
+      │  webhook → https://<ARGOCD_DOMAIN>/api/webhook
       ▼
 ArgoCD (argocd namespace)
   ├── repo-server   ← clones infra via SSH deploy key
@@ -62,9 +62,9 @@ This installs `argo/argo-cd` chart at the version pinned in `ARGOCD_VERSION`
 
 | Method | URL / Command |
 |---|---|
-| Web UI | `https://argocd.kevindb.dev` |
+| Web UI | `https://<ARGOCD_DOMAIN>` |
 | Initial password | `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` |
-| CLI login | `argocd login argocd.kevindb.dev --username admin` |
+| CLI login | `argocd login <ARGOCD_DOMAIN> --username admin` |
 
 > Change the default password after first login.
 
@@ -140,7 +140,7 @@ For instant sync (instead of polling every 3 minutes), configure a webhook:
 
 | Field | Value |
 |---|---|
-| URL | `https://argocd.kevindb.dev/api/webhook` |
+| URL | `https://<ARGOCD_DOMAIN>/api/webhook` |
 | Content type | `application/json` |
 | Events | **Just the push event** |
 | Secret | *(leave empty)* |
@@ -156,14 +156,14 @@ ArgoCD requires two IngressRoute routes because the CLI uses gRPC (HTTP/2):
 ```yaml
 routes:
   # UI + REST API
-  - match: Host(`argocd.kevindb.dev`)
+  - match: Host(`<ARGOCD_DOMAIN>`)
     priority: 10
     services:
       - name: argocd-server
         port: 80
 
   # gRPC (argocd CLI)
-  - match: Host(`argocd.kevindb.dev`) && Header(`Content-Type`, `application/grpc`)
+  - match: Host(`<ARGOCD_DOMAIN>`) && Header(`Content-Type`, `application/grpc`)
     priority: 11
     services:
       - name: argocd-server

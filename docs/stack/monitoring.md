@@ -102,6 +102,60 @@ kubectl port-forward svc/alertmanager-operated -n monitoring 9093:9093
 
 ---
 
+## Grafana OAuth2 / SSO
+
+Grafana supports OAuth2 login without any provider-specific configuration in k3s-lab.
+All provider settings are injected at runtime via a Kubernetes Secret.
+
+### How it works
+
+The `kube-prometheus-values.yaml` mounts `grafana-oauth-secret` as an **optional** secret:
+
+- **Secret absent** → Grafana starts normally with admin/password login
+- **Secret present** → Grafana reads all `GF_AUTH_GENERIC_OAUTH_*` env vars from it
+
+This means you can configure any OIDC-compatible provider (Infomaniak, Auth0, Keycloak,
+Entra ID, etc.) simply by creating the secret with the right values.
+
+### Enable OAuth2
+
+1. Create the `grafana-oauth-secret` with your provider's settings (see [configuration.md](../configuration.md#oauth2--sso-for-grafana)):
+
+   ```bash
+   kubectl create secret generic grafana-oauth-secret \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_ENABLED="true" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_NAME="<Provider Name>" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_ID="<client-id>" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="<client-secret>" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_AUTH_URL="<authorize-url>" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_TOKEN_URL="<token-url>" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_API_URL="<userinfo-url>" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_SCOPES="openid email profile" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_USE_PKCE="true" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN="true" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN="true" \
+     --from-literal=GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP="true" \
+     --from-literal=GF_AUTH_DISABLE_LOGIN_FORM="true" \
+     --namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+   ```
+
+2. Restart Grafana:
+
+   ```bash
+   kubectl rollout restart deployment/kube-prometheus-stack-grafana -n monitoring
+   ```
+
+### Disable OAuth2
+
+Delete the secret and restart Grafana to revert to admin/password login:
+
+```bash
+kubectl delete secret grafana-oauth-secret -n monitoring
+kubectl rollout restart deployment/kube-prometheus-stack-grafana -n monitoring
+```
+
+---
+
 ## Loki
 
 [Loki](https://grafana.com/oss/loki/) stores logs indexed by labels (no full-text indexing). It is queried from Grafana using [LogQL](https://grafana.com/docs/loki/latest/query/).

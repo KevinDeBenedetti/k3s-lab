@@ -123,3 +123,79 @@ GRAFANA_PASSWORD=changeme
 # Kubeconfig
 KUBECONFIG_CONTEXT=k3s-lab
 ```
+
+---
+
+## OAuth2 / SSO for Grafana
+
+Grafana supports OAuth2 login via a Kubernetes Secret — no provider-specific
+configuration is hardcoded in k3s-lab. Any OIDC-compatible provider works.
+
+### How it works
+
+`kube-prometheus-values.yaml` declares an **optional** secret mount:
+
+```yaml
+grafana:
+  envFromSecrets:
+    - name: grafana-oauth-secret
+      optional: true   # Grafana starts normally if the secret does not exist
+```
+
+When `grafana-oauth-secret` is absent, Grafana uses admin/password login.
+When the secret is present, Grafana reads every `GF_AUTH_GENERIC_OAUTH_*` key
+from it and activates the configured provider.
+
+### Required secret keys
+
+Create the secret in the `monitoring` namespace with these keys:
+
+| Key | Example value |
+|---|---|
+| `GF_AUTH_GENERIC_OAUTH_ENABLED` | `"true"` |
+| `GF_AUTH_GENERIC_OAUTH_NAME` | `"My Provider"` |
+| `GF_AUTH_GENERIC_OAUTH_CLIENT_ID` | `"<your-client-id>"` |
+| `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET` | `"<your-client-secret>"` |
+| `GF_AUTH_GENERIC_OAUTH_SCOPES` | `"openid email profile"` |
+| `GF_AUTH_GENERIC_OAUTH_AUTH_URL` | `"https://provider.example.com/authorize"` |
+| `GF_AUTH_GENERIC_OAUTH_TOKEN_URL` | `"https://provider.example.com/token"` |
+| `GF_AUTH_GENERIC_OAUTH_API_URL` | `"https://provider.example.com/userinfo"` |
+| `GF_AUTH_GENERIC_OAUTH_USE_PKCE` | `"true"` |
+| `GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN` | `"true"` |
+| `GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN` | `"true"` |
+| `GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP` | `"true"` |
+| `GF_AUTH_DISABLE_LOGIN_FORM` | `"true"` |
+
+### Creating the secret manually
+
+```bash
+kubectl create secret generic grafana-oauth-secret \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_ENABLED="true" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_NAME="My Provider" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_ID="<client-id>" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="<client-secret>" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_SCOPES="openid email profile" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_AUTH_URL="https://provider.example.com/authorize" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_TOKEN_URL="https://provider.example.com/token" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_API_URL="https://provider.example.com/userinfo" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_USE_PKCE="true" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN="true" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN="true" \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP="true" \
+  --from-literal=GF_AUTH_DISABLE_LOGIN_FORM="true" \
+  --namespace monitoring \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+Then restart Grafana to pick up the secret:
+
+```bash
+kubectl rollout restart deployment/kube-prometheus-stack-grafana -n monitoring
+kubectl rollout status deployment/kube-prometheus-stack-grafana -n monitoring --timeout=120s
+```
+
+### Using with a private infra repo
+
+If you use k3s-lab with a private `infra` repo (see [using-with-infra.md](./using-with-infra.md)),
+add a `deploy-grafana-oauth-secret` Make target to your `infra/Makefile` that
+creates the secret from your provider's credentials stored in `.env`.

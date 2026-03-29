@@ -3,7 +3,7 @@
 # Exposes Grafana at https://${GRAFANA_DOMAIN}
 # Applied via: envsubst < grafana-ingress.yaml | kubectl apply -f -
 #
-# No BasicAuth here — Grafana handles its own authentication.
+# Auth: Grafana handles its own authentication via Infomaniak OIDC (generic_oauth).
 # =============================================================================
 
 # -- IngressRoute: HTTPS
