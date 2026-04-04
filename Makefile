@@ -34,6 +34,8 @@ include makefiles/30-k3s.mk
 include makefiles/35-wireguard.mk
 include makefiles/40-kubeconfig.mk
 include makefiles/50-deploy.mk
+include makefiles/52-argocd.mk
+include makefiles/55-vault.mk
 include makefiles/60-status.mk
 include makefiles/70-ssh.mk
 include makefiles/80-dev.mk

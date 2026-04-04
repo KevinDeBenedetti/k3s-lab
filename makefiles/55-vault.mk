@@ -9,6 +9,21 @@ DASHBOARD_USER      ?= admin
 # VAULT_DOMAIN and VAULT_ROOT_TOKEN intentionally have no default here.
 # Set them in the consuming Makefile or .env.
 
+# ── Generic OIDC variables (used by vault-seed) ───────────────────────────────
+# Consuming repos map their provider-specific vars to these:
+#   OIDC_CLIENT_ID     ?= $(MYPROVIDER_CLIENT_ID)
+#   OIDC_CLIENT_SECRET ?= $(MYPROVIDER_CLIENT_SECRET)
+#   OIDC_PROVIDER_NAME ?= MyProvider
+#   OIDC_AUTH_URL      ?= https://auth.example.com/authorize
+#   OIDC_TOKEN_URL     ?= https://auth.example.com/token
+#   OIDC_API_URL       ?= https://auth.example.com/userinfo
+OIDC_CLIENT_ID     ?=
+OIDC_CLIENT_SECRET ?=
+OIDC_PROVIDER_NAME ?= OIDC
+OIDC_AUTH_URL      ?=
+OIDC_TOKEN_URL     ?=
+OIDC_API_URL       ?=
+
 .PHONY: deploy-vault vault-init vault-unseal vault-configure vault-seed vault-status deploy-eso
 
 deploy-vault: ## Deploy HashiCorp Vault via Helm (sealed — run make vault-init next)
@@ -58,14 +73,14 @@ vault-configure: ## (Re)create Vault policies and Kubernetes roles (idempotent)
 	    ttl=1h
 	@echo "$(GREEN)✅ Vault configured$(RESET)"
 
-vault-seed: ## Seed secrets into Vault (reads from env/.env, prompts only if missing)
+vault-seed: ## Seed secrets into Vault (reads from .env, prompts only if missing)
 	@[ -n "$(VAULT_ROOT_TOKEN)" ] || (echo "$(RED)❌ VAULT_ROOT_TOKEN not set$(RESET)"; exit 1)
 	@echo "$(YELLOW)→ Seeding secrets into Vault...$(RESET)"
 	@echo ""
-	@_oidc_id="$(INFOMANIAK_CLIENT_ID)"; \
-	 _oidc_secret="$(INFOMANIAK_CLIENT_SECRET)"; \
-	 [ -z "$$_oidc_id" ] && read -p "  INFOMANIAK_CLIENT_ID    : " _oidc_id < /dev/tty; \
-	 [ -z "$$_oidc_secret" ] && read -p "  INFOMANIAK_CLIENT_SECRET: " _oidc_secret < /dev/tty; \
+	@_oidc_id="$(OIDC_CLIENT_ID)"; \
+	 _oidc_secret="$(OIDC_CLIENT_SECRET)"; \
+	 [ -z "$$_oidc_id" ] && read -p "  OIDC_CLIENT_ID    : " _oidc_id < /dev/tty; \
+	 [ -z "$$_oidc_secret" ] && read -p "  OIDC_CLIENT_SECRET: " _oidc_secret < /dev/tty; \
 	 [ -n "$$_oidc_id" ] && \
 	   kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
 	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
@@ -76,7 +91,7 @@ vault-seed: ## Seed secrets into Vault (reads from env/.env, prompts only if mis
 	  || echo "  (skipped argocd/oidc)"
 	@echo ""
 	@_grafana_pw="$(GRAFANA_PASSWORD)"; \
-	 [ -z "$$_grafana_pw" ] && read -p "  GRAFANA_PASSWORD        : " _grafana_pw < /dev/tty; \
+	 [ -z "$$_grafana_pw" ] && read -p "  GRAFANA_PASSWORD  : " _grafana_pw < /dev/tty; \
 	 [ -n "$$_grafana_pw" ] && \
 	   kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
 	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
@@ -86,22 +101,28 @@ vault-seed: ## Seed secrets into Vault (reads from env/.env, prompts only if mis
 	  && echo "  ✓ grafana/admin" \
 	  || echo "  (skipped grafana/admin)"
 	@echo ""
-	@_gf_id="$(INFOMANIAK_CLIENT_ID)"; \
-	 _gf_sec="$(INFOMANIAK_CLIENT_SECRET)"; \
-	 [ -z "$$_gf_id" ] && read -p "  GF_AUTH CLIENT_ID       : " _gf_id < /dev/tty; \
-	 [ -z "$$_gf_sec" ] && read -p "  GF_AUTH CLIENT_SECRET   : " _gf_sec < /dev/tty; \
+	@_gf_id="$(OIDC_CLIENT_ID)"; \
+	 _gf_sec="$(OIDC_CLIENT_SECRET)"; \
+	 _gf_auth_url="$(OIDC_AUTH_URL)"; \
+	 _gf_token_url="$(OIDC_TOKEN_URL)"; \
+	 _gf_api_url="$(OIDC_API_URL)"; \
+	 [ -z "$$_gf_id" ] && read -p "  OIDC_CLIENT_ID    : " _gf_id < /dev/tty; \
+	 [ -z "$$_gf_sec" ] && read -p "  OIDC_CLIENT_SECRET: " _gf_sec < /dev/tty; \
+	 [ -z "$$_gf_auth_url" ] && read -p "  OIDC_AUTH_URL     : " _gf_auth_url < /dev/tty; \
+	 [ -z "$$_gf_token_url" ] && read -p "  OIDC_TOKEN_URL    : " _gf_token_url < /dev/tty; \
+	 [ -z "$$_gf_api_url" ] && read -p "  OIDC_API_URL      : " _gf_api_url < /dev/tty; \
 	 [ -n "$$_gf_id" ] && \
 	   kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
 	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
 	     vault kv put secret/grafana/oauth \
 	       GF_AUTH_GENERIC_OAUTH_ENABLED="true" \
-	       GF_AUTH_GENERIC_OAUTH_NAME="Infomaniak" \
+	       GF_AUTH_GENERIC_OAUTH_NAME="$(OIDC_PROVIDER_NAME)" \
 	       GF_AUTH_GENERIC_OAUTH_CLIENT_ID="$$_gf_id" \
 	       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="$$_gf_sec" \
 	       GF_AUTH_GENERIC_OAUTH_SCOPES="openid email profile" \
-	       GF_AUTH_GENERIC_OAUTH_AUTH_URL="https://login.infomaniak.com/authorize" \
-	       GF_AUTH_GENERIC_OAUTH_TOKEN_URL="https://login.infomaniak.com/token" \
-	       GF_AUTH_GENERIC_OAUTH_API_URL="https://login.infomaniak.com/userinfo" \
+	       GF_AUTH_GENERIC_OAUTH_AUTH_URL="$$_gf_auth_url" \
+	       GF_AUTH_GENERIC_OAUTH_TOKEN_URL="$$_gf_token_url" \
+	       GF_AUTH_GENERIC_OAUTH_API_URL="$$_gf_api_url" \
 	       GF_AUTH_GENERIC_OAUTH_USE_PKCE="true" \
 	       GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN="true" \
 	       GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN="true" \

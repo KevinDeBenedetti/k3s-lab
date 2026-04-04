@@ -1,0 +1,19 @@
+# =============================================================================
+# Traefik IPAllowList Middleware — VPN-only access (argocd namespace)
+#
+# Restricts requests to the WireGuard tunnel subnet (10.8.0.0/24).
+# Apply this middleware to any IngressRoute route that should only be
+# reachable when the client is connected to WireGuard.
+#
+# This file is namespace-scoped to argocd. Each namespace that needs
+# VPN restriction requires its own copy (see kubernetes/vault/ for vault ns).
+# =============================================================================
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: vpn-only
+  namespace: argocd
+spec:
+  ipAllowList:
+    sourceRange:
+      - 10.8.0.0/24   # WireGuard tunnel — only reachable when VPN is connected
