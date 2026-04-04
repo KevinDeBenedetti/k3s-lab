@@ -52,7 +52,7 @@ jobs:
       kubeconform-include-crds-catalog: true
       run-env-example: true
       env-example-required-keys: >-
-        MASTER_IP WORKER_IP DOMAIN EMAIL
+        SERVER_IP AGENT_IP DOMAIN EMAIL
         DASHBOARD_DOMAIN DASHBOARD_PASSWORD
         GRAFANA_DOMAIN GRAFANA_PASSWORD
         KUBECONFIG_CONTEXT K3S_VERSION K3S_NODE_TOKEN
