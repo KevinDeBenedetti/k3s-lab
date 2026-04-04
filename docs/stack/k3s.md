@@ -18,7 +18,7 @@
 
 ```
 ┌─────────────────────────────────┐    ┌─────────────────────────────────┐
-│          Master (VPS 1)         │    │          Worker (VPS 2)         │
+│          Server (VPS 1)         │    │          Agent (VPS 2)          │
 │                                 │    │                                 │
 │  k3s server                     │    │  k3s agent                      │
 │  ├─ kube-apiserver  :6443       │◄───│  ├─ kubelet                     │
@@ -41,17 +41,17 @@
 | Requirement | Notes |
 |---|---|
 | Ubuntu 22.04+ / Debian 12+ | Both nodes |
-| 2 vCPU / 2 GB RAM (master) | 1 GB minimum for agent |
+| 2 vCPU / 2 GB RAM (server) | 1 GB minimum for agent |
 | Public IP on each VPS | Required for TLS SAN + UFW rules |
 | SSH access as root or sudo user | Bootstrap uses `INITIAL_USER=root` |
-| Port `6443` open on master | k3s API server |
-| Ports `80`, `443` open on master | HTTP + HTTPS traffic |
+| Port `6443` open on server | k3s API server |
+| Ports `80`, `443` open on server | HTTP + HTTPS traffic |
 
 ---
 
 ## Install flags explained
 
-The master install script (`k3s/install-master.sh`) uses these key flags:
+The server install script (`k3s/install-server.sh`) uses these key flags:
 
 ```bash
 curl -sfL https://get.k3s.io | \
@@ -94,7 +94,7 @@ kernel.panic_on_oops                = 1
 
 ## Firewall rules (UFW)
 
-### Master node
+### Server node
 
 | Port | Protocol | Purpose |
 |---|---|---|
@@ -103,42 +103,42 @@ kernel.panic_on_oops                = 1
 | `6443` | TCP | Kubernetes API server |
 | `10.42.0.0/16` | any | k3s pod CIDR (Flannel) |
 | `10.43.0.0/16` | any | k3s service CIDR |
-| `8472` from WORKER_IP | UDP | Flannel VXLAN tunnel |
-| `10250` from WORKER_IP | TCP | kubelet API |
+| `8472` from AGENT_IP | UDP | Flannel VXLAN tunnel |
+| `10250` from AGENT_IP | TCP | kubelet API |
 
-### Worker node
+### Agent node
 
 | Port | Protocol | Purpose |
 |---|---|---|
-| `8472` from MASTER_IP | UDP | Flannel VXLAN tunnel |
-| `10250` from MASTER_IP | TCP | kubelet API |
+| `8472` from SERVER_IP | UDP | Flannel VXLAN tunnel |
+| `10250` from SERVER_IP | TCP | kubelet API |
 
 ---
 
 ## Installation workflow
 
-### 1. Bootstrap master
+### 1. Bootstrap server
 
 ```bash
-make k3s-master
+make k3s-server
 ```
 
 This:
-1. Copies `k3s/install-master.sh` to the VPS over SCP
+1. Copies `k3s/install-server.sh` to the VPS over SCP
 2. Runs the script as root via SSH
 3. Waits for the node to be `Ready`
 4. Reads the node token and saves it to `.env` as `K3S_NODE_TOKEN`
 
-### 2. Bootstrap worker
+### 2. Bootstrap agent
 
 ```bash
-make k3s-worker
+make k3s-agent
 ```
 
 This:
-1. Opens the master UFW firewall for the worker IP
-2. Copies `k3s/install-worker.sh` to the worker VPS
-3. Runs the script with `K3S_TOKEN` and `MASTER_IP`
+1. Opens the server UFW firewall for the agent IP
+2. Copies `k3s/install-agent.sh` to the agent VPS
+3. Runs the script with `K3S_TOKEN` and `SERVER_IP`
 
 ### 3. Fetch kubeconfig
 
@@ -146,15 +146,15 @@ This:
 make kubeconfig
 ```
 
-Fetches `/etc/rancher/k3s/k3s.yaml` from the master, replaces `127.0.0.1` with the public IP, and merges it into `~/.kube/config` under the context name `KUBECONFIG_CONTEXT`.
+Fetches `/etc/rancher/k3s/k3s.yaml` from the server, replaces `127.0.0.1` with the public IP, and merges it into `~/.kube/config` under the context name `KUBECONFIG_CONTEXT`.
 
 ---
 
 ## Uninstall
 
 ```bash
-make k3s-uninstall-master   # Remove k3s from master (DESTRUCTIVE)
-make k3s-uninstall-worker   # Remove k3s from worker (DESTRUCTIVE)
+make k3s-uninstall-server   # Remove k3s from server (DESTRUCTIVE)
+make k3s-uninstall-agent    # Remove k3s from agent (DESTRUCTIVE)
 ```
 
 The uninstall script (`k3s/uninstall.sh`):
@@ -167,11 +167,11 @@ The uninstall script (`k3s/uninstall.sh`):
 
 ## Node token
 
-The node token is a shared secret that workers use to authenticate with the master API.
+The node token is a shared secret that agents use to authenticate with the server API.
 
-- Auto-generated during master install if `K3S_NODE_TOKEN` is empty
-- Automatically saved to `.env` by `make k3s-master`
-- Stored on the master at `/var/lib/rancher/k3s/server/node-token`
+- Auto-generated during server install if `K3S_NODE_TOKEN` is empty
+- Automatically saved to `.env` by `make k3s-server`
+- Stored on the server at `/var/lib/rancher/k3s/server/node-token`
 
 To rotate: uninstall both nodes and reinstall with a new token.
 

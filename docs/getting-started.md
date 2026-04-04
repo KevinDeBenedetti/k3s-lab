@@ -32,20 +32,20 @@ This guide walks you through provisioning a production-ready k3s cluster from tw
 |---|---|
 | OS | Ubuntu 22.04+ or Debian 12+ |
 | Architecture | x86_64 or ARM64 |
-| Master: vCPU / RAM | 2 vCPU / 2 GB minimum (4 GB recommended) |
-| Worker: vCPU / RAM | 2 vCPU / 1 GB minimum (2 GB recommended) |
-| Disk | 20 GB+ (master), 20 GB+ (worker) |
+| Server: vCPU / RAM | 2 vCPU / 2 GB minimum (4 GB recommended) |
+| Agent: vCPU / RAM | 2 vCPU / 1 GB minimum (2 GB recommended) |
+| Disk | 20 GB+ (server), 20 GB+ (agent) |
 | Public IP | Required on each node |
-| DNS | A records pointing to `MASTER_IP` for all subdomains |
+| DNS | A records pointing to `SERVER_IP` for all subdomains |
 
 ### DNS records (before deploy)
 
-Set the following A records to `MASTER_IP`:
+Set the following A records to `SERVER_IP`:
 
 ```
-dashboard.example.com → MASTER_IP
-grafana.example.com   → MASTER_IP
-app.example.com       → MASTER_IP   (your apps)
+dashboard.example.com → SERVER_IP
+grafana.example.com   → SERVER_IP
+app.example.com       → SERVER_IP   (your apps)
 ```
 
 > DNS must propagate before TLS certificates can be issued. Use `dig dashboard.example.com` to verify.
@@ -61,8 +61,8 @@ cp .env.example .env
 Edit `.env` and fill in at minimum:
 
 ```bash
-MASTER_IP=1.2.3.4
-WORKER_IP=5.6.7.8
+SERVER_IP=1.2.3.4
+AGENT_IP=5.6.7.8
 SSH_USER=ubuntu
 SSH_KEY=~/.ssh/id_ed25519
 K3S_VERSION=v1.32.2+k3s1
@@ -79,13 +79,13 @@ See [Configuration](./configuration) for the full variable reference.
 
 ---
 
-## Step 2 — Bootstrap master node
+## Step 2 — Bootstrap server node
 
 ```bash
-make k3s-master
+make k3s-server
 ```
 
-This installs k3s server on `MASTER_IP` with:
+This installs k3s server on `SERVER_IP` with:
 - Traefik and built-in LB **disabled** (managed via Helm)
 - `--tls-san` set to the public IP for remote `kubectl` access
 - Secrets encryption at rest
@@ -98,15 +98,15 @@ When it completes, `K3S_NODE_TOKEN` is automatically saved to `.env`.
 
 ---
 
-## Step 3 — Join worker node
+## Step 3 — Join agent node
 
 ```bash
-make k3s-worker
+make k3s-agent
 ```
 
 This:
-1. Opens the master UFW for the worker IP (VXLAN + kubelet ports)
-2. Installs k3s agent on `WORKER_IP`
+1. Opens the server UFW for the agent IP (VXLAN + kubelet ports)
+2. Installs k3s agent on `AGENT_IP`
 
 > ⏱️ Takes ~3 minutes.
 
@@ -124,8 +124,8 @@ Verify both nodes are ready:
 ```bash
 make nodes
 # NAME     STATUS   ROLES                  AGE   VERSION
-# master   Ready    control-plane,master   5m    v1.32.2+k3s1
-# worker   Ready    <none>                 2m    v1.32.2+k3s1
+# server   Ready    control-plane,master   5m    v1.32.2+k3s1
+# agent    Ready    <none>                 2m    v1.32.2+k3s1
 ```
 
 ---

@@ -2,15 +2,15 @@
 set -euo pipefail
 
 # =============================================================================
-# get-kubeconfig.sh — Fetch kubeconfig from master and merge into ~/.kube/config
-# Usage: ./scripts/get-kubeconfig.sh <MASTER_IP> [SSH_USER] [CONTEXT_NAME]
+# get-kubeconfig.sh — Fetch kubeconfig from server and merge into ~/.kube/config
+# Usage: ./scripts/get-kubeconfig.sh <SERVER_IP> [SSH_USER] [CONTEXT_NAME]
 #
 # Examples:
 #   ./scripts/get-kubeconfig.sh 1.2.3.4
 #   ./scripts/get-kubeconfig.sh 1.2.3.4 kevin my-cluster
 # =============================================================================
 
-MASTER_IP="${1:?'Usage: ./scripts/get-kubeconfig.sh <MASTER_IP> [SSH_USER] [CONTEXT_NAME]'}"
+SERVER_IP="${1:?'Usage: ./scripts/get-kubeconfig.sh <SERVER_IP> [SSH_USER] [CONTEXT_NAME]'}"
 SSH_USER="${2:-${SSH_USER:-kevin}}"
 CONTEXT_NAME="${3:-${KUBECONFIG_CONTEXT:-k3s-infra}}"
 SSH_KEY="${SSH_KEY:-}"
@@ -36,12 +36,12 @@ chmod 700 "${HOME}/.kube"
 
 build_ssh_opts "${SSH_PORT}" "no"
 
-log_info "Fetching kubeconfig from ${SSH_USER}@${MASTER_IP} (port ${SSH_PORT})..."
+log_info "Fetching kubeconfig from ${SSH_USER}@${SERVER_IP} (port ${SSH_PORT})..."
 
 # Fetch, rewrite the localhost address and cluster/context/user names
-ssh "${SSH_OPTS[@]}" "${SSH_USER}@${MASTER_IP}" \
+ssh "${SSH_OPTS[@]}" "${SSH_USER}@${SERVER_IP}" \
   "sudo cat /etc/rancher/k3s/k3s.yaml" \
-  | sed "s/127\.0\.0\.1/${MASTER_IP}/g" \
+  | sed "s/127\.0\.0\.1/${SERVER_IP}/g" \
   | sed "s/name: default/name: ${CONTEXT_NAME}/g" \
   | sed "s/cluster: default/cluster: ${CONTEXT_NAME}/g" \
   | sed "s/user: default/user: ${CONTEXT_NAME}/g" \

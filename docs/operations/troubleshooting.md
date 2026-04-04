@@ -11,12 +11,12 @@ Common issues and how to resolve them.
 ```bash
 kubectl get nodes
 # NAME     STATUS     ROLES   AGE
-# master   NotReady   ...     1m
+# server   NotReady   ...     1m
 ```
 
 **Check k3s service logs:**
 ```bash
-ssh ubuntu@MASTER_IP "sudo journalctl -u k3s -n 50 --no-pager"
+ssh ubuntu@SERVER_IP "sudo journalctl -u k3s -n 50 --no-pager"
 ```
 
 Common causes:
@@ -34,20 +34,20 @@ Unable to connect to server: x509: certificate is valid for 127.0.0.1, not 1.2.3
 
 **Cause:** `--tls-san` was not set with the public IP during install.
 
-**Fix:** Re-run `make k3s-master` with the correct `MASTER_IP` set.
+**Fix:** Re-run `make k3s-server` with the correct `SERVER_IP` set.
 
 ---
 
-### Worker can't join cluster
+### Agent can't join cluster
 
 ```
 FATA[0005] Node token or agent token is required
 ```
 
-**Fix:** Ensure `K3S_NODE_TOKEN` is set in `.env`. It should have been saved automatically by `make k3s-master`. Otherwise:
+**Fix:** Ensure `K3S_NODE_TOKEN` is set in `.env`. It should have been saved automatically by `make k3s-server`. Otherwise:
 
 ```bash
-ssh ubuntu@MASTER_IP "sudo cat /var/lib/rancher/k3s/server/node-token"
+ssh ubuntu@SERVER_IP "sudo cat /var/lib/rancher/k3s/server/node-token"
 # Add the output to .env: K3S_NODE_TOKEN=<token>
 ```
 
@@ -79,7 +79,7 @@ make known-hosts-reset
 
 ### Dashboard returns 404
 
-Traefik dashboard requires the path `/dashboard/` (with trailing slash). Ensure your `DASHBOARD_DOMAIN` DNS points to `MASTER_IP` and the TLS certificate is issued.
+Traefik dashboard requires the path `/dashboard/` (with trailing slash). Ensure your `DASHBOARD_DOMAIN` DNS points to `SERVER_IP` and the TLS certificate is issued.
 
 ```bash
 kubectl get certificate -n ingress
@@ -289,9 +289,9 @@ kubectl config use-context k3s-lab
 The connection to the server 1.2.3.4:6443 was refused
 ```
 
-1. Verify k3s is running: `ssh ubuntu@MASTER_IP "sudo systemctl status k3s"`
-2. If crashed: `ssh ubuntu@MASTER_IP "sudo systemctl restart k3s"`
-3. Verify port 6443 is open: `curl -k https://MASTER_IP:6443/healthz`
+1. Verify k3s is running: `ssh ubuntu@SERVER_IP "sudo systemctl status k3s"`
+2. If crashed: `ssh ubuntu@SERVER_IP "sudo systemctl restart k3s"`
+3. Verify port 6443 is open: `curl -k https://SERVER_IP:6443/healthz`
 
 ---
 

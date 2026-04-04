@@ -95,5 +95,5 @@ ssh "${SSH_OPTS[@]}" \
 log_ok "VPS ${VPS_IP} setup complete!"
 echo ""
 echo "Next steps:"
-echo "  Install k3s server (master):"
-echo "    make k3s-master"
+echo "  Install k3s server:"
+echo "    make k3s-server"

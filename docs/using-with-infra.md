@@ -55,8 +55,8 @@ SSH_PORT            ?= 22
 SSH_KEY             ?= $(HOME)/.ssh/id_ed25519
 SSH_KEY             := $(subst ~,$(HOME),$(SSH_KEY))
 INITIAL_USER        ?= root
-MASTER_IP           ?=
-WORKER_IP           ?=
+SERVER_IP           ?=
+AGENT_IP            ?=
 KUBECONFIG_CONTEXT  ?= k3s-infra
 K3S_VERSION         ?= v1.32.2+k3s1
 
@@ -131,8 +131,8 @@ Edit `.env` with **your** values — this is the only file that changes between 
 
 ```bash
 # VPS nodes
-MASTER_IP=1.2.3.4
-WORKER_IP=5.6.7.8
+SERVER_IP=1.2.3.4
+AGENT_IP=5.6.7.8
 
 # SSH
 SSH_USER=kevin
@@ -141,7 +141,7 @@ INITIAL_USER=root
 
 # k3s
 K3S_VERSION=v1.32.2+k3s1
-# K3S_NODE_TOKEN is auto-filled by `make k3s-master`
+# K3S_NODE_TOKEN is auto-filled by `make k3s-server`
 
 # Helm chart versions (pin to avoid surprise upgrades)
 TRAEFIK_CHART_VERSION=34.4.0
@@ -185,8 +185,8 @@ Or step by step:
 
 ```bash
 make setup-all             # bootstrap VPS nodes (dotfiles + packages)
-make k3s-master            # install k3s server + auto-save K3S_NODE_TOKEN
-make k3s-worker            # join worker to cluster
+make k3s-server            # install k3s server + auto-save K3S_NODE_TOKEN
+make k3s-agent             # join agent to cluster
 make kubeconfig            # merge ~/.kube/config
 kubectl config use-context k3s-infra
 make nodes                 # verify both nodes Ready
@@ -364,7 +364,7 @@ make vm-k3s-smoke         # TLS pipeline smoke test
 make vm-k3s-clean         # tear down when done
 ```
 
-The Lima targets read the same `.env` but override environment-specific values (`MASTER_IP=127.0.0.1`, self-signed TLS, NodePort instead of externalIPs).
+The Lima targets read the same `.env` but override environment-specific values (`SERVER_IP=127.0.0.1`, self-signed TLS, NodePort instead of externalIPs).
 
 See the [Local Testing guide](./operations/local-testing.md) for the complete walkthrough.
 
@@ -410,6 +410,6 @@ make mk-update           # pull latest makefiles from k3s-lab
 make deploy              # apply Helm upgrade
 
 # ── Debug remotely ────────────────────────────────────────────────────────────
-make ssh-master          # open SSH shell on master VPS
-make ssh-worker          # open SSH shell on worker VPS
+make ssh-server          # open SSH shell on server VPS
+make ssh-agent           # open SSH shell on agent VPS
 ```

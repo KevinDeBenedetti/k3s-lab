@@ -53,9 +53,9 @@ for pod in "${EXPECTED_PODS[@]}"; do
   if [ "$STATUS" = "Running" ]; then
     ok "${pod}: Running"
   elif [ -z "$STATUS" ]; then
-    # traefik is disabled in install-master.sh — skip if not found
+    # traefik is disabled in install-server.sh — skip if not found
     [[ "$pod" == "traefik" ]] \
-      && echo "  ⏭  ${pod}: disabled (expected — install-master.sh uses --disable=traefik)" \
+      && echo "  ⏭  ${pod}: disabled (expected — install-server.sh uses --disable=traefik)" \
       || fail "${pod}: not found"
   else
     fail "${pod}: ${STATUS} (expected Running)"

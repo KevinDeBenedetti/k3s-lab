@@ -33,7 +33,7 @@ CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.17.1}"
 # --- Validate required vars ---
 [ -n "${DOMAIN:-}" ]    || { log_error "DOMAIN is not set — add it to .env (e.g. DOMAIN=kevindb.dev)"; exit 1; }
 [ -n "${EMAIL:-}" ]     || { log_error "EMAIL is not set — add it to .env (e.g. EMAIL=contact@kevindb.dev)"; exit 1; }
-[ -n "${MASTER_IP:-}" ] || { log_error "MASTER_IP is not set — add it to .env"; exit 1; }
+[ -n "${SERVER_IP:-}" ] || { log_error "SERVER_IP is not set — add it to .env"; exit 1; }
 
 log_info "Deploying base stack on cluster: $(kubectl config current-context)"
 
@@ -47,8 +47,8 @@ helm repo add traefik https://helm.traefik.io/traefik --force-update
 helm repo update traefik
 # Kubernetes forbids loopback addresses as externalIPs; skip the flag for local Lima testing.
 EXTERNAL_IP_FLAG=""
-if [[ "${MASTER_IP}" != "127."* ]] && [[ "${MASTER_IP}" != "::1" ]]; then
-  EXTERNAL_IP_FLAG="--set service.externalIPs={${MASTER_IP}}"
+if [[ "${SERVER_IP}" != "127."* ]] && [[ "${SERVER_IP}" != "::1" ]]; then
+  EXTERNAL_IP_FLAG="--set service.externalIPs={${SERVER_IP}}"
 fi
 
 helm upgrade --install traefik traefik/traefik \

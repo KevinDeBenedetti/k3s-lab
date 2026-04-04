@@ -26,10 +26,10 @@ helm upgrade --install traefik traefik/traefik \
   --namespace ingress \
   --create-namespace \
   --values kubernetes/ingress/traefik-values.yaml \
-  --set service.externalIPs="{${MASTER_IP}}"
+  --set service.externalIPs="{${SERVER_IP}}"
 ```
 
-> The `--set service.externalIPs` flag pins the LoadBalancer service to the master node's public IP. This is skipped automatically for local testing (`127.*` addresses).
+> The `--set service.externalIPs` flag pins the LoadBalancer service to the server node's public IP. This is skipped automatically for local testing (`127.*` addresses).
 
 ---
 

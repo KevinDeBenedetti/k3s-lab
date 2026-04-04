@@ -25,8 +25,8 @@ setup() {
 
 # ── Lima config files ─────────────────────────────────────────────────────────
 
-@test "tests/lima/k3s-master.yaml exists" {
-    [ -f "$LIMA_DIR/k3s-master.yaml" ]
+@test "tests/lima/k3s-server.yaml exists" {
+    [ -f "$LIMA_DIR/k3s-server.yaml" ]
 }
 
 @test "tests/lima/debian-vps.yaml exists" {
@@ -41,21 +41,21 @@ setup() {
     [ -f "$LIMA_DIR/smoke-monitoring.yaml" ]
 }
 
-# ── k3s-master.yaml port forwards ────────────────────────────────────────────
+# ── k3s-server.yaml port forwards ─────────────────────────────────────────────
 
-@test "k3s-master.yaml forwards API server port 6443 to localhost" {
-    grep -q "guestPort: 6443" "$LIMA_DIR/k3s-master.yaml"
-    grep -q "hostPort: 6443"  "$LIMA_DIR/k3s-master.yaml"
+@test "k3s-server.yaml forwards API server port 6443 to localhost" {
+    grep -q "guestPort: 6443" "$LIMA_DIR/k3s-server.yaml"
+    grep -q "hostPort: 6443"  "$LIMA_DIR/k3s-server.yaml"
 }
 
-@test "k3s-master.yaml forwards HTTPS NodePort 30443 → host 8443" {
-    grep -q "guestPort: 30443" "$LIMA_DIR/k3s-master.yaml"
-    grep -q "hostPort: 8443"   "$LIMA_DIR/k3s-master.yaml"
+@test "k3s-server.yaml forwards HTTPS NodePort 30443 → host 8443" {
+    grep -q "guestPort: 30443" "$LIMA_DIR/k3s-server.yaml"
+    grep -q "hostPort: 8443"   "$LIMA_DIR/k3s-server.yaml"
 }
 
-@test "k3s-master.yaml forwards HTTP NodePort 30080 → host 8080" {
-    grep -q "guestPort: 30080" "$LIMA_DIR/k3s-master.yaml"
-    grep -q "hostPort: 8080"   "$LIMA_DIR/k3s-master.yaml"
+@test "k3s-server.yaml forwards HTTP NodePort 30080 → host 8080" {
+    grep -q "guestPort: 30080" "$LIMA_DIR/k3s-server.yaml"
+    grep -q "hostPort: 8080"   "$LIMA_DIR/k3s-server.yaml"
 }
 
 # ── smoke-test.yaml — whoami TLS pipeline ────────────────────────────────────

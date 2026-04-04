@@ -21,12 +21,12 @@ setup() {
 
 # ── Required keys ─────────────────────────────────────────────────────────────
 
-@test ".env.example has MASTER_IP" {
-    grep -q "^MASTER_IP=" "$REPO_ROOT/.env.example"
+@test ".env.example has SERVER_IP" {
+    grep -q "^SERVER_IP=" "$REPO_ROOT/.env.example"
 }
 
-@test ".env.example has WORKER_IP" {
-    grep -q "^WORKER_IP=" "$REPO_ROOT/.env.example"
+@test ".env.example has AGENT_IP" {
+    grep -q "^AGENT_IP=" "$REPO_ROOT/.env.example"
 }
 
 @test ".env.example has DOMAIN" {
@@ -67,8 +67,8 @@ setup() {
 
 # ── No real secrets in .env.example ──────────────────────────────────────────
 
-@test ".env.example values are placeholders (no real IPs in MASTER_IP)" {
-    val="$(grep "^MASTER_IP=" "$REPO_ROOT/.env.example" | cut -d= -f2)"
+@test ".env.example values are placeholders (no real IPs in SERVER_IP)" {
+    val="$(grep "^SERVER_IP=" "$REPO_ROOT/.env.example" | cut -d= -f2)"
     # Allow empty or obvious placeholder strings
     [[ -z "$val" || "$val" =~ ^(1\.2\.3\.4|x\.x\.x\.x|<.*>|your-|YOUR_|CHANGE_ME) ]] \
         || [[ "$val" =~ \. ]]

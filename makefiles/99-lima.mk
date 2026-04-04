@@ -3,7 +3,7 @@
 # Lima — Local VM testing
 # Requires: brew install lima
 # Docs:     tests/lima/debian-vps.yaml   (VPS setup verification)
-#           tests/lima/k3s-master.yaml   (k3s master node)
+#           tests/lima/k3s-server.yaml  (k3s server node)
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Path to the local dotfiles repo (mounted read-only into Lima VMs at same path)
@@ -12,7 +12,7 @@ DOTFILES_DIR ?= $(HOME)/dev/dotfiles
 VPS_VM_NAME    := infra-vps-vm
 K3S_VM_NAME    := infra-k3s-vm
 VPS_VM_CONFIG  := $(LIMA_TESTS_DIR)/debian-vps.yaml
-K3S_VM_CONFIG  := $(LIMA_TESTS_DIR)/k3s-master.yaml
+K3S_VM_CONFIG  := $(LIMA_TESTS_DIR)/k3s-server.yaml
 # Shared secret for local Lima k3s — not a real credential
 K3S_LIMA_TOKEN ?= lima-local-test-token-k3s
 
@@ -73,22 +73,22 @@ vm-vps-full: vm-vps-create vm-vps-install vm-vps-test ## [Lima] Full VPS cycle: 
 	@echo ""
 	@echo "$(GREEN)🎉 VPS test cycle complete$(RESET)"
 
-# ─── k3s VM (tests install-master.sh on a real k3s single-node cluster) ──────
+# ─── k3s VM (tests install-server.sh on a real k3s single-node cluster) ──────
 
-vm-k3s-create: ## [Lima] Create k3s master VM (Debian 12, 4 GB RAM)
+vm-k3s-create: ## [Lima] Create k3s server VM (Debian 12, 4 GB RAM)
 	@echo "$(YELLOW)→ Creating VM '$(K3S_VM_NAME)'...$(RESET)"
 	@limactl list $(K3S_VM_NAME) > /dev/null 2>&1 \
 		&& echo "  ⚠️  VM already exists — run 'make vm-k3s-clean' first" \
 		|| limactl start --name=$(K3S_VM_NAME) --tty=false $(K3S_VM_CONFIG)
 	@echo "$(GREEN)✅ VM '$(K3S_VM_NAME)' ready$(RESET)"
 
-vm-k3s-install: ## [Lima] Run install-master.sh inside the k3s VM
-	@echo "$(YELLOW)→ Installing k3s master in '$(K3S_VM_NAME)'...$(RESET)"
+vm-k3s-install: ## [Lima] Run install-server.sh inside the k3s VM
+	@echo "$(YELLOW)→ Installing k3s server in '$(K3S_VM_NAME)'...$(RESET)"
 	@echo "  Token:     $(K3S_LIMA_TOKEN)"
 	@echo "  PUBLIC_IP: 127.0.0.1 (port-forwarded to host)"
 	@limactl shell $(K3S_VM_NAME) bash -c \
-		"sudo K3S_NODE_TOKEN='$(K3S_LIMA_TOKEN)' PUBLIC_IP=127.0.0.1 $(call lima-run-script,k3s/install-master.sh)"
-	@echo "$(GREEN)✅ k3s master installed$(RESET)"
+		"sudo K3S_NODE_TOKEN='$(K3S_LIMA_TOKEN)' PUBLIC_IP=127.0.0.1 $(call lima-run-script,k3s/install-server.sh)"
+	@echo "$(GREEN)✅ k3s server installed$(RESET)"
 
 vm-k3s-kubeconfig: ## [Lima] Merge k3s Lima kubeconfig → local context 'k3s-lima'
 	@echo "$(YELLOW)→ Fetching kubeconfig from '$(K3S_VM_NAME)'...$(RESET)"
@@ -147,7 +147,7 @@ vm-k3s-deploy: ## [Lima] Deploy base stack on Lima k3s (mirrors make deploy but 
 	@kubectl --context k3s-lima cluster-info --request-timeout=5s >/dev/null 2>&1 || \
 		(echo "$(RED)❌ Cannot reach k3s-lima — run make vm-k3s-full first$(RESET)"; exit 1)
 	@kubectl config use-context k3s-lima
-	@MASTER_IP=127.0.0.1 KUBECONFIG_CONTEXT=k3s-lima SKIP_DASHBOARD=true \
+	@SERVER_IP=127.0.0.1 KUBECONFIG_CONTEXT=k3s-lima SKIP_DASHBOARD=true \
 		TRAEFIK_EXTRA_ARGS="--set metrics.prometheus.serviceMonitor.enabled=false \
 		  --set service.type=NodePort \
 		  --set ports.web.nodePort=30080 \

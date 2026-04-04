@@ -11,8 +11,8 @@ SSH_PORT            ?= 22
 SSH_KEY             ?= $(HOME)/.ssh/id_ed25519
 SSH_KEY             := $(subst ~,$(HOME),$(SSH_KEY))
 INITIAL_USER        ?= root
-MASTER_IP           ?=
-WORKER_IP           ?=
+SERVER_IP           ?=
+AGENT_IP            ?=
 KUBECONFIG_CONTEXT  ?= k3s-lab
 K3S_VERSION         ?= v1.32.2+k3s1
 
@@ -31,6 +31,7 @@ include makefiles/00-lib.mk
 include makefiles/10-help.mk
 include makefiles/20-vps.mk
 include makefiles/30-k3s.mk
+include makefiles/35-wireguard.mk
 include makefiles/40-kubeconfig.mk
 include makefiles/50-deploy.mk
 include makefiles/60-status.mk

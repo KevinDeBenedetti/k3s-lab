@@ -3,7 +3,7 @@ set -euo pipefail
 
 # =============================================================================
 # k3s Uninstall — Remove k3s from a node
-# Run on the node you want to reset (master or worker).
+# Run on the node you want to reset (server or agent).
 # =============================================================================
 
 echo "⚠️  This will completely remove k3s from this node."

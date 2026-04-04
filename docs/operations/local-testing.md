@@ -38,7 +38,7 @@ brew install bats-core
 
 ## 2. Lima VM — full local k3s cluster
 
-Lima runs a Debian 12 VM on macOS (Apple Virtualization framework), exposing port `6443` on `localhost`. This lets you test `install-master.sh`, Helm deployments, TLS, and Grafana exactly as they run in production.
+Lima runs a Debian 12 VM on macOS (Apple Virtualization framework), exposing port `6443` on `localhost`. This lets you test `install-server.sh`, Helm deployments, TLS, and Grafana exactly as they run in production.
 
 **Prerequisites:**
 
@@ -86,13 +86,13 @@ Creates a Debian 12 VM (`infra-k3s-vm`) with:
 - Port `6443` forwarded to `localhost:6443` (k3s API server)
 - Host `~` mounted read-only inside the VM
 
-#### Install k3s master
+#### Install k3s server
 
 ```bash
 make vm-k3s-install
 ```
 
-Runs `k3s/install-master.sh` inside the VM with:
+Runs `k3s/install-server.sh` inside the VM with:
 - `K3S_NODE_TOKEN=lima-local-test-token-k3s`
 - `PUBLIC_IP=127.0.0.1`
 
@@ -254,7 +254,7 @@ To filter for errors only (mirrors the built-in dashboard):
 | ------------------------------- | -------------------------------------------------- |
 | `make vm-k3s-full`              | Full cycle: create → install → kubeconfig → verify |
 | `make vm-k3s-create`            | Create Debian 12 VM                                |
-| `make vm-k3s-install`           | Run `install-master.sh` inside the VM              |
+| `make vm-k3s-install`           | Run `install-server.sh` inside the VM              |
 | `make vm-k3s-kubeconfig`        | Merge kubeconfig → context `k3s-lima`              |
 | `make vm-k3s-test`              | Verify cluster health                              |
 | `make vm-k3s-deploy`            | Deploy Traefik + cert-manager                      |

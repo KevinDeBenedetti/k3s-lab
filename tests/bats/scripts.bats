@@ -10,12 +10,12 @@ setup() {
 
 # ── Required scripts exist ────────────────────────────────────────────────────
 
-@test "k3s/install-master.sh exists" {
-    [ -f "$REPO_ROOT/k3s/install-master.sh" ]
+@test "k3s/install-server.sh exists" {
+    [ -f "$REPO_ROOT/k3s/install-server.sh" ]
 }
 
-@test "k3s/install-worker.sh exists" {
-    [ -f "$REPO_ROOT/k3s/install-worker.sh" ]
+@test "k3s/install-agent.sh exists" {
+    [ -f "$REPO_ROOT/k3s/install-agent.sh" ]
 }
 
 @test "k3s/uninstall.sh exists" {
@@ -36,6 +36,14 @@ setup() {
 
 @test "scripts/setup-vps.sh exists" {
     [ -f "$REPO_ROOT/scripts/setup-vps.sh" ]
+}
+
+@test "scripts/wireguard/setup-server.sh exists" {
+    [ -f "$REPO_ROOT/scripts/wireguard/setup-server.sh" ]
+}
+
+@test "scripts/wireguard/add-peer.sh exists" {
+    [ -f "$REPO_ROOT/scripts/wireguard/add-peer.sh" ]
 }
 
 @test "lib/load-env.sh exists" {
@@ -84,12 +92,12 @@ setup() {
 
 # ── Script content checks ─────────────────────────────────────────────────────
 
-@test "install-master.sh sets -euo pipefail" {
-    grep -q "set -euo pipefail" "$REPO_ROOT/k3s/install-master.sh"
+@test "install-server.sh sets -euo pipefail" {
+    grep -q "set -euo pipefail" "$REPO_ROOT/k3s/install-server.sh"
 }
 
-@test "install-worker.sh sets -euo pipefail" {
-    grep -q "set -euo pipefail" "$REPO_ROOT/k3s/install-worker.sh"
+@test "install-agent.sh sets -euo pipefail" {
+    grep -q "set -euo pipefail" "$REPO_ROOT/k3s/install-agent.sh"
 }
 
 @test "deploy-stack.sh sets -euo pipefail" {
@@ -106,6 +114,14 @@ setup() {
 
 @test "setup-vps.sh sets -euo pipefail" {
     grep -q "set -euo pipefail" "$REPO_ROOT/scripts/setup-vps.sh"
+}
+
+@test "wireguard/setup-server.sh sets -euo pipefail" {
+    grep -q "set -euo pipefail" "$REPO_ROOT/scripts/wireguard/setup-server.sh"
+}
+
+@test "wireguard/add-peer.sh sets -euo pipefail" {
+    grep -q "set -euo pipefail" "$REPO_ROOT/scripts/wireguard/add-peer.sh"
 }
 
 # ── lib helpers are sourceable ────────────────────────────────────────────────

@@ -12,11 +12,11 @@ make help
 
 | Target                          | Required vars                              | Description                                                                                                                         |
 | ------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `make k3s-master`               | `MASTER_IP`, `K3S_VERSION`                 | Install k3s server on the master node. Copies `install-master.sh` via SCP, runs it remotely, then saves `K3S_NODE_TOKEN` to `.env`. |
-| `make k3s-worker`               | `WORKER_IP`, `MASTER_IP`, `K3S_NODE_TOKEN` | Open master firewall for the worker, install k3s agent on the worker node.                                                          |
-| `make k3s-open-master-firewall` | `WORKER_IP`, `MASTER_IP`                   | Add UFW rules on the master to allow a new worker (VXLAN `:8472/udp`, kubelet `:10250/tcp`).                                        |
-| `make k3s-uninstall-master`     | `MASTER_IP`                                | ⚠️ Remove k3s from the master node (destructive).                                                                                    |
-| `make k3s-uninstall-worker`     | `WORKER_IP`                                | ⚠️ Remove k3s from the worker node (destructive).                                                                                    |
+| `make k3s-server`               | `SERVER_IP`, `K3S_VERSION`                 | Install k3s server on the server node. Copies `install-server.sh` via SCP, runs it remotely, then saves `K3S_NODE_TOKEN` to `.env`. |
+| `make k3s-agent`                | `AGENT_IP`, `SERVER_IP`, `K3S_NODE_TOKEN`  | Open server firewall for the agent, install k3s agent on the agent node.                                                            |
+| `make k3s-open-server-firewall` | `AGENT_IP`, `SERVER_IP`                    | Add UFW rules on the server to allow a new agent (VXLAN `:8472/udp`, kubelet `:10250/tcp`).                                         |
+| `make k3s-uninstall-server`     | `SERVER_IP`                                | ⚠️ Remove k3s from the server node (destructive).                                                                                    |
+| `make k3s-uninstall-agent`      | `AGENT_IP`                                 | ⚠️ Remove k3s from the agent node (destructive).                                                                                     |
 
 ---
 
@@ -24,7 +24,7 @@ make help
 
 | Target            | Required vars                                 | Description                                                                                                                                           |
 | ----------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `make kubeconfig` | `MASTER_IP`, `SSH_USER`, `KUBECONFIG_CONTEXT` | Fetch `/etc/rancher/k3s/k3s.yaml` from the master, replace `127.0.0.1` with `MASTER_IP`, merge into `~/.kube/config` as context `KUBECONFIG_CONTEXT`. |
+| `make kubeconfig` | `SERVER_IP`, `SSH_USER`, `KUBECONFIG_CONTEXT` | Fetch `/etc/rancher/k3s/k3s.yaml` from the server, replace `127.0.0.1` with `SERVER_IP`, merge into `~/.kube/config` as context `KUBECONFIG_CONTEXT`. |
 
 After running:
 ```bash
@@ -38,7 +38,7 @@ kubectl get nodes
 
 | Target                         | Required vars                                              | Description                                                                                                  |
 | ------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `make deploy`                  | `DOMAIN`, `EMAIL`, `MASTER_IP`                             | Deploy base stack: namespaces, Traefik, cert-manager, ClusterIssuers, Traefik dashboard IngressRoute.        |
+| `make deploy`                  | `DOMAIN`, `EMAIL`, `SERVER_IP`                             | Deploy base stack: namespaces, Traefik, cert-manager, ClusterIssuers, Traefik dashboard IngressRoute.        |
 | `make deploy-dashboard-secret` | `DASHBOARD_PASSWORD`                                       | Create the `traefik-dashboard-auth` BasicAuth secret in the `ingress` namespace.                             |
 | `make deploy-monitoring`       | `GRAFANA_DOMAIN`, `GRAFANA_PASSWORD`, `KUBECONFIG_CONTEXT` | Deploy observability stack: kube-prometheus-stack, Loki, Promtail, Grafana IngressRoute.                     |
 | `make deploy-grafana-secret`   | `GRAFANA_PASSWORD`, `KUBECONFIG_CONTEXT`                   | Create the `grafana-admin-secret` in the `monitoring` namespace (prerequisite for `make deploy-monitoring`). |
@@ -59,9 +59,9 @@ kubectl get nodes
 
 | Target                   | Required vars | Description                                                                                           |
 | ------------------------ | ------------- | ----------------------------------------------------------------------------------------------------- |
-| `make ssh-master`        | `MASTER_IP`   | Open an interactive SSH shell on the master node                                                      |
-| `make ssh-worker`        | `WORKER_IP`   | Open an interactive SSH shell on the worker node                                                      |
-| `make known-hosts-reset` | —             | Remove stale `~/.ssh/known_hosts` entries for `MASTER_IP` and `WORKER_IP` (useful after VPS reformat) |
+| `make ssh-server`        | `SERVER_IP`   | Open an interactive SSH shell on the server node                                                      |
+| `make ssh-agent`         | `AGENT_IP`    | Open an interactive SSH shell on the agent node                                                       |
+| `make known-hosts-reset` | —             | Remove stale `~/.ssh/known_hosts` entries for `SERVER_IP` and `AGENT_IP` (useful after VPS reformat)  |
 
 ---
 
@@ -88,7 +88,7 @@ kubectl get nodes
 
 | Target           | Description                                                                                       |
 | ---------------- | ------------------------------------------------------------------------------------------------- |
-| `make provision` | Full cluster lifecycle: VPS setup → k3s master → k3s worker → kubeconfig → deploy → monitoring   |
+| `make provision` | Full cluster lifecycle: VPS setup → k3s server → k3s agent → kubeconfig → deploy → monitoring    |
 
 This is equivalent to running all individual targets in order and is the recommended entry point for a fresh cluster.
 
@@ -102,7 +102,7 @@ Lima targets are bundled directly in k3s-lab (`makefiles/99-lima.mk`) — no par
 | ------------------------------- | ---------------------------------------------------------- |
 | `make vm-k3s-full`              | Full cycle: create VM → install k3s → kubeconfig → verify  |
 | `make vm-k3s-create`            | Create Debian 12 VM (2 CPU, 4 GB RAM, 20 GB disk)          |
-| `make vm-k3s-install`           | Run `k3s/install-master.sh` inside the VM                  |
+| `make vm-k3s-install`           | Run `k3s/install-server.sh` inside the VM                  |
 | `make vm-k3s-kubeconfig`        | Merge kubeconfig → context `k3s-lima`                      |
 | `make vm-k3s-test`              | Verify cluster health (all 15 checks)                      |
 | `make vm-k3s-deploy`            | Deploy Traefik + cert-manager (mirrors production)         |
@@ -126,8 +126,8 @@ cp .env.example .env
 # Edit .env with your VPS IPs, domain, etc.
 
 # 2. Bootstrap k3s
-make k3s-master            # Install control plane (~5 min)
-make k3s-worker            # Join worker node (~3 min)
+make k3s-server            # Install control plane (~5 min)
+make k3s-agent             # Join agent node (~3 min)
 
 # 3. Configure kubectl
 make kubeconfig

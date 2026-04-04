@@ -1,10 +1,10 @@
-# Lima VM — k3s Master Node (Debian 12 Bookworm)
-# Tests k3s/install-master.sh locally. Runs a real single-node k3s cluster
+# Lima VM — k3s Server Node (Debian 12 Bookworm)
+# Tests k3s/install-server.sh locally. Runs a real single-node k3s cluster
 # accessible from the host via port-forwarded API server (localhost:6443).
 #
 # Usage (via Makefile):
 #   make vm-k3s-create      → create VM (Debian 12, 2 CPU, 4 GB)
-#   make vm-k3s-install     → run install-master.sh inside VM
+#   make vm-k3s-install     → run install-server.sh inside VM
 #   make vm-k3s-kubeconfig  → merge kubeconfig → context: k3s-lima
 #   make vm-k3s-test        → verify node Ready + pods running
 #   make vm-k3s-shell       → open interactive shell
@@ -37,8 +37,8 @@ vmOpts:
       binfmt: true
 
 mounts:
-  # Host home mounted read-only at the same path — k3s/install-master.sh is
-  # accessible inside the VM at /Users/<you>/dev/infra/k3s/install-master.sh
+  # Host home mounted read-only at the same path — k3s/install-server.sh is
+  # accessible inside the VM at /Users/<you>/dev/k3s-lab/k3s/install-server.sh
   - location: "~"
     writable: false
   - location: "/tmp/lima"

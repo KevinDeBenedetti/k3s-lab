@@ -23,8 +23,8 @@
 
 ```bash
 cp .env.example .env          # fill in your values
-make k3s-master               # bootstrap control plane
-make k3s-worker               # join worker node
+make k3s-server               # bootstrap control plane
+make k3s-agent                # join agent node
 make kubeconfig               # fetch kubeconfig
 make deploy                   # deploy Traefik + cert-manager
 make deploy-monitoring        # deploy Prometheus + Grafana + Loki
