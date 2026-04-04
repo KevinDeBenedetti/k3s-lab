@@ -3,12 +3,17 @@
 # SSH
 # ──────────────────────────────────────────────────────────────────────────────
 
+# SSH_SERVER_HOST: override in the consuming Makefile to change where
+# ssh-server connects (e.g. via WireGuard instead of public IP).
+# Default: public SERVER_IP.
+SSH_SERVER_HOST ?= $(SERVER_IP)
+
 .PHONY: ssh-server ssh-agent known-hosts-reset
 
 ssh-server: ## Open SSH shell on server
-	@[ -n "$(SERVER_IP)" ] || (echo "$(RED)❌ SERVER_IP is not set$(RESET)"; exit 1)
-	@echo "$(CYAN)→ Connecting to server $(SERVER_IP)...$(RESET)"
-	@ssh -i $(SSH_KEY) -p $(SSH_PORT) $(SSH_USER)@$(SERVER_IP)
+	@[ -n "$(SSH_SERVER_HOST)" ] || (echo "$(RED)❌ SERVER_IP is not set$(RESET)"; exit 1)
+	@echo "$(CYAN)→ Connecting to server $(SSH_SERVER_HOST)...$(RESET)"
+	@ssh -i $(SSH_KEY) -p $(SSH_PORT) $(SSH_USER)@$(SSH_SERVER_HOST)
 
 ssh-agent: ## Open SSH shell on agent
 	@[ -n "$(AGENT_IP)" ] || (echo "$(RED)❌ AGENT_IP is not set$(RESET)"; exit 1)

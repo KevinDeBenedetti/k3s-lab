@@ -5,8 +5,8 @@
 
 VAULT_CHART_VERSION ?= 0.29.1
 ESO_CHART_VERSION   ?= 0.14.3
-VAULT_DOMAIN        ?=
-VAULT_ROOT_TOKEN    ?=   # optional: set to skip interactive prompt in vault-init
+# VAULT_DOMAIN and VAULT_ROOT_TOKEN intentionally have no default here.
+# Set them in the consuming Makefile or .env.
 
 .PHONY: deploy-vault vault-init vault-unseal vault-configure vault-seed vault-status deploy-eso
 
