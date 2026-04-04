@@ -79,3 +79,23 @@ ifdef K3S_LAB
 else
   LIMA_TESTS_DIR := $(K3S_LAB_RAW)/tests/lima
 endif
+
+# ── Shared makefile cache management ──────────────────────────────────────────
+# Available when the consumer defines MK_CACHE + SHARED_MKS (e.g. infra repo).
+ifdef MK_CACHE
+
+.PHONY: mk-update mk-clean
+
+mk-update: ## Force re-fetch all shared makefiles from k3s-lab
+	@echo "$(YELLOW)→ Refreshing shared makefiles from k3s-lab...$(RESET)"
+	@rm -rf $(MK_CACHE) && mkdir -p $(MK_CACHE)
+	@$(foreach f,$(SHARED_MKS),\
+	  curl -fsSL $(K3S_LAB_RAW)/makefiles/$(f).mk -o $(MK_CACHE)/$(f).mk \
+	    && echo "  ✓ $(f).mk";)
+	@echo "$(GREEN)✅ Shared makefiles updated$(RESET)"
+
+mk-clean: ## Remove cached makefiles (will re-fetch on next make invocation)
+	@rm -rf $(MK_CACHE)
+	@echo "$(GREEN)✅ $(MK_CACHE) cleared — re-fetch on next make invocation$(RESET)"
+
+endif

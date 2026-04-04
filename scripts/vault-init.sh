@@ -6,18 +6,12 @@ set -euo pipefail
 #
 # Run AFTER Vault pods are Running: make vault-init
 #
-# What this does:
-#   1. Initialize Vault (if not already initialized)
-#   2. Unseal Vault with the generated unseal keys
+# Steps:
+#   1. Check init + seal status
+#   2. Initialize (if needed) or unseal (if sealed)
 #   3. Enable KV v2 secrets engine at 'secret/'
-#   4. Enable Kubernetes auth method
-#   5. Configure K8s auth (token reviewer binding)
-#   6. Create read policies for each managed namespace
-#   7. Create Kubernetes roles binding policies to ESO ServiceAccount
-#
-# Outputs:
-#   - Unseal keys and root token printed to stdout ONLY
-#   - ⚠️  Save these immediately — Vault never shows them again
+#   4. Enable + configure Kubernetes auth method
+#   5. Create ESO read policy + Kubernetes role
 # =============================================================================
 
 K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
@@ -41,26 +35,66 @@ VAULT_POD="vault-0"
 ESO_NAMESPACE="${ESO_NAMESPACE:-external-secrets}"
 ESO_SA="${ESO_SA:-external-secrets}"
 
-# ── Helper: run vault CLI inside the Vault pod ────────────────────────────────
+# ── Helpers: run vault CLI inside the Vault pod ───────────────────────────────
+# vault_exec: for commands that do NOT need stdin (status, unseal, auth list…)
+# vault_exec_stdin: for commands that read from stdin (policy write via heredoc)
 vault_exec() {
   kubectl --context "${KUBECONFIG_CONTEXT}" exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-    -- vault "$@"
+    -- env VAULT_TOKEN="${VAULT_TOKEN:-}" vault "$@"
+}
+vault_exec_stdin() {
+  kubectl --context "${KUBECONFIG_CONTEXT}" exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
+    -- env VAULT_TOKEN="${VAULT_TOKEN:-}" vault "$@"
 }
 
-# ── 0. Wait for Vault pod to be Running ───────────────────────────────────────
+# _parse_status <json> <field> <default>
+# Extract a boolean field from Vault status JSON, returns "yes" or "no".
+_parse_status() {
+  echo "$1" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+print('yes' if d.get('$2') else 'no')
+" 2>/dev/null || echo "$3"
+}
+
+# ── 0. Wait for Vault pod ────────────────────────────────────────────────────
 log_info "Waiting for Vault pod to be Running..."
 kubectl --context "${KUBECONFIG_CONTEXT}" wait pod/"${VAULT_POD}" \
   -n "${VAULT_NAMESPACE}" \
   --for=condition=Ready \
   --timeout=120s
 
-# ── 1. Check init status ──────────────────────────────────────────────────────
-INIT_STATUS=$(vault_exec status -format=json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('initialized','false'))" 2>/dev/null || echo "false")
+# ── 1. Check init + seal status ──────────────────────────────────────────────
+# vault status exits 0 (unsealed), 1 (error), or 2 (sealed) — all produce JSON.
+STATUS_JSON=$(vault_exec status -format=json 2>/dev/null || true)
 
-if [[ "${INIT_STATUS}" == "true" ]]; then
+if [[ -z "${STATUS_JSON}" ]]; then
+  log_error "Cannot reach Vault — is the pod running?"
+  exit 1
+fi
+
+INITIALIZED=$(_parse_status "${STATUS_JSON}" initialized no)
+SEALED=$(_parse_status "${STATUS_JSON}" sealed yes)
+
+if [[ "${INITIALIZED}" == "yes" ]]; then
   log_info "Vault is already initialized — skipping init"
+
+  if [[ "${SEALED}" == "yes" ]]; then
+    log_step "[2/5] Vault is sealed — unsealing..."
+    if [[ -z "${VAULT_UNSEAL_KEY_1:-}" ]]; then
+      read -r -s -p "  Unseal Key 1: " VAULT_UNSEAL_KEY_1; echo ""
+    fi
+    if [[ -z "${VAULT_UNSEAL_KEY_2:-}" ]]; then
+      read -r -s -p "  Unseal Key 2: " VAULT_UNSEAL_KEY_2; echo ""
+    fi
+    vault_exec operator unseal "${VAULT_UNSEAL_KEY_1}"
+    vault_exec operator unseal "${VAULT_UNSEAL_KEY_2}"
+    log_info "Vault unsealed"
+  else
+    log_info "Vault is already unsealed"
+  fi
 else
-  # ── 2. Initialize ─────────────────────────────────────────────────────────
+  # ── Initialize ──────────────────────────────────────────────────────────
   log_step "[1/5] Initializing Vault..."
   INIT_OUTPUT=$(vault_exec operator init \
     -key-shares=3 \
@@ -76,9 +110,8 @@ else
   echo "${INIT_OUTPUT}" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
-print('Unseal Key 1:', d['unseal_keys_b64'][0])
-print('Unseal Key 2:', d['unseal_keys_b64'][1])
-print('Unseal Key 3:', d['unseal_keys_b64'][2])
+for i, k in enumerate(d['unseal_keys_b64'], 1):
+    print(f'Unseal Key {i}: {k}')
 print()
 print('Root Token:  ', d['root_token'])
 "
@@ -86,20 +119,18 @@ print('Root Token:  ', d['root_token'])
   echo "════════════════════════════════════════════════════════════════"
   echo ""
 
-  # Extract keys for use in this script
-  UNSEAL_KEY_1=$(echo "${INIT_OUTPUT}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['unseal_keys_b64'][0])")
-  UNSEAL_KEY_2=$(echo "${INIT_OUTPUT}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['unseal_keys_b64'][1])")
-  ROOT_TOKEN=$(echo "${INIT_OUTPUT}"   | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['root_token'])")
+  UNSEAL_KEY_1=$(echo "${INIT_OUTPUT}" | python3 -c "import sys,json; print(json.load(sys.stdin)['unseal_keys_b64'][0])")
+  UNSEAL_KEY_2=$(echo "${INIT_OUTPUT}" | python3 -c "import sys,json; print(json.load(sys.stdin)['unseal_keys_b64'][1])")
+  ROOT_TOKEN=$(echo "${INIT_OUTPUT}"   | python3 -c "import sys,json; print(json.load(sys.stdin)['root_token'])")
 
-  # ── 3. Unseal ────────────────────────────────────────────────────────────
+  # ── Unseal ──────────────────────────────────────────────────────────────
   log_step "[2/5] Unsealing Vault..."
   vault_exec operator unseal "${UNSEAL_KEY_1}"
   vault_exec operator unseal "${UNSEAL_KEY_2}"
-
   log_info "Vault unsealed successfully"
 fi
 
-# ── 4. Require root token for the rest ───────────────────────────────────────
+# ── Require root token for the rest ──────────────────────────────────────────
 if [[ -z "${ROOT_TOKEN:-}" ]]; then
   if [[ -n "${VAULT_ROOT_TOKEN:-}" ]]; then
     ROOT_TOKEN="${VAULT_ROOT_TOKEN}"
@@ -110,29 +141,33 @@ if [[ -z "${ROOT_TOKEN:-}" ]]; then
   fi
 fi
 
-export VAULT_TOKEN="${ROOT_TOKEN}"
+VAULT_TOKEN="${ROOT_TOKEN}"
 
-# ── 5. Enable KV v2 ──────────────────────────────────────────────────────────
+# ── 3. Enable KV v2 ──────────────────────────────────────────────────────────
 log_step "[3/5] Enabling KV v2 secrets engine at 'secret/'..."
-vault_exec secrets list -format=json | python3 -c "import sys,json; print('secret/' in json.load(sys.stdin))" | grep -q True \
-  && log_info "KV v2 already enabled — skipping" \
-  || vault_exec secrets enable -path=secret kv-v2
+if vault_exec secrets list -format=json 2>/dev/null \
+  | python3 -c "import sys,json; sys.exit(0 if 'secret/' in json.load(sys.stdin) else 1)" 2>/dev/null; then
+  log_info "KV v2 already enabled — skipping"
+else
+  vault_exec secrets enable -path=secret kv-v2
+fi
 
-# ── 6. Enable Kubernetes auth ─────────────────────────────────────────────────
+# ── 4. Enable Kubernetes auth ────────────────────────────────────────────────
 log_step "[4/5] Configuring Kubernetes auth method..."
-vault_exec auth list -format=json | python3 -c "import sys,json; print('kubernetes/' in json.load(sys.stdin))" | grep -q True \
-  && log_info "Kubernetes auth already enabled — skipping" \
-  || vault_exec auth enable kubernetes
+if vault_exec auth list -format=json 2>/dev/null \
+  | python3 -c "import sys,json; sys.exit(0 if 'kubernetes/' in json.load(sys.stdin) else 1)" 2>/dev/null; then
+  log_info "Kubernetes auth already enabled — skipping"
+else
+  vault_exec auth enable kubernetes
+fi
 
-# Configure K8s auth — use the cluster's internal API and Vault's own SA token
 vault_exec write auth/kubernetes/config \
   kubernetes_host="https://kubernetes.default.svc.cluster.local:443"
 
-# ── 7. Create policies and roles ─────────────────────────────────────────────
+# ── 5. Create policies and roles ─────────────────────────────────────────────
 log_step "[5/5] Creating policies and Kubernetes roles..."
 
-# Policy: ESO read-only access to all secrets
-vault_exec policy write eso-read - <<'POLICY'
+vault_exec_stdin policy write eso-read - <<'POLICY'
 path "secret/data/*" {
   capabilities = ["read", "list"]
 }
@@ -141,7 +176,6 @@ path "secret/metadata/*" {
 }
 POLICY
 
-# Kubernetes role for ESO — bound to the external-secrets ServiceAccount
 vault_exec write auth/kubernetes/role/eso \
   bound_service_account_names="${ESO_SA}" \
   bound_service_account_namespaces="${ESO_NAMESPACE}" \
@@ -151,7 +185,6 @@ vault_exec write auth/kubernetes/role/eso \
 log_info "✅ Vault initialized and configured"
 echo ""
 echo "Next steps:"
-echo "  make vault-seed        # store all secrets into Vault"
-echo "  make deploy-eso        # install External Secrets Operator"
-echo "  kubectl apply -f kubernetes/external-secrets/cluster-secret-store.yaml"
-echo "  kubectl apply -f kubernetes/vault/external-secrets/"
+echo "  make vault-seed                     # store secrets into Vault"
+echo "  make deploy-eso                     # install External Secrets Operator"
+echo "  make vault-apply-externalsecrets    # apply ClusterSecretStore + ExternalSecrets"

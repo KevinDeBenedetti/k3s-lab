@@ -46,19 +46,15 @@ vault-unseal: ## Unseal Vault after a node reboot (requires VAULT_UNSEAL_KEY_1 +
 vault-configure: ## (Re)create Vault policies and Kubernetes roles (idempotent)
 	@[ -n "$(VAULT_ROOT_TOKEN)" ] || (echo "$(RED)❌ VAULT_ROOT_TOKEN not set — add to .env$(RESET)"; exit 1)
 	@echo "$(YELLOW)→ Configuring Vault policies and roles...$(RESET)"
-	@kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 \
-	  -e VAULT_TOKEN=$(VAULT_ROOT_TOKEN) -- \
-	  sh -c ' \
-	    vault policy write eso-read - <<EOF\n\
-path "secret/data/*" { capabilities = ["read", "list"] }\n\
-path "secret/metadata/*" { capabilities = ["read", "list"] }\n\
-EOF\n\
-	    vault write auth/kubernetes/role/eso \
-	      bound_service_account_names=external-secrets \
-	      bound_service_account_namespaces=external-secrets \
-	      policies=eso-read \
-	      ttl=1h \
-	  '
+	@printf 'path "secret/data/*" {\n  capabilities = ["read", "list"]\n}\npath "secret/metadata/*" {\n  capabilities = ["read", "list"]\n}\n' \
+	  | kubectl --context $(KUBECONFIG_CONTEXT) exec -i -n vault vault-0 -- \
+	    env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) vault policy write eso-read -
+	@kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
+	  env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) vault write auth/kubernetes/role/eso \
+	    bound_service_account_names=external-secrets \
+	    bound_service_account_namespaces=external-secrets \
+	    policies=eso-read \
+	    ttl=1h
 	@echo "$(GREEN)✅ Vault configured$(RESET)"
 
 vault-seed: ## Interactively store all managed secrets into Vault
@@ -85,35 +81,33 @@ vault-seed: ## Interactively store all managed secrets into Vault
 	       password="$$_grafana_pw" \
 	  || echo "  (skipped grafana/admin)"
 	@echo ""
-	@read -p "  INFOMANIAK_CLIENT_ID (Grafana — same app? y/n): " _same; \
-	 if [ "$$_same" = "y" ]; then \
-	   read -p "  GF_AUTH CLIENT_ID    : " _gf_id; \
-	   read -p "  GF_AUTH CLIENT_SECRET: " _gf_sec; \
-	   [ -n "$$_gf_id" ] && \
-	     kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
-	       env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
-	       vault kv put secret/grafana/oauth \
-	         GF_AUTH_GENERIC_OAUTH_ENABLED="true" \
-	         GF_AUTH_GENERIC_OAUTH_NAME="Infomaniak" \
-	         GF_AUTH_GENERIC_OAUTH_CLIENT_ID="$$_gf_id" \
-	         GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="$$_gf_sec" \
-	         GF_AUTH_GENERIC_OAUTH_SCOPES="openid email profile" \
-	         GF_AUTH_GENERIC_OAUTH_AUTH_URL="https://login.infomaniak.com/authorize" \
-	         GF_AUTH_GENERIC_OAUTH_TOKEN_URL="https://login.infomaniak.com/token" \
-	         GF_AUTH_GENERIC_OAUTH_API_URL="https://login.infomaniak.com/userinfo" \
-	         GF_AUTH_GENERIC_OAUTH_USE_PKCE="true" \
-	         GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN="true" \
-	         GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN="true" \
-	         GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP="true" \
-	         GF_AUTH_DISABLE_LOGIN_FORM="true" \
-	  || echo "  (skipped grafana/oauth)"; fi
+	@read -p "  GF_AUTH CLIENT_ID       : " _gf_id; \
+	 read -p "  GF_AUTH CLIENT_SECRET   : " _gf_sec; \
+	 [ -n "$$_gf_id" ] && \
+	   kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
+	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
+	     vault kv put secret/grafana/oauth \
+	       GF_AUTH_GENERIC_OAUTH_ENABLED="true" \
+	       GF_AUTH_GENERIC_OAUTH_NAME="Infomaniak" \
+	       GF_AUTH_GENERIC_OAUTH_CLIENT_ID="$$_gf_id" \
+	       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="$$_gf_sec" \
+	       GF_AUTH_GENERIC_OAUTH_SCOPES="openid email profile" \
+	       GF_AUTH_GENERIC_OAUTH_AUTH_URL="https://login.infomaniak.com/authorize" \
+	       GF_AUTH_GENERIC_OAUTH_TOKEN_URL="https://login.infomaniak.com/token" \
+	       GF_AUTH_GENERIC_OAUTH_API_URL="https://login.infomaniak.com/userinfo" \
+	       GF_AUTH_GENERIC_OAUTH_USE_PKCE="true" \
+	       GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN="true" \
+	       GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN="true" \
+	       GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP="true" \
+	       GF_AUTH_DISABLE_LOGIN_FORM="true" \
+	  || echo "  (skipped grafana/oauth)"
 	@echo ""
-	@read -p "  DASHBOARD_PASSWORD      : " _dash_pw; \
-	 [ -n "$$_dash_pw" ] && \
+	@read -p "  DASHBOARD_USERS (htpasswd): " _dash_users; \
+	 [ -n "$$_dash_users" ] && \
 	   kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
 	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
 	     vault kv put secret/traefik/dashboard \
-	       password="$$_dash_pw" \
+	       users="$$_dash_users" \
 	  || echo "  (skipped traefik/dashboard)"
 	@echo ""
 	@echo "$(GREEN)✅ Vault secrets seeded$(RESET)"
