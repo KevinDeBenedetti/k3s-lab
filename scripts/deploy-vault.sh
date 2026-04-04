@@ -61,9 +61,25 @@ if [[ "${DEPLOY_VAULT}" == "true" ]]; then
 
   echo ""
   log_info "✅ Vault deployed"
-  echo ""
-  echo "  Vault is SEALED and UNINITIALIZED."
-  echo "  Run: make vault-init"
+
+  # Check actual state — vault may already be initialized from a previous deploy
+  _status=$(kubectl --context "${KUBECONFIG_CONTEXT}" exec -n vault vault-0 \
+    -- vault status -format=json 2>/dev/null || true)
+  _init=$(echo "${_status}" | python3 -c "import sys,json; print('yes' if json.load(sys.stdin).get('initialized') else 'no')" 2>/dev/null || echo "no")
+  _sealed=$(echo "${_status}" | python3 -c "import sys,json; print('yes' if json.load(sys.stdin).get('sealed') else 'no')" 2>/dev/null || echo "yes")
+
+  if [[ "${_init}" == "no" ]]; then
+    echo ""
+    echo "  Vault is SEALED and UNINITIALIZED."
+    echo "  Run: make vault-init"
+  elif [[ "${_sealed}" == "yes" ]]; then
+    echo ""
+    echo "  Vault is initialized but SEALED."
+    echo "  Run: make vault-unseal"
+  else
+    echo ""
+    echo "  Vault is initialized and unsealed — ready to use."
+  fi
 fi
 
 # ── 2. External Secrets Operator ──────────────────────────────────────────────

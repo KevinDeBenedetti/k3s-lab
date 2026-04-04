@@ -14,10 +14,10 @@ deploy: ## Deploy base stack (Traefik, cert-manager, ClusterIssuers)
 deploy-dashboard-secret: ## Create Traefik dashboard BasicAuth secret (requires DASHBOARD_PASSWORD)
 	@[ -n "$(DASHBOARD_PASSWORD)" ] || (echo "$(RED)❌ DASHBOARD_PASSWORD is not set$(RESET)"; exit 1)
 	@echo "$(YELLOW)→ Creating dashboard auth secret...$(RESET)"
-	@kubectl create secret generic traefik-dashboard-auth \
+	@kubectl --context $(KUBECONFIG_CONTEXT) create secret generic traefik-dashboard-auth \
 		--from-literal=users="$$(htpasswd -nb admin $(DASHBOARD_PASSWORD))" \
 		-n ingress \
-		--dry-run=client -o yaml | kubectl apply -f -
+		--dry-run=client -o yaml | kubectl --context $(KUBECONFIG_CONTEXT) apply -f -
 	@echo "$(GREEN)✅ Dashboard secret created$(RESET)"
 
 deploy-monitoring: ## Deploy observability stack (Prometheus + Grafana + Loki + Promtail)
