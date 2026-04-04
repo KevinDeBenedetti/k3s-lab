@@ -82,10 +82,10 @@ if [[ "${INITIALIZED}" == "yes" ]]; then
   if [[ "${SEALED}" == "yes" ]]; then
     log_step "[2/5] Vault is sealed — unsealing..."
     if [[ -z "${VAULT_UNSEAL_KEY_1:-}" ]]; then
-      read -r -s -p "  Unseal Key 1: " VAULT_UNSEAL_KEY_1; echo ""
+      read -r -s -p "  Unseal Key 1: " VAULT_UNSEAL_KEY_1 < /dev/tty; echo ""
     fi
     if [[ -z "${VAULT_UNSEAL_KEY_2:-}" ]]; then
-      read -r -s -p "  Unseal Key 2: " VAULT_UNSEAL_KEY_2; echo ""
+      read -r -s -p "  Unseal Key 2: " VAULT_UNSEAL_KEY_2 < /dev/tty; echo ""
     fi
     vault_exec operator unseal "${VAULT_UNSEAL_KEY_1}"
     vault_exec operator unseal "${VAULT_UNSEAL_KEY_2}"
@@ -136,12 +136,24 @@ if [[ -z "${ROOT_TOKEN:-}" ]]; then
     ROOT_TOKEN="${VAULT_ROOT_TOKEN}"
   else
     echo ""
-    read -r -s -p "Enter Vault root token: " ROOT_TOKEN
+    read -r -s -p "Enter Vault root token: " ROOT_TOKEN < /dev/tty
     echo ""
   fi
 fi
 
+if [[ -z "${ROOT_TOKEN}" ]]; then
+  log_error "No root token provided — cannot continue"
+  exit 1
+fi
+
 VAULT_TOKEN="${ROOT_TOKEN}"
+
+# Validate token before proceeding
+if ! vault_exec token lookup > /dev/null 2>&1; then
+  log_error "Invalid or expired root token — check your token and try again"
+  echo "  Hint: set VAULT_ROOT_TOKEN in .env or pass it when prompted"
+  exit 1
+fi
 
 # ── 3. Enable KV v2 ──────────────────────────────────────────────────────────
 log_step "[3/5] Enabling KV v2 secrets engine at 'secret/'..."

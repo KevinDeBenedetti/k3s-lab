@@ -5,6 +5,7 @@
 
 VAULT_CHART_VERSION ?= 0.29.1
 ESO_CHART_VERSION   ?= 0.14.3
+DASHBOARD_USER      ?= admin
 # VAULT_DOMAIN and VAULT_ROOT_TOKEN intentionally have no default here.
 # Set them in the consuming Makefile or .env.
 
@@ -57,32 +58,38 @@ vault-configure: ## (Re)create Vault policies and Kubernetes roles (idempotent)
 	    ttl=1h
 	@echo "$(GREEN)✅ Vault configured$(RESET)"
 
-vault-seed: ## Interactively store all managed secrets into Vault
+vault-seed: ## Seed secrets into Vault (reads from env/.env, prompts only if missing)
 	@[ -n "$(VAULT_ROOT_TOKEN)" ] || (echo "$(RED)❌ VAULT_ROOT_TOKEN not set$(RESET)"; exit 1)
 	@echo "$(YELLOW)→ Seeding secrets into Vault...$(RESET)"
-	@echo "$(CYAN)Enter values for each secret (leave blank to skip):$(RESET)"
 	@echo ""
-	@read -p "  INFOMANIAK_CLIENT_ID    : " _oidc_id;     \
-	 read -p "  INFOMANIAK_CLIENT_SECRET: " _oidc_secret; \
+	@_oidc_id="$(INFOMANIAK_CLIENT_ID)"; \
+	 _oidc_secret="$(INFOMANIAK_CLIENT_SECRET)"; \
+	 [ -z "$$_oidc_id" ] && read -p "  INFOMANIAK_CLIENT_ID    : " _oidc_id < /dev/tty; \
+	 [ -z "$$_oidc_secret" ] && read -p "  INFOMANIAK_CLIENT_SECRET: " _oidc_secret < /dev/tty; \
 	 [ -n "$$_oidc_id" ] && \
 	   kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
 	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
 	     vault kv put secret/argocd/oidc \
 	       clientID="$$_oidc_id" \
 	       clientSecret="$$_oidc_secret" \
+	  && echo "  ✓ argocd/oidc" \
 	  || echo "  (skipped argocd/oidc)"
 	@echo ""
-	@read -p "  GRAFANA_PASSWORD        : " _grafana_pw; \
+	@_grafana_pw="$(GRAFANA_PASSWORD)"; \
+	 [ -z "$$_grafana_pw" ] && read -p "  GRAFANA_PASSWORD        : " _grafana_pw < /dev/tty; \
 	 [ -n "$$_grafana_pw" ] && \
 	   kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
 	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
 	     vault kv put secret/grafana/admin \
 	       username="admin" \
 	       password="$$_grafana_pw" \
+	  && echo "  ✓ grafana/admin" \
 	  || echo "  (skipped grafana/admin)"
 	@echo ""
-	@read -p "  GF_AUTH CLIENT_ID       : " _gf_id; \
-	 read -p "  GF_AUTH CLIENT_SECRET   : " _gf_sec; \
+	@_gf_id="$(INFOMANIAK_CLIENT_ID)"; \
+	 _gf_sec="$(INFOMANIAK_CLIENT_SECRET)"; \
+	 [ -z "$$_gf_id" ] && read -p "  GF_AUTH CLIENT_ID       : " _gf_id < /dev/tty; \
+	 [ -z "$$_gf_sec" ] && read -p "  GF_AUTH CLIENT_SECRET   : " _gf_sec < /dev/tty; \
 	 [ -n "$$_gf_id" ] && \
 	   kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
 	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
@@ -100,14 +107,21 @@ vault-seed: ## Interactively store all managed secrets into Vault
 	       GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN="true" \
 	       GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP="true" \
 	       GF_AUTH_DISABLE_LOGIN_FORM="true" \
+	  && echo "  ✓ grafana/oauth" \
 	  || echo "  (skipped grafana/oauth)"
 	@echo ""
-	@read -p "  DASHBOARD_USERS (htpasswd): " _dash_users; \
+	@_dash_users="$(DASHBOARD_USERS)"; \
+	 if [ -z "$$_dash_users" ] && [ -n "$(DASHBOARD_PASSWORD)" ]; then \
+	   _dash_users=$$(htpasswd -nb "$(DASHBOARD_USER)" "$(DASHBOARD_PASSWORD)" 2>/dev/null \
+	     || printf '%s:%s\n' "$(DASHBOARD_USER)" "$$(openssl passwd -apr1 "$(DASHBOARD_PASSWORD)")"); \
+	 fi; \
+	 [ -z "$$_dash_users" ] && read -p "  DASHBOARD_USERS (htpasswd): " _dash_users < /dev/tty; \
 	 [ -n "$$_dash_users" ] && \
 	   kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
 	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
 	     vault kv put secret/traefik/dashboard \
 	       users="$$_dash_users" \
+	  && echo "  ✓ traefik/dashboard" \
 	  || echo "  (skipped traefik/dashboard)"
 	@echo ""
 	@echo "$(GREEN)✅ Vault secrets seeded$(RESET)"
