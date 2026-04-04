@@ -12,6 +12,7 @@
 - Makefile-driven workflow — one target per lifecycle stage
 - Static CI: ShellCheck, actionlint, kubeconform, Bats, and secret scanning (no live cluster required)
 - Reusable as a git submodule with includeable Makefile fragments
+- **Optional:** HashiCorp Vault + External Secrets Operator for centralized secret management
 
 ## Prerequisites
 
@@ -28,6 +29,9 @@ make k3s-agent                # join agent node
 make kubeconfig               # fetch kubeconfig
 make deploy                   # deploy Traefik + cert-manager
 make deploy-monitoring        # deploy Prometheus + Grafana + Loki
+make deploy-vault             # (optional) deploy HashiCorp Vault
+make vault-init               # (optional) initialize + configure Vault
+make deploy-eso               # (optional) deploy External Secrets Operator
 ```
 
 → Full guide: [docs](https://kevindebenedetti.github.io/k3s-lab/getting-started)

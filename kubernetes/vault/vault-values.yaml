@@ -1,0 +1,84 @@
+# =============================================================================
+# Vault Helm Values — Single Node VPS
+# Chart: hashicorp/vault
+# Docs:  https://developer.hashicorp.com/vault/docs/platform/k8s/helm
+#
+# Storage: Raft (integrated) — no external Consul/etcd required.
+# UI: enabled, exposed via Traefik IngressRoute (VPN-only).
+# Single replica — suitable for homelab; scale to 3 for HA.
+#
+# After deploy, run: make vault-init  (initializes, unseals, configures K8s auth)
+# =============================================================================
+
+global:
+  enabled: true
+  tlsDisable: true   # TLS terminated by Traefik
+
+# ─── Injector (agent sidecar) — disabled ─────────────────────────────────────
+# We use External Secrets Operator (ESO) instead of the Vault Agent sidecar.
+injector:
+  enabled: false
+
+# ─── Vault server ─────────────────────────────────────────────────────────────
+server:
+  image:
+    repository: hashicorp/vault
+    tag: "1.19.0"
+    pullPolicy: IfNotPresent
+
+  # Raft integrated storage — uses a PVC for persistence
+  ha:
+    enabled: false   # single-replica; flip to true + set replicas: 3 for HA
+
+  dataStorage:
+    enabled: true
+    size: 5Gi
+    storageClass: local-path   # bundled with k3s
+
+  auditStorage:
+    enabled: false   # enable once cluster has headroom
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  # Liveness / readiness — Vault reports unsealed status on /v1/sys/health
+  readinessProbe:
+    enabled: true
+    path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+  livenessProbe:
+    enabled: true
+    path: /v1/sys/health?standbyok=true
+    initialDelaySeconds: 60
+
+  # Ingress handled by Traefik IngressRoute (vault-ingressroute.yaml)
+  ingress:
+    enabled: false
+
+  # Standalone (single-replica) config block
+  standalone:
+    enabled: true
+    config: |
+      ui = true
+
+      listener "tcp" {
+        tls_disable     = 1
+        address         = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+
+      storage "raft" {
+        path    = "/vault/data"
+        node_id = "vault-0"
+      }
+
+      service_registration "kubernetes" {}
+
+# ─── UI ──────────────────────────────────────────────────────────────────────
+ui:
+  enabled: true
+  serviceType: ClusterIP

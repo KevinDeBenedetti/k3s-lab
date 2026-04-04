@@ -1,0 +1,59 @@
+# =============================================================================
+# Vault — Traefik IngressRoute + TLS Certificate
+#
+# Vault UI is restricted to the WireGuard tunnel subnet (vpn-only middleware).
+# Connect to WireGuard before accessing the UI: make wg-up
+#
+# Variables substituted at deploy time:
+#   ${VAULT_DOMAIN}   — e.g. vault.example.com
+# =============================================================================
+
+# ── IngressRoute ──────────────────────────────────────────────────────────────
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`${VAULT_DOMAIN}`)
+      priority: 10
+      middlewares:
+        - name: vpn-only
+          namespace: vault
+      services:
+        - name: vault-ui
+          port: 8200
+  tls:
+    secretName: vault-tls
+
+# ── VPN-only middleware (copy scoped to vault namespace) ──────────────────────
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: vpn-only
+  namespace: vault
+spec:
+  ipAllowList:
+    sourceRange:
+      - 10.8.0.0/24   # WireGuard tunnel — only reachable when VPN is connected
+
+# ── TLS Certificate (cert-manager → Let's Encrypt) ───────────────────────────
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: vault-tls
+  namespace: vault
+spec:
+  secretName: vault-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  dnsNames:
+    - ${VAULT_DOMAIN}

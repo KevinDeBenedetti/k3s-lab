@@ -1,0 +1,41 @@
+# =============================================================================
+# External Secrets Operator (ESO) Helm Values
+# Chart: external-secrets/external-secrets
+# Docs:  https://external-secrets.io/latest/introduction/getting-started/
+#
+# ESO watches ExternalSecret CRs and syncs secrets from Vault (or any other
+# provider) into Kubernetes Secrets automatically.
+#
+# After deploy, apply:
+#   kubernetes/external-secrets/cluster-secret-store.yaml
+#   kubernetes/vault/external-secrets/*.yaml
+# =============================================================================
+
+# ─── Controller ───────────────────────────────────────────────────────────────
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+# ─── Webhook ──────────────────────────────────────────────────────────────────
+webhook:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# ─── Cert controller ──────────────────────────────────────────────────────────
+certController:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
