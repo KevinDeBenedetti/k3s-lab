@@ -27,7 +27,7 @@ _lib load-env.sh
 load_env "${_RUN_REPO:-.}/.env"
 
 # --- Pinned versions (can be overridden via .env) ---
-TRAEFIK_CHART_VERSION="${TRAEFIK_CHART_VERSION:-34.4.0}"
+TRAEFIK_CHART_VERSION="${TRAEFIK_CHART_VERSION:-39.0.7}"
 CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.17.1}"
 
 # --- Validate required vars ---
@@ -45,18 +45,16 @@ kubectl apply -f "$(_k8s namespaces/namespaces.yaml)"
 log_step "[2/4] Traefik ${TRAEFIK_CHART_VERSION}..."
 helm repo add traefik https://helm.traefik.io/traefik --force-update
 helm repo update traefik
-# Kubernetes forbids loopback addresses as externalIPs; skip the flag for local Lima testing.
-EXTERNAL_IP_FLAG=""
-if [[ "${SERVER_IP}" != "127."* ]] && [[ "${SERVER_IP}" != "::1" ]]; then
-  EXTERNAL_IP_FLAG="--set service.externalIPs={${SERVER_IP}}"
-fi
+# hostPort (defined in traefik-values.yaml) binds ports 80/443 directly on the
+# host without kube-proxy SNAT, preserving real client IPs for ipAllowList middleware.
+# externalIPs is no longer needed and must NOT be set — it would intercept traffic
+# before hostPort rules and SNAT the source IP back to 10.42.0.1.
 
 helm upgrade --install traefik traefik/traefik \
   --version "${TRAEFIK_CHART_VERSION}" \
   --namespace ingress \
   --create-namespace \
   --values "$(_k8s_file ingress/traefik-values.yaml)" \
-  ${EXTERNAL_IP_FLAG} \
   ${TRAEFIK_EXTRA_ARGS:-} \
   --wait \
   --timeout 120s

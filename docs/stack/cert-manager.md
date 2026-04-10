@@ -60,6 +60,17 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-staging-account-key
     solvers:
+      # DNS-01 via Cloudflare — for ${DOMAIN} and all its subdomains
+      # Works even when apex domain points to Vercel or another provider
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-secret
+              key: api-token
+        selector:
+          dnsZones:
+            - "${DOMAIN}"
+      # HTTP-01 fallback — for any domain not covered by the dns01 selector
       - http01:
           ingress:
             ingressClassName: traefik
@@ -79,12 +90,22 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-production-account-key
     solvers:
+      # DNS-01 via Cloudflare — for ${DOMAIN} and all its subdomains
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-secret
+              key: api-token
+        selector:
+          dnsZones:
+            - "${DOMAIN}"
+      # HTTP-01 fallback — for any domain not covered by the dns01 selector
       - http01:
           ingress:
             ingressClassName: traefik
 ```
 
-> The `ClusterIssuer` manifests use `${EMAIL}` — they are applied via `envsubst` so your `.env` variable is substituted at deploy time.
+> `${EMAIL}` and `${DOMAIN}` are substituted at deploy time from `.env` via `envsubst`.
 
 ---
 
@@ -170,9 +191,77 @@ This is why `traefik-values.yaml` has no `redirectTo` on the `web` entrypoint. U
 
 ---
 
+## DNS-01 via Cloudflare (recommended)
+
+Use DNS-01 when:
+- The apex domain (`example.com`) DNS points elsewhere (e.g. Vercel) — HTTP-01 would reach the wrong server
+- You need **wildcard certificates** (`*.example.com`) — Let's Encrypt only issues these via DNS-01
+- The cluster is not publicly reachable on port 80
+
+```
+cert-manager → Cloudflare API → creates TXT _acme-challenge.example.com
+Let's Encrypt → DNS lookup → validates TXT → issues certificate
+```
+
+### Setup
+
+1. Create a Cloudflare API Token with:
+   - Permission: `Zone - DNS - Edit`
+   - Permission: `Zone - Zone - Read`
+   - Zone Resources: `Include - All Zones`
+
+2. Store the token in Vault and sync via ESO:
+
+```bash
+# In your infra repo
+make vault-seed-cloudflare        # seeds secret/cert-manager/cloudflare
+make vault-apply-externalsecrets  # syncs cloudflare-api-token-secret → cert-manager namespace
+```
+
+3. The `ClusterIssuer` manifests already include a DNS-01 solver for `${DOMAIN}`:
+
+```yaml
+solvers:
+  - dns01:
+      cloudflare:
+        apiTokenSecretRef:
+          name: cloudflare-api-token-secret
+          key: api-token
+    selector:
+      dnsZones:
+        - "${DOMAIN}"
+  - http01:
+      ingress:
+        ingressClassName: traefik  # fallback for other domains
+```
+
+> `${DOMAIN}` is substituted at deploy time from your `.env` via `envsubst`.
+
+### Wildcard certificate example
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-tls
+  namespace: apps
+spec:
+  secretName: wildcard-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.example.com"
+    - "example.com"
+```
+
+---
+
 ## References
 
 - [cert-manager documentation](https://cert-manager.io/docs/)
 - [ACME HTTP-01 challenge](https://cert-manager.io/docs/configuration/acme/http01/)
+- [ACME DNS-01 challenge](https://cert-manager.io/docs/configuration/acme/dns01/)
+- [cert-manager Cloudflare DNS-01](https://cert-manager.io/docs/configuration/acme/dns01/cloudflare/)
 - [Let's Encrypt rate limits](https://letsencrypt.org/docs/rate-limits/)
 - [cert-manager Helm chart](https://artifacthub.io/packages/helm/cert-manager/cert-manager)

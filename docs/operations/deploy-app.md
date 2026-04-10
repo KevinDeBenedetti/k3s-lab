@@ -83,7 +83,7 @@ spec:
 ### ingress.yaml
 
 ```yaml
-# TLS certificate (cert-manager → Let's Encrypt)
+# TLS certificate (cert-manager → Let's Encrypt via DNS-01/Cloudflare)
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -103,6 +103,9 @@ kind: IngressRoute
 metadata:
   name: myapp
   namespace: apps
+  annotations:
+    # external-dns: automatically creates/updates the A record in Cloudflare
+    external-dns.alpha.kubernetes.io/hostname: myapp.kevindb.dev
 spec:
   entryPoints:
     - websecure
@@ -120,24 +123,7 @@ spec:
 
 ---
 
-## Step 2 — Add a DNS record
-
-Point your subdomain to the cluster's external IP (same IP as all other apps):
-
-```bash
-kubectl --context k3s-infra get svc -n ingress traefik \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-```
-
-Add an `A` record in your DNS provider:
-
-| Type | Name | Value |
-|------|------|-------|
-| A | `myapp` | `<traefik-ip>` |
-
----
-
-## Step 3 — Create the ArgoCD Application
+## Step 2 — Create the ArgoCD Application
 
 Create `infra/kubernetes/argocd/apps/myapp.yaml`:
 
@@ -174,7 +160,7 @@ spec:
 
 ---
 
-## Step 4 — Apply and push
+## Step 3 — Apply and push
 
 ```bash
 # Register the ArgoCD Application in the cluster
@@ -190,17 +176,23 @@ ArgoCD detects the push (via webhook) and syncs within seconds.
 
 ---
 
-## Step 5 — Verify
+## Step 4 — Verify
 
 ```bash
+# Check DNS was created in Cloudflare (within ~1 min)
+dig myapp.kevindb.dev +short
+
 # Check ArgoCD sync status
 kubectl --context k3s-infra get application myapp -n argocd
 
 # Check pods
 kubectl --context k3s-infra get pods -n apps
 
-# Check certificate
+# Check certificate (DNS-01 — works even before DNS resolves)
 kubectl --context k3s-infra get certificate myapp-tls -n apps
+
+# Check external-dns logs
+make external-dns-logs
 ```
 
 Or open the ArgoCD UI: **https://argocd.kevindb.dev**
@@ -237,7 +229,7 @@ git add -A && git commit -m "chore: remove myapp" && git push
 
 ## Checklist
 
-- [ ] DNS `A` record pointing to Traefik IP
+- [ ] `external-dns.alpha.kubernetes.io/hostname` annotation on IngressRoute (DNS A record auto-created)
 - [ ] `kubernetes/apps/myapp/` directory with deployment, service, ingress
 - [ ] `kubernetes/argocd/apps/myapp.yaml` with SSH `repoURL`
 - [ ] `kubectl apply -f kubernetes/argocd/apps/myapp.yaml` (once)

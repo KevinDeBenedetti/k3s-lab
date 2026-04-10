@@ -1,0 +1,78 @@
+# =============================================================================
+# external-dns — Helm values (Cloudflare provider)
+# Chart:   https://kubernetes-sigs.github.io/external-dns/
+# Repo:    https://github.com/kubernetes-sigs/external-dns
+#
+# Automatically creates/updates Cloudflare DNS records from:
+#   - Kubernetes Ingress resources (standard)
+#   - Traefik IngressRoute CRDs (via traefik-proxy source)
+#   - Services with external-dns.alpha.kubernetes.io/hostname annotation
+#
+# Prerequisites (applied by deploy-external-dns.sh):
+#   Secret cloudflare-api-token-secret in external-dns namespace
+#   (synced from Vault via ESO — see infra/kubernetes/vault/external-secrets/cloudflare-external-dns.yaml)
+#
+# domainFilters and txtOwnerId are set at deploy time via --set flags.
+# =============================================================================
+
+# --- DNS provider ---
+provider:
+  name: cloudflare
+
+# --- Sources: which Kubernetes resources to watch for hostnames ---
+sources:
+  - service
+  - ingress
+  - traefik-proxy  # reads Traefik IngressRoute / IngressRouteTCP / IngressRouteUDP
+
+# --- Cloudflare API token from Secret (synced from Vault via ESO) ---
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token-secret
+        key: api-token
+
+# --- Safety: never auto-delete DNS records; only create/update ---
+policy: upsert-only
+
+# --- Sync interval ---
+interval: "1m"
+
+# --- RBAC: grant read access to Traefik IngressRoute CRDs ---
+# Added to the chart-managed ClusterRole so external-dns can discover hostnames
+# from IngressRoute resources across all namespaces.
+extraRules:
+  - apiGroups: ["traefik.io"]
+    resources:
+      - ingressroutes
+      - ingressroutetcps
+      - ingressrouteudps
+    verbs: ["get", "list", "watch"]
+
+# --- Logging ---
+logLevel: info
+logFormat: json
+
+# --- Resources ---
+resources:
+  requests:
+    cpu: "10m"
+    memory: "32Mi"
+  limits:
+    cpu: "100m"
+    memory: "128Mi"
+
+# --- Security context ---
+podSecurityContext:
+  fsGroup: 65534
+  runAsNonRoot: true
+  runAsUser: 65534
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65534

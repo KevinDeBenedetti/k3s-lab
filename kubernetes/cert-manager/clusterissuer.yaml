@@ -2,6 +2,14 @@
 # cert-manager ClusterIssuers — Let's Encrypt
 # Apply AFTER cert-manager pods are running:
 #   kubectl rollout status deployment/cert-manager -n cert-manager
+#
+# Solver strategy:
+#   1. dns01 via Cloudflare — for ${DOMAIN} and all its subdomains.
+#      Allows issuing certs even when the apex/subdomain DNS points elsewhere
+#      (e.g. Vercel). Required for wildcard certificates.
+#      Prereq: Secret cloudflare-api-token-secret in cert-manager namespace.
+#              Create via: make vault-seed-cloudflare + make vault-apply-externalsecrets
+#   2. http01 via Traefik — fallback for any domain outside ${DOMAIN}.
 # =============================================================================
 
 # ---------------------
@@ -19,6 +27,16 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-staging-account-key
     solvers:
+      # DNS-01 via Cloudflare — used for ${DOMAIN} and subdomains (incl. wildcard)
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-secret
+              key: api-token
+        selector:
+          dnsZones:
+            - "${DOMAIN}"
+      # HTTP-01 fallback — for domains not covered by the dns01 selector above
       - http01:
           ingress:
             ingressClassName: traefik
@@ -38,6 +56,16 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-production-account-key
     solvers:
+      # DNS-01 via Cloudflare — used for ${DOMAIN} and subdomains (incl. wildcard)
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-secret
+              key: api-token
+        selector:
+          dnsZones:
+            - "${DOMAIN}"
+      # HTTP-01 fallback — for domains not covered by the dns01 selector above
       - http01:
           ingress:
             ingressClassName: traefik

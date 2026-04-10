@@ -36,19 +36,13 @@ This guide walks you through provisioning a production-ready k3s cluster from tw
 | Agent: vCPU / RAM | 2 vCPU / 1 GB minimum (2 GB recommended) |
 | Disk | 20 GB+ (server), 20 GB+ (agent) |
 | Public IP | Required on each node |
-| DNS | A records pointing to `SERVER_IP` for all subdomains |
+| DNS | Managed by Cloudflare (A records created automatically by external-dns) |
 
-### DNS records (before deploy)
+### DNS records
 
-Set the following A records to `SERVER_IP`:
-
-```
-dashboard.example.com → SERVER_IP
-grafana.example.com   → SERVER_IP
-app.example.com       → SERVER_IP   (your apps)
-```
-
-> DNS must propagate before TLS certificates can be issued. Use `dig dashboard.example.com` to verify.
+> **No manual DNS setup required.** Once `external-dns` is deployed, it automatically creates and updates Cloudflare A records whenever you add an `IngressRoute` with the `external-dns.alpha.kubernetes.io/hostname` annotation.
+>
+> TLS certificates use the **DNS-01 challenge** (Cloudflare API), so they can be issued even before traffic is routed — no chicken-and-egg problem with DNS propagation.
 
 ---
 

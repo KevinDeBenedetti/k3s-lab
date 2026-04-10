@@ -1,7 +1,15 @@
 # =============================================================================
 # Traefik Helm Chart — Production Values
-# Repo:    https://helm.traefik.io/traefik
-# Install: helm upgrade --install traefik traefik/traefik -n ingress -f traefik-values.yaml
+# Chart:   https://helm.traefik.io/traefik
+# Version: 39.0.7 (Traefik v3.6.12)
+#
+# Key design decisions:
+#   • hostPort 80/443 — binds host ports directly via CNI, no kube-proxy SNAT.
+#     This preserves real client IPs so ipAllowList (vpn-only) middleware works.
+#   • NO hostNetwork — container has its own network namespace; uses ClusterFirst
+#     DNS so it can resolve internal services (e.g. vault.vault.svc.cluster.local).
+#   • NO externalIPs on service — externalIPs use kube-proxy DNAT+MASQUERADE which
+#     intercepts traffic before hostPort CNI rules and hides the real client IP.
 # =============================================================================
 
 # --- Replica count (1 worker node, scale if more)
@@ -14,9 +22,13 @@ ingressRoute:
     enabled: false
 
 # --- Ports / EntryPoints
+# Container listens on non-privileged ports (8000/8443).
+# hostPort maps host 80/443 → container 8000/8443 WITHOUT kube-proxy SNAT,
+# so Traefik sees the real client IP and ipAllowList/VPN middleware works.
 ports:
   web:
     port: 8000
+    hostPort: 80
     expose:
       default: true
     exposedPort: 80
@@ -26,23 +38,27 @@ ports:
     # Use a per-route 'redirectScheme' middleware on each IngressRoute instead.
   websecure:
     port: 8443
+    hostPort: 443
     expose:
       default: true
     exposedPort: 443
-    tls:
-      enabled: true
-  metrics:
-    port: 9100
+  # Avoid port collision with k3s (8080) and node-exporter (9100)
+  traefik:
+    port: 9000
     expose:
       default: false
-    exposedPort: 9100
+  metrics:
+    port: 9101
+    expose:
+      default: false
+    exposedPort: 9101
 
-# --- Service (external load-balancer on the single worker)
+# --- Service
+# hostPort handles external traffic directly — service is only for cluster-internal
+# routing (ClusterIP). LoadBalancer/externalIPs are NOT needed and must NOT be used
+# (they cause kube-proxy to SNAT client IPs before they reach Traefik).
 service:
-  type: LoadBalancer
-  spec:
-    # Optional: if your VPS has a fixed public IP, pin it here
-    # loadBalancerIP: "5.6.7.8"
+  type: ClusterIP
 
 # --- TLS hardening: drop TLS 1.0/1.1, restrict cipher suites
 tlsOptions:
