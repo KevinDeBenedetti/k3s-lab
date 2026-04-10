@@ -1,5 +1,5 @@
 # =============================================================================
-# Traefik Dashboard — secured via BasicAuth + HTTPS
+# Traefik Dashboard — secured via VPN + BasicAuth + HTTPS
 # Prerequisites:
 #   1. Create the BasicAuth secret (run once on your local machine):
 #      kubectl create secret generic traefik-dashboard-auth \
@@ -8,7 +8,7 @@
 #   2. Set DASHBOARD_DOMAIN in your .env and replace below.
 # =============================================================================
 
-# -- Middleware: strip the /dashboard prefix handled by Traefik internally
+# -- Middleware: BasicAuth for dashboard access
 ---
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
@@ -31,6 +31,18 @@ spec:
     scheme: https
     permanent: true
 
+# -- Middleware: VPN-only (scoped to ingress namespace)
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: vpn-only
+  namespace: ingress
+spec:
+  ipAllowList:
+    sourceRange:
+      - 10.8.0.0/24   # WireGuard tunnel — only reachable when VPN is connected
+
 # -- IngressRoute: expose dashboard on dashboard.<DOMAIN>
 ---
 apiVersion: traefik.io/v1alpha1
@@ -45,6 +57,8 @@ spec:
     - match: Host(`${DASHBOARD_DOMAIN}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))
       kind: Rule
       middlewares:
+        - name: vpn-only
+          namespace: ingress
         - name: dashboard-basicauth
           namespace: ingress
       services:

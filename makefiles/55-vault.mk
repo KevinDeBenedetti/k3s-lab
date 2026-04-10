@@ -14,12 +14,14 @@ DASHBOARD_USER      ?= admin
 #   OIDC_CLIENT_ID     ?= $(MYPROVIDER_CLIENT_ID)
 #   OIDC_CLIENT_SECRET ?= $(MYPROVIDER_CLIENT_SECRET)
 #   OIDC_PROVIDER_NAME ?= MyProvider
+#   OIDC_ISSUER_URL    ?= https://auth.example.com
 #   OIDC_AUTH_URL      ?= https://auth.example.com/authorize
 #   OIDC_TOKEN_URL     ?= https://auth.example.com/token
 #   OIDC_API_URL       ?= https://auth.example.com/userinfo
 OIDC_CLIENT_ID     ?=
 OIDC_CLIENT_SECRET ?=
 OIDC_PROVIDER_NAME ?= OIDC
+OIDC_ISSUER_URL    ?=
 OIDC_AUTH_URL      ?=
 OIDC_TOKEN_URL     ?=
 OIDC_API_URL       ?=
@@ -47,7 +49,12 @@ deploy-eso: ## Deploy External Secrets Operator via Helm
 vault-init: ## Initialize Vault, unseal, enable K8s auth, create policies + ESO role
 	@echo "$(YELLOW)→ Initializing Vault...$(RESET)"
 	@echo "$(YELLOW)⚠️  Save the unseal keys and root token — they will not be shown again$(RESET)"
-	@$(call run-local-script,scripts/vault-init.sh)
+	@OIDC_CLIENT_ID="$(OIDC_CLIENT_ID)" \
+	 OIDC_CLIENT_SECRET="$(OIDC_CLIENT_SECRET)" \
+	 OIDC_ISSUER_URL="$(OIDC_ISSUER_URL)" \
+	 VAULT_DOMAIN="$(VAULT_DOMAIN)" \
+	 ADMIN_EMAIL="$(ADMIN_EMAIL)" \
+	 $(call run-local-script,scripts/vault-init.sh)
 
 vault-unseal: ## Unseal Vault after a node reboot (requires VAULT_UNSEAL_KEY_1 + KEY_2 in .env)
 	@[ -n "$(VAULT_UNSEAL_KEY_1)" ] || (echo "$(RED)❌ VAULT_UNSEAL_KEY_1 not set$(RESET)"; exit 1)
@@ -71,6 +78,31 @@ vault-configure: ## (Re)create Vault policies and Kubernetes roles (idempotent)
 	    bound_service_account_namespaces=external-secrets \
 	    policies=eso-read \
 	    ttl=1h
+	@if [ -n "$(OIDC_CLIENT_ID)" ] && [ -n "$(OIDC_ISSUER_URL)" ] && [ -n "$(VAULT_DOMAIN)" ]; then \
+	  echo "$(YELLOW)→ Configuring Vault OIDC...$(RESET)"; \
+	  kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
+	    env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) vault auth list -format=json 2>/dev/null \
+	    | python3 -c "import sys,json; sys.exit(0 if 'oidc/' in json.load(sys.stdin) else 1)" 2>/dev/null \
+	    || kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
+	      env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) vault auth enable oidc; \
+	  kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
+	    env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) vault write auth/oidc/config \
+	      oidc_discovery_url="$(OIDC_ISSUER_URL)" \
+	      oidc_client_id="$(OIDC_CLIENT_ID)" \
+	      oidc_client_secret="$(OIDC_CLIENT_SECRET)" \
+	      default_role="default"; \
+	  printf 'path "secret/*" {\n  capabilities = ["create","read","update","delete","list"]\n}\npath "secret/data/*" {\n  capabilities = ["create","read","update","delete","list"]\n}\npath "secret/metadata/*" {\n  capabilities = ["read","list","delete"]\n}\npath "sys/health" {\n  capabilities = ["read","sudo"]\n}\npath "sys/seal-status" {\n  capabilities = ["read"]\n}\npath "sys/policies/*" {\n  capabilities = ["read","list"]\n}\npath "auth/*" {\n  capabilities = ["read","list"]\n}\n' \
+	    | kubectl --context $(KUBECONFIG_CONTEXT) exec -i -n vault vault-0 -- \
+	      env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) vault policy write vault-admin -; \
+	  kubectl --context $(KUBECONFIG_CONTEXT) exec -n vault vault-0 -- \
+	    env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) vault write auth/oidc/role/default \
+	      user_claim="email" \
+	      allowed_redirect_uris="https://$(VAULT_DOMAIN)/ui/vault/auth/oidc/oidc/callback" \
+	      allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+	      policies="default,vault-admin" \
+	      oidc_scopes="openid,email,profile" \
+	      ttl=12h; \
+	fi
 	@echo "$(GREEN)✅ Vault configured$(RESET)"
 
 vault-seed: ## Seed secrets into Vault (reads from .env, prompts only if missing)

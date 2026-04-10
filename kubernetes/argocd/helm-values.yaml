@@ -38,6 +38,7 @@ configs:
     #     - openid
     #     - email
     #     - profile
+    #     - offline_access
 
   # ── RBAC ──────────────────────────────────────────────────────────────────
   # Uncomment and restrict once OIDC is configured.

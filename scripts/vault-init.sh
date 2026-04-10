@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # =============================================================================
-# vault-init.sh — Initialize Vault, configure Kubernetes auth, create policies
+# vault-init.sh — Initialize Vault, configure auth methods, create policies
 #
 # Run AFTER Vault pods are Running: make vault-init
 #
@@ -12,6 +12,8 @@ set -euo pipefail
 #   3. Enable KV v2 secrets engine at 'secret/'
 #   4. Enable + configure Kubernetes auth method
 #   5. Create ESO read policy + Kubernetes role
+#   6. Enable + configure OIDC auth method (if OIDC_CLIENT_ID is set)
+#   7. Create vault-admin policy + OIDC role
 # =============================================================================
 
 K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
@@ -193,6 +195,77 @@ vault_exec write auth/kubernetes/role/eso \
   bound_service_account_namespaces="${ESO_NAMESPACE}" \
   policies="eso-read" \
   ttl=1h
+
+# ── 6. Enable OIDC auth (optional — requires OIDC_CLIENT_ID) ────────────────
+if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_CLIENT_SECRET:-}" ]]; then
+  log_step "[6/7] Configuring OIDC auth method..."
+
+  VAULT_DOMAIN="${VAULT_DOMAIN:-}"
+  ADMIN_EMAIL="${ADMIN_EMAIL:-}"
+
+  if [[ -z "${VAULT_DOMAIN}" ]]; then
+    log_warn "VAULT_DOMAIN not set — skipping OIDC (needed for callback URL)"
+  else
+    if vault_exec auth list -format=json 2>/dev/null \
+      | python3 -c "import sys,json; sys.exit(0 if 'oidc/' in json.load(sys.stdin) else 1)" 2>/dev/null; then
+      log_info "OIDC auth already enabled — updating config"
+    else
+      vault_exec auth enable oidc
+    fi
+
+    vault_exec write auth/oidc/config \
+      oidc_discovery_url="${OIDC_ISSUER_URL}" \
+      oidc_client_id="${OIDC_CLIENT_ID}" \
+      oidc_client_secret="${OIDC_CLIENT_SECRET}" \
+      default_role="default"
+
+    # ── 7. Create vault-admin policy + OIDC role ─────────────────────────────
+    log_step "[7/7] Creating vault-admin policy + OIDC role..."
+
+    vault_exec_stdin policy write vault-admin - <<'POLICY'
+path "secret/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+path "secret/data/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+path "secret/metadata/*" {
+  capabilities = ["read", "list", "delete"]
+}
+path "sys/health" {
+  capabilities = ["read", "sudo"]
+}
+path "sys/seal-status" {
+  capabilities = ["read"]
+}
+path "sys/policies/*" {
+  capabilities = ["read", "list"]
+}
+path "auth/*" {
+  capabilities = ["read", "list"]
+}
+POLICY
+
+    _oidc_policies="default,vault-admin"
+    _bound_claims=()
+    if [[ -n "${ADMIN_EMAIL}" ]]; then
+      _bound_claims=("bound_claims={\"email\":\"${ADMIN_EMAIL}\"}")
+    fi
+
+    vault_exec write auth/oidc/role/default \
+      user_claim="email" \
+      allowed_redirect_uris="https://${VAULT_DOMAIN}/ui/vault/auth/oidc/oidc/callback" \
+      allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+      policies="${_oidc_policies}" \
+      oidc_scopes="openid,email,profile" \
+      ttl=12h \
+      "${_bound_claims[@]}"
+
+    log_info "OIDC configured — login at https://${VAULT_DOMAIN}"
+  fi
+else
+  log_info "Skipping OIDC auth (OIDC_CLIENT_ID not set)"
+fi
 
 log_info "✅ Vault initialized and configured"
 echo ""

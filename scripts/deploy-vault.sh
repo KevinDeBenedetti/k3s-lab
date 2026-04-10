@@ -59,6 +59,10 @@ if [[ "${DEPLOY_VAULT}" == "true" ]]; then
     < "$(_k8s_file vault/vault-ingressroute.yaml)" \
     | kubectl --context "${KUBECONFIG_CONTEXT}" apply -f -
 
+  log_info "Applying Vault service-registration RBAC..."
+  kubectl --context "${KUBECONFIG_CONTEXT}" apply \
+    -f "$(_k8s_file vault/vault-rbac.yaml)"
+
   echo ""
   log_info "✅ Vault deployed"
 

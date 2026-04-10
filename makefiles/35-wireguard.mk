@@ -22,6 +22,10 @@ WG_SUBNET       ?= 10.8.0.0/24
 WG_CLIENT_IP    ?= 10.8.0.2
 WG_CLIENT_PUBKEY ?=
 WG_PEER_NAME    ?= laptop
+# Space-separated list of domains to resolve via the VPN tunnel.
+# When wg0 is up, these domains resolve to WG_SERVER_IP via /etc/hosts,
+# so Traefik's vpn-only middleware sees a WireGuard source IP.
+WG_VPN_DOMAINS  ?=
 
 .PHONY: wg-server-up wg-peer-add wg-client-config wg-status wg-down \
         wg-up wg-disconnect wg-ssh-harden kubeconfig-vpn
@@ -54,6 +58,14 @@ wg-client-config: ## Generate a client keypair locally, add it as peer, and prin
 	@echo "PrivateKey = $(CLIENT_KEY)"
 	@echo "Address    = $(WG_CLIENT_IP)/32"
 	@echo "DNS        = 1.1.1.1"
+	@# When WG_VPN_DOMAINS is set, add /etc/hosts entries so VPN-protected domains
+	@# resolve to the WireGuard server IP. Traffic then goes through the tunnel and
+	@# Traefik's vpn-only middleware sees a 10.8.0.x source IP instead of the
+	@# client's public IP (which would be rejected with "Forbidden").
+	@if [ -n "$(WG_VPN_DOMAINS)" ]; then \
+		echo "PostUp   = printf '$(WG_SERVER_IP)\t$(WG_VPN_DOMAINS) # wg0-vpn\n' >> /etc/hosts; dscacheutil -flushcache; killall -HUP mDNSResponder"; \
+		echo "PostDown = sed -i '' '/# wg0-vpn/d' /etc/hosts; dscacheutil -flushcache; killall -HUP mDNSResponder"; \
+	fi
 	@echo ""
 	@echo "[Peer]"
 	@echo "PublicKey           = $(SERVER_PUB)"

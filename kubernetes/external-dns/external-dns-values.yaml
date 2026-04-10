@@ -50,6 +50,10 @@ extraRules:
       - ingressrouteudps
     verbs: ["get", "list", "watch"]
 
+# --- Traefik v3 uses traefik.io API group; skip legacy traefik.containo.us CRDs ---
+extraArgs:
+  - --traefik-disable-legacy
+
 # --- Logging ---
 logLevel: info
 logFormat: json

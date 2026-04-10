@@ -52,7 +52,7 @@ server:
     path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
   livenessProbe:
     enabled: true
-    path: /v1/sys/health?standbyok=true
+    path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
     initialDelaySeconds: 60
 
   # Ingress handled by Traefik IngressRoute (vault-ingressroute.yaml)
