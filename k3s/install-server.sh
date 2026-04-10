@@ -61,7 +61,7 @@ PUBLIC_IP="${PUBLIC_IP:-${NODE_IP}}"
 AGENT_IP="${AGENT_IP:-}"
 WG_PORT="${WG_PORT:-}"
 
-# K3S_NODE_TOKEN: explicit shared secret so workers can join without reading
+# K3S_NODE_TOKEN: explicit shared secret so agents can join without reading
 # the server-generated token from disk.
 if [[ -z "${K3S_NODE_TOKEN:-}" ]]; then
   echo "⚠️  K3S_NODE_TOKEN is not set. Generating a random token."
@@ -95,7 +95,7 @@ curl -sfL https://get.k3s.io | \
     --protect-kernel-defaults \
     --secrets-encryption \
     --write-kubeconfig-mode=600 \
-    --node-label="node-role=master"
+    --node-label="node-role=server"
 
 # --- Wait for node to be ready (timeout: 120s) ---
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml

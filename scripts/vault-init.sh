@@ -59,6 +59,13 @@ print('yes' if d.get('$2') else 'no')
 " 2>/dev/null || echo "$3"
 }
 
+# ── Compute total steps (5 base + 2 if OIDC is configured) ───────────────────
+if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_CLIENT_SECRET:-}" ]]; then
+  TOTAL_STEPS=7
+else
+  TOTAL_STEPS=5
+fi
+
 # ── 0. Wait for Vault pod ────────────────────────────────────────────────────
 log_info "Waiting for Vault pod to be Running..."
 kubectl --context "${KUBECONFIG_CONTEXT}" wait pod/"${VAULT_POD}" \
@@ -82,7 +89,7 @@ if [[ "${INITIALIZED}" == "yes" ]]; then
   log_info "Vault is already initialized — skipping init"
 
   if [[ "${SEALED}" == "yes" ]]; then
-    log_step "[2/5] Vault is sealed — unsealing..."
+    log_step "[2/${TOTAL_STEPS}] Vault is sealed — unsealing..."
     if [[ -z "${VAULT_UNSEAL_KEY_1:-}" ]]; then
       read -r -s -p "  Unseal Key 1: " VAULT_UNSEAL_KEY_1 < /dev/tty; echo ""
     fi
@@ -97,7 +104,7 @@ if [[ "${INITIALIZED}" == "yes" ]]; then
   fi
 else
   # ── Initialize ──────────────────────────────────────────────────────────
-  log_step "[1/5] Initializing Vault..."
+  log_step "[1/${TOTAL_STEPS}] Initializing Vault..."
   INIT_OUTPUT=$(vault_exec operator init \
     -key-shares=3 \
     -key-threshold=2 \
@@ -126,7 +133,7 @@ print('Root Token:  ', d['root_token'])
   ROOT_TOKEN=$(echo "${INIT_OUTPUT}"   | python3 -c "import sys,json; print(json.load(sys.stdin)['root_token'])")
 
   # ── Unseal ──────────────────────────────────────────────────────────────
-  log_step "[2/5] Unsealing Vault..."
+  log_step "[2/${TOTAL_STEPS}] Unsealing Vault..."
   vault_exec operator unseal "${UNSEAL_KEY_1}"
   vault_exec operator unseal "${UNSEAL_KEY_2}"
   log_info "Vault unsealed successfully"
@@ -158,7 +165,7 @@ if ! vault_exec token lookup > /dev/null 2>&1; then
 fi
 
 # ── 3. Enable KV v2 ──────────────────────────────────────────────────────────
-log_step "[3/5] Enabling KV v2 secrets engine at 'secret/'..."
+log_step "[3/${TOTAL_STEPS}] Enabling KV v2 secrets engine at 'secret/'..."
 if vault_exec secrets list -format=json 2>/dev/null \
   | python3 -c "import sys,json; sys.exit(0 if 'secret/' in json.load(sys.stdin) else 1)" 2>/dev/null; then
   log_info "KV v2 already enabled — skipping"
@@ -167,7 +174,7 @@ else
 fi
 
 # ── 4. Enable Kubernetes auth ────────────────────────────────────────────────
-log_step "[4/5] Configuring Kubernetes auth method..."
+log_step "[4/${TOTAL_STEPS}] Configuring Kubernetes auth method..."
 if vault_exec auth list -format=json 2>/dev/null \
   | python3 -c "import sys,json; sys.exit(0 if 'kubernetes/' in json.load(sys.stdin) else 1)" 2>/dev/null; then
   log_info "Kubernetes auth already enabled — skipping"
@@ -179,7 +186,7 @@ vault_exec write auth/kubernetes/config \
   kubernetes_host="https://kubernetes.default.svc.cluster.local:443"
 
 # ── 5. Create policies and roles ─────────────────────────────────────────────
-log_step "[5/5] Creating policies and Kubernetes roles..."
+log_step "[5/${TOTAL_STEPS}] Creating policies and Kubernetes roles..."
 
 vault_exec_stdin policy write eso-read - <<'POLICY'
 path "secret/data/*" {
@@ -198,7 +205,7 @@ vault_exec write auth/kubernetes/role/eso \
 
 # ── 6. Enable OIDC auth (optional — requires OIDC_CLIENT_ID) ────────────────
 if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_CLIENT_SECRET:-}" ]]; then
-  log_step "[6/7] Configuring OIDC auth method..."
+  log_step "[6/${TOTAL_STEPS}] Configuring OIDC auth method..."
 
   VAULT_DOMAIN="${VAULT_DOMAIN:-}"
   ADMIN_EMAIL="${ADMIN_EMAIL:-}"
@@ -220,7 +227,7 @@ if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_CLIENT_SECRET:-}" ]]; then
       default_role="default"
 
     # ── 7. Create vault-admin policy + OIDC role ─────────────────────────────
-    log_step "[7/7] Creating vault-admin policy + OIDC role..."
+    log_step "[7/${TOTAL_STEPS}] Creating vault-admin policy + OIDC role..."
 
     vault_exec_stdin policy write vault-admin - <<'POLICY'
 path "secret/*" {

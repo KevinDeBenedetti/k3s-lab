@@ -12,7 +12,7 @@
 #     intercepts traffic before hostPort CNI rules and hides the real client IP.
 # =============================================================================
 
-# --- Replica count (1 worker node, scale if more)
+# --- Replica count (1 agent node, scale if more)
 deployment:
   replicas: 1
 

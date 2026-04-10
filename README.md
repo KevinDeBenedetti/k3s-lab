@@ -6,7 +6,7 @@
 
 ## Features
 
-- Lightweight Kubernetes via [k3s](https://k3s.io) with automated control-plane and worker bootstrap
+- Lightweight Kubernetes via [k3s](https://k3s.io) with automated control-plane and agent bootstrap
 - Ingress + automatic HTTPS via [Traefik](https://traefik.io) and [cert-manager](https://cert-manager.io) (Let's Encrypt HTTP-01)
 - Full observability stack: Prometheus, Grafana, Alertmanager, Loki, and Promtail
 - Makefile-driven workflow — one target per lifecycle stage

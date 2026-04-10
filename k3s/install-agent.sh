@@ -66,7 +66,7 @@ curl -sfL https://get.k3s.io | \
     --server="https://${SERVER_IP}:6443" \
     --node-ip="${NODE_IP}" \
     --protect-kernel-defaults \
-    --node-label="node-role=worker"
+    --node-label="node-role=agent"
 
 echo ""
 echo "✅ Agent node joined the cluster!"
