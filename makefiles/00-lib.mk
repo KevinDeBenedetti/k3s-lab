@@ -71,6 +71,9 @@ endef
 
 endif
 
+# ── kubectl shorthand (used across all .mk modules) ───────────────────────────
+K := kubectl --context $(KUBECONFIG_CONTEXT)
+
 # ── Lima test config path ─────────────────────────────────────────────────────
 # Local mode: use filesystem path.  Remote mode: use raw GitHub URL.
 # Both limactl start and kubectl apply -f support URLs natively.

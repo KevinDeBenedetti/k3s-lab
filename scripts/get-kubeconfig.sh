@@ -4,10 +4,6 @@ set -euo pipefail
 # =============================================================================
 # get-kubeconfig.sh — Fetch kubeconfig from server and merge into ~/.kube/config
 # Usage: ./scripts/get-kubeconfig.sh <SERVER_IP> [SSH_USER] [CONTEXT_NAME]
-#
-# Examples:
-#   ./scripts/get-kubeconfig.sh 1.2.3.4
-#   ./scripts/get-kubeconfig.sh 1.2.3.4 kevin my-cluster
 # =============================================================================
 
 SERVER_IP="${1:?'Usage: ./scripts/get-kubeconfig.sh <SERVER_IP> [SSH_USER] [CONTEXT_NAME]'}"
@@ -18,6 +14,8 @@ SSH_PORT="${SSH_PORT:-22}"
 
 K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
 
+# get-kubeconfig uses positional args before sourcing — keep manual preamble
+# since script-init.sh would try to load .env (not needed here).
 _run_src="${BASH_SOURCE[0]:-}"
 if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
   source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"

@@ -4,6 +4,9 @@
 # Uses run-local-script from 00-lib.mk (local bash or remote curl, transparent).
 # ──────────────────────────────────────────────────────────────────────────────
 
+DASHBOARD_USER ?= admin
+GRAFANA_USER   ?= admin
+
 .PHONY: deploy deploy-dashboard-secret deploy-monitoring deploy-grafana-secret
 
 deploy: ## Deploy base stack (Traefik, cert-manager, ClusterIssuers)
@@ -14,10 +17,10 @@ deploy: ## Deploy base stack (Traefik, cert-manager, ClusterIssuers)
 deploy-dashboard-secret: ## Create Traefik dashboard BasicAuth secret (requires DASHBOARD_PASSWORD)
 	@[ -n "$(DASHBOARD_PASSWORD)" ] || (echo "$(RED)❌ DASHBOARD_PASSWORD is not set$(RESET)"; exit 1)
 	@echo "$(YELLOW)→ Creating dashboard auth secret...$(RESET)"
-	@kubectl --context $(KUBECONFIG_CONTEXT) create secret generic traefik-dashboard-auth \
-		--from-literal=users="$$(htpasswd -nb admin $(DASHBOARD_PASSWORD))" \
+	@$(K) create secret generic traefik-dashboard-auth \
+		--from-literal=users="$$(htpasswd -nb $(DASHBOARD_USER) $(DASHBOARD_PASSWORD))" \
 		-n ingress \
-		--dry-run=client -o yaml | kubectl --context $(KUBECONFIG_CONTEXT) apply -f -
+		--dry-run=client -o yaml | $(K) apply -f -
 	@echo "$(GREEN)✅ Dashboard secret created$(RESET)"
 
 deploy-monitoring: ## Deploy observability stack (Prometheus + Grafana + Loki + Promtail)
@@ -26,20 +29,20 @@ deploy-monitoring: ## Deploy observability stack (Prometheus + Grafana + Loki + 
 	@echo "$(YELLOW)→ Deploying observability stack...$(RESET)"
 	@$(call run-local-script,scripts/deploy-monitoring.sh)
 	@echo "$(YELLOW)→ Syncing Grafana admin password (grafana-cli reset)...$(RESET)"
-	@kubectl --context $(KUBECONFIG_CONTEXT) exec -n monitoring deployment/kube-prometheus-stack-grafana \
+	@$(K) exec -n monitoring deployment/kube-prometheus-stack-grafana \
 		-- grafana-cli admin reset-admin-password "$(GRAFANA_PASSWORD)"
 	@echo "$(GREEN)✅ Observability stack deployed$(RESET)"
 
 deploy-grafana-secret: ## Create Grafana admin secret (requires GRAFANA_PASSWORD)
 	@[ -n "$(GRAFANA_PASSWORD)" ] || (echo "$(RED)❌ GRAFANA_PASSWORD is not set$(RESET)"; exit 1)
-	@kubectl --context $(KUBECONFIG_CONTEXT) cluster-info --request-timeout=5s >/dev/null 2>&1 || \
+	@$(K) cluster-info --request-timeout=5s >/dev/null 2>&1 || \
 		(echo "$(RED)❌ Cannot reach cluster $(KUBECONFIG_CONTEXT) — is k3s running? Try: ssh kevin@<VPS> 'sudo systemctl restart k3s'$(RESET)"; exit 1)
 	@echo "$(YELLOW)→ Creating monitoring namespace + Grafana admin secret...$(RESET)"
-	@kubectl --context $(KUBECONFIG_CONTEXT) create namespace monitoring --dry-run=client -o yaml \
-		| kubectl --context $(KUBECONFIG_CONTEXT) apply -f -
-	@kubectl --context $(KUBECONFIG_CONTEXT) create secret generic grafana-admin-secret \
-		--from-literal=username=admin \
+	@$(K) create namespace monitoring --dry-run=client -o yaml \
+		| $(K) apply -f -
+	@$(K) create secret generic grafana-admin-secret \
+		--from-literal=username=$(GRAFANA_USER) \
 		--from-literal=password="$(GRAFANA_PASSWORD)" \
 		-n monitoring \
-		--dry-run=client -o yaml | kubectl --context $(KUBECONFIG_CONTEXT) apply -f -
+		--dry-run=client -o yaml | $(K) apply -f -
 	@echo "$(GREEN)✅ Grafana admin secret created$(RESET)"

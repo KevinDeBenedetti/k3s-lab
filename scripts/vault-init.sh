@@ -16,20 +16,8 @@ set -euo pipefail
 #   7. Create vault-admin policy + OIDC role
 # =============================================================================
 
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
-
-_run_src="${BASH_SOURCE[0]:-}"
-if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
-  source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"
-else
-  # shellcheck source=/dev/null
-  source <(curl -fsSL "${K3S_LAB_RAW}/lib/run-mode.sh")
-fi
-
-_lib log.sh
-_lib load-env.sh
-
-load_env "${_RUN_REPO:-.}/.env"
+# shellcheck source=lib/script-init.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
 
 KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-infra}"
 VAULT_NAMESPACE="${VAULT_NAMESPACE:-vault}"

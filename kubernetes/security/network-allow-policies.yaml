@@ -1,0 +1,195 @@
+# =============================================================================
+# Explicit Allow NetworkPolicies — Reusable Templates
+#
+# These complement the default-deny rules. Each policy opens the minimum
+# required traffic paths for a specific component.
+#
+# IMPORTANT: NetworkPolicies operate on real *pod* ports (after kube-proxy
+# DNAT), NOT Service ports. For example, if a Service maps port 80 → 4180,
+# you must allow port 4180 in the NetworkPolicy.
+#
+# Customize the port lists and namespace selectors for your environment.
+# =============================================================================
+
+# ── Traefik Ingress Controller ───────────────────────────────────────────────
+# Traefik needs broad egress to reach any backend pod in the cluster.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-traefik-ingress
+  namespace: ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Accept external HTTP/HTTPS traffic (Traefik hostPort entrypoints)
+    - ports:
+        - port: 8000    # web entrypoint
+          protocol: TCP
+        - port: 8443    # websecure entrypoint
+          protocol: TCP
+  egress:
+    # Traefik → any backend pod in any namespace
+    # Add your app pod ports here (these are *pod* ports, not Service ports)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 80
+          protocol: TCP
+        - port: 443
+          protocol: TCP
+        - port: 3000      # Grafana, Nuxt/Next apps
+          protocol: TCP
+        - port: 4180      # oauth2-proxy
+          protocol: TCP
+        - port: 8080      # ArgoCD server, generic web apps
+          protocol: TCP
+        - port: 8200      # Vault
+          protocol: TCP
+        - port: 9090      # Prometheus
+          protocol: TCP
+    # DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+
+# ── Example App (apps namespace) ─────────────────────────────────────────────
+# Allows Traefik to reach the app and gives the app DNS + external HTTPS.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-app-from-traefik
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: example-app          # ← Change to your app label
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress
+      ports:
+        - port: 80              # ← Change to your app's pod port
+          protocol: TCP
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # External HTTPS (APIs, registries, etc.)
+    - ports:
+        - port: 443
+          protocol: TCP
+
+# ── Vault ────────────────────────────────────────────────────────────────────
+# Receives from ESO (any namespace) + Traefik (VPN-gated UI).
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vault-traffic
+  namespace: vault
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # ESO reads secrets from any namespace via ClusterSecretStore
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - port: 8200
+          protocol: TCP
+  egress:
+    # Raft peer communication (single-node: loopback only)
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 8201
+          protocol: TCP
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Kubernetes API (K8s auth method, token review)
+    - ports:
+        - port: 443
+          protocol: TCP
+        - port: 6443
+          protocol: TCP
+
+# ── Monitoring (Prometheus + Grafana + Loki + Promtail) ──────────────────────
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-traffic
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Traefik → Grafana (VPN-gated)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress
+      ports:
+        - port: 3000
+          protocol: TCP
+        - port: 80
+          protocol: TCP
+    # Internal: Prometheus ↔ Grafana ↔ Loki
+    - from:
+        - podSelector: {}
+  egress:
+    # Prometheus → scrape any namespace (metrics endpoints)
+    - to:
+        - namespaceSelector: {}
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # External (Grafana plugins, alertmanager webhooks, etc.)
+    - ports:
+        - port: 443
+          protocol: TCP

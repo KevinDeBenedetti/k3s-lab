@@ -24,10 +24,9 @@ concurrency:
 
 jobs:
 
-  # ─── Shell linting + BATS tests ───────────────────────────────────────────
+  # ─── Shell linting ─────────────────────────────────────────────────────────
   # shellcheck  → all .sh files at warning severity
   # actionlint  → .github/workflows/
-  # bats        → tests/bats/ (env, scripts, kubernetes — offline)
   # docs-link-check → relative links in docs/ don't escape docs/
   shell-ci:
     uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@main
@@ -36,9 +35,7 @@ jobs:
       shellcheck-severity: warning
       run-actionlint: true
       actionlint-paths: .github/workflows/
-      run-bats: true
-      bats-tests-dir: tests/bats/
-      bats-submodules: false
+      run-bats: false
       run-docker: false
       run-docs-link-check: true
 

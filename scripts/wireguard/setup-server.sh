@@ -15,7 +15,7 @@ WG_PORT="${WG_PORT:-51820}"
 WG_SUBNET="${WG_SUBNET:-10.8.0.0/24}"
 
 # Detect the public-facing network interface (usually eth0 or ens3)
-WAN_IF=$(ip route get 1.1.1.1 | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1); exit}')
+WAN_IF=$(ip route get ${WG_ROUTE_IP:-1.1.1.1} | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1); exit}')
 
 echo "→ Installing WireGuard..."
 sudo apt-get update -qq

@@ -5,25 +5,12 @@ set -euo pipefail
 # setup-vps.sh — Bootstrap a fresh Debian VPS with dotfiles
 # Run FROM YOUR LOCAL MACHINE.
 #
-# Usage:
-#   ./scripts/setup-vps.sh <VPS_IP> [SSH_USER] [SSH_PORT] [INITIAL_USER]
-#
-# Environment variables (can also be set in .env):
-#   SSH_PORT            SSH port (default: 22)
-#   SSH_KEY             Path to SSH private key (default: ~/.ssh/id_ed25519)
-#   INITIAL_USER        User for the first connection (default: root)
-#   SSH_ALLOWED_USERS   Space-separated list of users allowed to SSH in
-#   DOTFILES_FLAGS      init.sh flags (default: -a — full install)
-#
-# Examples:
-#   ./scripts/setup-vps.sh 1.2.3.4
-#   ./scripts/setup-vps.sh 1.2.3.4 kevin 22 root
-#   SSH_PORT=2222 SSH_ALLOWED_USERS="kevin" ./scripts/setup-vps.sh 1.2.3.4
-#   SSH_KEY=~/.ssh/id_ed25519 INITIAL_USER=root ./scripts/setup-vps.sh 1.2.3.4
+# Usage: ./scripts/setup-vps.sh <VPS_IP> [SSH_USER] [SSH_PORT] [INITIAL_USER]
 # =============================================================================
 
 K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
 
+# setup-vps uses positional args — keep manual preamble (no .env load needed)
 _run_src="${BASH_SOURCE[0]:-}"
 if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
   source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"

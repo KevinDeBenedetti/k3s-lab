@@ -14,20 +14,9 @@ set -euo pipefail
 # Both default to true. Set to false to skip one.
 # =============================================================================
 
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
-
-_run_src="${BASH_SOURCE[0]:-}"
-if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
-  source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"
-else
-  # shellcheck source=/dev/null
-  source <(curl -fsSL "${K3S_LAB_RAW}/lib/run-mode.sh")
-fi
-
-_lib log.sh
-_lib load-env.sh
-
-load_env "${_RUN_REPO:-.}/.env"
+# shellcheck source=lib/script-init.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
+_lib helm-repo.sh
 
 DEPLOY_VAULT="${DEPLOY_VAULT:-true}"
 DEPLOY_ESO="${DEPLOY_ESO:-true}"
@@ -43,8 +32,7 @@ if [[ "${DEPLOY_VAULT}" == "true" ]]; then
 
   [ -n "${VAULT_DOMAIN:-}" ] || { log_error "VAULT_DOMAIN is not set — add it to .env"; exit 1; }
 
-  helm repo add hashicorp https://helm.releases.hashicorp.com --force-update
-  helm repo update hashicorp
+  helm_add_repo hashicorp https://helm.releases.hashicorp.com
 
   helm upgrade --install vault hashicorp/vault \
     --version "${VAULT_CHART_VERSION}" \
@@ -90,8 +78,7 @@ fi
 if [[ "${DEPLOY_ESO}" == "true" ]]; then
   log_info "Deploying External Secrets Operator ${ESO_CHART_VERSION}..."
 
-  helm repo add external-secrets https://charts.external-secrets.io --force-update
-  helm repo update external-secrets
+  helm_add_repo external-secrets https://charts.external-secrets.io
 
   helm upgrade --install external-secrets external-secrets/external-secrets \
     --version "${ESO_CHART_VERSION}" \

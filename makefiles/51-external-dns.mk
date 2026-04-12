@@ -28,15 +28,15 @@ deploy-external-dns: ## Deploy external-dns (Cloudflare provider, traefik-proxy 
 external-dns-status: ## Show external-dns pod status and recent log lines
 	@echo ""
 	@echo "$(CYAN)── external-dns ─────────────────────────────────────────────────$(RESET)"
-	@kubectl --context $(KUBECONFIG_CONTEXT) get pods -n external-dns \
+	@$(K) get pods -n external-dns \
 	  -o custom-columns='NAME:.metadata.name,READY:.status.containerStatuses[0].ready,STATUS:.status.phase,RESTARTS:.status.containerStatuses[0].restartCount,AGE:.metadata.creationTimestamp' \
 	  2>/dev/null || echo "$(RED)❌ external-dns not installed$(RESET)"
 	@echo ""
 	@echo "$(CYAN)── Recent log (last 20 lines) ───────────────────────────────────$(RESET)"
-	@kubectl --context $(KUBECONFIG_CONTEXT) logs -n external-dns \
+	@$(K) logs -n external-dns \
 	  deployment/external-dns --tail=20 2>/dev/null || true
 	@echo ""
 
 external-dns-logs: ## Tail external-dns logs (live)
-	@kubectl --context $(KUBECONFIG_CONTEXT) logs -n external-dns \
+	@$(K) logs -n external-dns \
 	  deployment/external-dns -f

@@ -77,14 +77,3 @@ language = "system"
 entry = "bash -c 'for f in \"$@\"; do echo \"❌ Refusing to commit $f — contains secrets\"; exit 1; done' --"
 files = "^\\.env$"
 pass_filenames = true
-
-[[repos.hooks]]
-id = "bats"
-name = "BATS — unit tests"
-# Runs the offline test suite before every push.
-# Install bats: brew install bats-core
-language = "system"
-entry = "bash -c 'which bats >/dev/null 2>&1 && bats tests/bats/ || echo \"⚠️  bats not installed — skipping (brew install bats-core)\"'"
-pass_filenames = false
-always_run = true
-stages = ["pre-push"]

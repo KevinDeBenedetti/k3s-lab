@@ -15,26 +15,15 @@ set -euo pipefail
 #   SERVER_IP   — VPS public IP (for DNS A record value)
 # =============================================================================
 
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
-
-_run_src="${BASH_SOURCE[0]:-}"
-if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
-  source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"
-else
-  # shellcheck source=/dev/null
-  source <(curl -fsSL "${K3S_LAB_RAW}/lib/run-mode.sh")
-fi
-
-_lib log.sh
-_lib load-env.sh
-
-load_env "${_RUN_REPO:-.}/.env"
+# shellcheck source=lib/script-init.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
+_lib require-vars.sh
+_lib helm-repo.sh
 
 EXTERNAL_DNS_VERSION="${EXTERNAL_DNS_VERSION:-1.16.1}"
 KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-$(kubectl config current-context 2>/dev/null)}"
 
-[ -n "${DOMAIN:-}"     ] || { log_error "DOMAIN is not set — add it to .env"; exit 1; }
-[ -n "${SERVER_IP:-}"  ] || { log_error "SERVER_IP is not set — add it to .env"; exit 1; }
+require_vars DOMAIN SERVER_IP
 
 log_info "Deploying external-dns ${EXTERNAL_DNS_VERSION} on cluster: $(kubectl config current-context)"
 
@@ -45,8 +34,7 @@ kubectl --context "${KUBECONFIG_CONTEXT}" create namespace external-dns \
 
 # --- 2. Helm install ---
 log_step "[2/3] external-dns ${EXTERNAL_DNS_VERSION} (Cloudflare)..."
-helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/ --force-update
-helm repo update external-dns
+helm_add_repo external-dns https://kubernetes-sigs.github.io/external-dns/
 
 helm upgrade --install external-dns external-dns/external-dns \
   --version "${EXTERNAL_DNS_VERSION}" \

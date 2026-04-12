@@ -33,7 +33,9 @@ include makefiles/20-vps.mk
 include makefiles/30-k3s.mk
 include makefiles/35-wireguard.mk
 include makefiles/40-kubeconfig.mk
+include makefiles/45-security.mk
 include makefiles/50-deploy.mk
+include makefiles/51-external-dns.mk
 include makefiles/52-argocd.mk
 include makefiles/55-vault.mk
 include makefiles/60-status.mk

@@ -1,0 +1,62 @@
+# =============================================================================
+# Default-Deny NetworkPolicies
+#
+# Drop-in zero-trust baseline: blocks ALL pod ingress & egress by default.
+# Apply this first, then layer explicit allow rules on top.
+#
+# Requires a CNI that supports NetworkPolicy (Calico, Cilium, kube-router).
+# Flannel alone does NOT enforce NetworkPolicy — k3s ships kube-router by
+# default which does support it.
+#
+# Usage:
+#   Duplicate this block for each namespace that needs isolation.
+#   Or use the deploy-security Makefile target which applies it automatically.
+# =============================================================================
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: apps
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: ingress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

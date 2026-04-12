@@ -14,20 +14,10 @@ set -euo pipefail
 #   - Grafana IngressRoute + TLS certificate
 # =============================================================================
 
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
-
-_run_src="${BASH_SOURCE[0]:-}"
-if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
-  source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"
-else
-  # shellcheck source=/dev/null
-  source <(curl -fsSL "${K3S_LAB_RAW}/lib/run-mode.sh")
-fi
-
-_lib log.sh
-_lib load-env.sh
-
-load_env "${_RUN_REPO:-.}/.env"
+# shellcheck source=lib/script-init.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
+_lib require-vars.sh
+_lib helm-repo.sh
 
 # --- Context (overridable via env for Lima / alternate clusters) ---
 KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-infra}"
@@ -38,7 +28,7 @@ LOKI_VERSION="${LOKI_VERSION:-6.35.1}"
 PROMTAIL_VERSION="${PROMTAIL_VERSION:-6.17.1}"
 
 # --- Validate ---
-[ -n "${GRAFANA_DOMAIN:-}" ] || { log_error "GRAFANA_DOMAIN not set — add it to .env (e.g. GRAFANA_DOMAIN=grafana.kevindb.dev)"; exit 1; }
+require_vars GRAFANA_DOMAIN
 
 log_info "Deploying observability stack on cluster: $(kubectl config current-context)"
 
@@ -58,10 +48,8 @@ fi
 
 # --- 1. Helm repo ---
 log_step "[1/5] Helm repos..."
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
-helm repo add grafana https://grafana.github.io/helm-charts --force-update
-helm repo update prometheus-community
-helm repo update grafana
+helm_add_repo prometheus-community https://prometheus-community.github.io/helm-charts
+helm_add_repo grafana https://grafana.github.io/helm-charts
 
 # --- 2. kube-prometheus-stack ---
 log_step "[2/5] kube-prometheus-stack ${KUBE_PROMETHEUS_VERSION}..."

@@ -124,8 +124,8 @@ if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: activ
   ufw allow 80/tcp  comment 'HTTP (Traefik + ACME HTTP-01)'
   ufw allow 443/tcp comment 'HTTPS (Traefik TLS)'
   ufw allow 6443/tcp comment 'k3s API server'
-  ufw allow from 10.42.0.0/16 to any comment 'k3s pod traffic'
-  ufw allow from 10.43.0.0/16 to any comment 'k3s service traffic'
+  ufw allow from ${K3S_POD_CIDR:-10.42.0.0/16} to any comment 'k3s pod traffic'
+  ufw allow from ${K3S_SERVICE_CIDR:-10.43.0.0/16} to any comment 'k3s service traffic'
   # Allow VXLAN + kubelet from agent if known
   if [[ -n "${AGENT_IP}" ]]; then
     ufw allow from "${AGENT_IP}" to any port 8472 proto udp comment 'flannel VXLAN from agent'
