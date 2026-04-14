@@ -17,6 +17,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
+  # GHCR requires a lowercase owner — compute it at job level (see steps)
   REGISTRY_PATH: ghcr.io/${{ github.repository_owner }}/charts
 
 jobs:
@@ -24,6 +25,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set lowercase registry path
+        id: registry
+        run: echo "path=ghcr.io/${OWNER,,}/charts" >> "$GITHUB_OUTPUT"
+        env:
+          OWNER: ${{ github.repository_owner }}
 
       - name: Install Helm
         uses: azure/setup-helm@v4
@@ -50,7 +57,7 @@ jobs:
 
               # Push to GHCR
               pkg=$(ls /tmp/charts/"${chart_name}"-*.tgz)
-              helm push "$pkg" "oci://${{ env.REGISTRY_PATH }}"
+              helm push "$pkg" "oci://${{ steps.registry.outputs.path }}"
 
               echo "::endgroup::"
             fi
@@ -64,6 +71,6 @@ jobs:
             if [ -f "$chart/Chart.yaml" ]; then
               name=$(basename "$chart")
               version=$(grep '^version:' "$chart/Chart.yaml" | awk '{print $2}')
-              echo "- **$name** v$version → \`${{ env.REGISTRY_PATH }}/$name\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "- **$name** v$version → \`${{ steps.registry.outputs.path }}/$name\`" >> "$GITHUB_STEP_SUMMARY"
             fi
           done
