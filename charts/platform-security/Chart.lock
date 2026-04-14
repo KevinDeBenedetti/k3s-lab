@@ -1,0 +1,15 @@
+dependencies:
+- name: falco
+  repository: https://falcosecurity.github.io/charts
+  version: 8.0.2
+- name: falcosidekick
+  repository: https://falcosecurity.github.io/charts
+  version: 0.13.1
+- name: tetragon
+  repository: https://helm.cilium.io
+  version: 1.6.1
+- name: trivy-operator
+  repository: https://aquasecurity.github.io/helm-charts
+  version: 0.32.1
+digest: sha256:d09d8722b385a087530f14ac0b788e03ce9f20f38fbc9dafe6b21d8f16e99253
+generated: "2026-04-14T17:58:38.643524+02:00"
