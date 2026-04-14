@@ -45,7 +45,7 @@ jobs:
     with:
       run-kubeconform: true
       kubeconform-paths: kubernetes/
-      kubeconform-exclude: '.*-values\.yaml'
+      kubeconform-exclude: '.*(kustomization\.yaml|-values\.yaml)'
       kubeconform-include-crds-catalog: true
       run-env-example: true
       env-example-required-keys: >-

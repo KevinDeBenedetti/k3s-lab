@@ -66,7 +66,7 @@ name = "kubeconform — Kubernetes schema validation"
 language = "system"
 entry = "bash -c 'which kubeconform >/dev/null 2>&1 && kubeconform -strict -summary -schema-location default -schema-location \"https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json\" \"$@\" || echo \"⚠️  kubeconform not installed — skipping (brew install kubeconform)\"' --"
 files = "^kubernetes/.*\\.yaml$"
-exclude = ".*-values\\.yaml$"
+exclude = ".*(kustomization\\.yaml|-values\\.yaml)$"
 pass_filenames = true
 
 [[repos.hooks]]
