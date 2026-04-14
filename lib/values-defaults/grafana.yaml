@@ -1,0 +1,12 @@
+# =============================================================================
+# Grafana defaults — VPS-optimized
+# Used as reference by platform-monitoring chart.
+# =============================================================================
+storageSize: 2Gi
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 300m
+    memory: 200Mi

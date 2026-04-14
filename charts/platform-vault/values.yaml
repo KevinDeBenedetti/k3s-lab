@@ -1,0 +1,80 @@
+vault:
+  global:
+    enabled: true
+    tlsDisable: true
+  injector:
+    enabled: false
+  server:
+    image:
+      repository: hashicorp/vault
+      tag: "1.19.0"
+      pullPolicy: IfNotPresent
+    ha:
+      enabled: false
+    dataStorage:
+      enabled: true
+      size: 5Gi
+      storageClass: local-path
+    auditStorage:
+      enabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    readinessProbe:
+      enabled: true
+      path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+    livenessProbe:
+      enabled: true
+      path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+      initialDelaySeconds: 60
+    ingress:
+      enabled: false
+    standalone:
+      enabled: true
+      config: |
+        ui = true
+
+        listener "tcp" {
+          tls_disable     = 1
+          address         = "[::]:8200"
+          cluster_address = "[::]:8201"
+        }
+
+        storage "raft" {
+          path    = "/vault/data"
+          node_id = "vault-0"
+        }
+
+        service_registration "kubernetes" {}
+  ui:
+    enabled: true
+    serviceType: ClusterIP
+
+external-secrets:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+  webhook:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+  certController:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi

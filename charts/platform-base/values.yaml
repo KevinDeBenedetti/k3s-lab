@@ -1,0 +1,63 @@
+# Namespaces to create with Pod Security Standards labels
+namespaces:
+  - name: apps
+    pss:
+      enforce: restricted
+      audit: restricted
+      warn: restricted
+    labels:
+      environment: production
+
+  - name: ingress
+    pss:
+      enforce: baseline
+      audit: restricted
+      warn: restricted
+
+  - name: cert-manager
+    pss:
+      enforce: restricted
+      audit: restricted
+      warn: restricted
+
+  - name: monitoring
+    pss:
+      enforce: baseline
+      audit: restricted
+      warn: restricted
+
+  - name: vault
+    pss:
+      enforce: restricted
+      audit: restricted
+      warn: restricted
+
+  - name: external-dns
+    pss:
+      enforce: restricted
+      audit: restricted
+      warn: restricted
+
+  - name: external-secrets
+    pss:
+      enforce: restricted
+      audit: restricted
+      warn: restricted
+
+  - name: auth
+    pss:
+      enforce: restricted
+      audit: restricted
+      warn: restricted
+
+# Default LimitRange applied to all namespaces
+limitRange:
+  default:
+    cpu: 200m
+    memory: 256Mi
+  defaultRequest:
+    cpu: 50m
+    memory: 64Mi
+  max:
+    cpu: "2"
+    memory: 2Gi

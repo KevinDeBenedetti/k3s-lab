@@ -1,0 +1,17 @@
+{{- range .Values.namespaces }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .name }}
+  labels:
+    kubernetes.io/metadata.name: {{ .name }}
+    {{- if .pss }}
+    pod-security.kubernetes.io/enforce: {{ .pss.enforce }}
+    pod-security.kubernetes.io/audit: {{ .pss.audit }}
+    pod-security.kubernetes.io/warn: {{ .pss.warn }}
+    {{- end }}
+    {{- range $key, $value := .labels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+{{- end }}

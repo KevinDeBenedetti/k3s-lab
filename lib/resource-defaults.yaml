@@ -1,0 +1,26 @@
+# =============================================================================
+# Standard LimitRange defaults — applied to workload namespaces
+#
+# Ensures containers without explicit resource specs still get safe defaults.
+# Tuned for an 8GB VPS — adjust max values for larger nodes.
+# =============================================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 200m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      max:
+        cpu: "2"
+        memory: 2Gi
+    - type: Pod
+      max:
+        cpu: "4"
+        memory: 4Gi

@@ -1,0 +1,16 @@
+# =============================================================================
+# Prometheus defaults — VPS-optimized (8GB single-node)
+# Used as reference by platform-monitoring chart.
+# =============================================================================
+retention: 7d
+retentionSize: "5GB"
+walCompression: true
+scrapeInterval: "60s"
+storageSize: 8Gi
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 300m
+    memory: 400Mi

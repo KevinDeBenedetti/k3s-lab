@@ -22,7 +22,7 @@ hooks = [
   { id = "end-of-file-fixer" },
   # --allow-multiple-documents: Kubernetes files use multiple --- separated docs
   # exclude Helm values files that embed Go template syntax ({{ }})
-  { id = "check-yaml", args = ["--allow-multiple-documents"], exclude = "^kubernetes/.*/.*-values\\.yaml$" },
+  { id = "check-yaml", args = ["--allow-multiple-documents"], exclude = "^(kubernetes/.*/.*-values\\.yaml|charts/.*/templates/.*\\.yaml)$" },
   { id = "check-merge-conflict" },
   { id = "check-executables-have-shebangs" },
   { id = "check-shebang-scripts-are-executable" },

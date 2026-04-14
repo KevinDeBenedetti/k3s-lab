@@ -1,0 +1,69 @@
+# =============================================================================
+# Release Charts — Package and publish Helm charts to GHCR (OCI)
+#
+# Triggered on tags matching v*.
+# Packages each chart in charts/ and pushes to ghcr.io.
+# =============================================================================
+name: Release Charts
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  packages: write
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  REGISTRY_PATH: ghcr.io/${{ github.repository_owner }}/charts
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.0
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} \
+            --username ${{ github.actor }} --password-stdin
+
+      - name: Package and push charts
+        run: |
+          for chart in charts/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+              echo "::group::Publishing $chart_name"
+
+              # Update dependencies
+              helm dependency update "$chart"
+
+              # Package
+              helm package "$chart" -d /tmp/charts/
+
+              # Push to GHCR
+              pkg=$(ls /tmp/charts/"${chart_name}"-*.tgz)
+              helm push "$pkg" "oci://${{ env.REGISTRY_PATH }}"
+
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: Summary
+        run: |
+          echo "## Published Charts" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          for chart in charts/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              name=$(basename "$chart")
+              version=$(grep '^version:' "$chart/Chart.yaml" | awk '{print $2}')
+              echo "- **$name** v$version → \`${{ env.REGISTRY_PATH }}/$name\`" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done

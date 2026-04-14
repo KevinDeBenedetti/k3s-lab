@@ -1,0 +1,14 @@
+# =============================================================================
+# Loki defaults — VPS-optimized SingleBinary mode
+# Used as reference by platform-monitoring chart.
+# =============================================================================
+deploymentMode: SingleBinary
+replicas: 1
+storageSize: 8Gi
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

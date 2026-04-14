@@ -1,0 +1,21 @@
+# =============================================================================
+# Default LimitRange — applied to workload namespaces
+# Ensures all containers have resource requests/limits even if not specified.
+# =============================================================================
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 200m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      max:
+        cpu: "2"
+        memory: 2Gi

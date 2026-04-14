@@ -1,0 +1,102 @@
+# =============================================================================
+# CI — k3s-lab lint, tests, security & validation
+#
+# Runs on every push and PR to main.
+# Does NOT require a real cluster — all checks are static/offline.
+#
+# Jobs:
+#   shell-ci    — shellcheck + actionlint + bats
+#   kubernetes  — kubeconform + .env.example check
+#   security    — Gitleaks secret scanning
+#   helm-lint   — Helm chart linting
+#   resource-limits — Verify all charts define resource limits
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+
+  # ─── Shell linting ─────────────────────────────────────────────────────────
+  shell-ci:
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@main
+    with:
+      run-shellcheck: true
+      shellcheck-severity: warning
+      run-actionlint: true
+      actionlint-paths: .github/workflows/
+      run-bats: false
+      run-docker: false
+      run-docs-link-check: true
+
+  # ─── Kubernetes validation + .env.example check ──────────────────────────
+  kubernetes:
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-kubernetes.yml@main
+    with:
+      run-kubeconform: true
+      kubeconform-paths: kubernetes/
+      kubeconform-exclude: '.*-values\.yaml'
+      kubeconform-include-crds-catalog: true
+      run-env-example: true
+      env-example-required-keys: >-
+        SERVER_IP AGENT_IP DOMAIN EMAIL
+        DASHBOARD_DOMAIN DASHBOARD_PASSWORD
+        GRAFANA_DOMAIN GRAFANA_PASSWORD
+        KUBECONFIG_CONTEXT K3S_VERSION K3S_NODE_TOKEN
+
+  # ─── Secret scanning ──────────────────────────────────────────────────────
+  security:
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/security.yml@main
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+      pull-requests: read
+    with:
+      run-node-audit: false
+      run-python-audit: false
+      run-secret-scan: true
+      run-codeql: false
+
+  # ─── Helm chart linting ────────────────────────────────────────────────────
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.0
+      - name: Lint all charts
+        run: |
+          for chart in charts/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              echo "::group::Linting $chart"
+              helm lint "$chart"
+              echo "::endgroup::"
+            fi
+          done
+
+  # ─── Resource limits check ────────────────────────────────────────────────
+  resource-limits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check resource limits in chart values
+        run: ./scripts/check-resource-limits.sh
+
+  # ─── Docs dispatch (push to main only) ───────────────────────────────────
+  docs:
+    needs: [shell-ci, kubernetes, security, helm-lint, resource-limits]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/cd-docs.yml@main
+    secrets:
+      PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
