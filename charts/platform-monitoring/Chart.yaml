@@ -1,7 +1,7 @@
 apiVersion: v2
 name: platform-monitoring
 description: Observability stack — Prometheus, Grafana, Loki, Promtail
-version: 0.1.0
+version: 0.2.0
 type: application
 dependencies:
   - name: kube-prometheus-stack

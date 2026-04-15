@@ -1,0 +1,21 @@
+# =============================================================================
+# Release — Automated versioning via release-please
+#
+# On push to main: creates/updates a release PR with changelog.
+# On merge of release PR: creates a GitHub release + tag.
+# Then triggers release-charts.yml to publish OCI charts.
+# =============================================================================
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/release.yml@v0
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write

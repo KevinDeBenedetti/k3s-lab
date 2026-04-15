@@ -1,4 +1,5 @@
 vault:
+  fullnameOverride: vault
   global:
     enabled: true
     tlsDisable: true
@@ -50,31 +51,8 @@ vault:
         }
 
         service_registration "kubernetes" {}
+
+        disable_mlock = true
   ui:
     enabled: true
     serviceType: ClusterIP
-
-external-secrets:
-  resources:
-    requests:
-      cpu: 10m
-      memory: 32Mi
-    limits:
-      cpu: 100m
-      memory: 64Mi
-  webhook:
-    resources:
-      requests:
-        cpu: 10m
-        memory: 32Mi
-      limits:
-        cpu: 100m
-        memory: 64Mi
-  certController:
-    resources:
-      requests:
-        cpu: 10m
-        memory: 32Mi
-      limits:
-        cpu: 100m
-        memory: 64Mi

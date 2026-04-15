@@ -12,4 +12,4 @@ dependencies:
   repository: https://aquasecurity.github.io/helm-charts
   version: 0.32.1
 digest: sha256:d09d8722b385a087530f14ac0b788e03ce9f20f38fbc9dafe6b21d8f16e99253
-generated: "2026-04-14T17:58:38.643524+02:00"
+generated: "2026-04-15T17:21:36.221203+02:00"

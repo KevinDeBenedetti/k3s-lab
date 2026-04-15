@@ -1,0 +1,15 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "changelog-path": "CHANGELOG.md",
+      "include-v-tag": true,
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": false
+    }
+  },
+  "git-user-name": "github-actions[bot]",
+  "git-user-email": "github-actions[bot]@users.noreply.github.com",
+  "changelog-path": "CHANGELOG.md",
+  "release-type": "simple"
+}

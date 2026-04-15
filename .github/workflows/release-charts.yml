@@ -1,7 +1,7 @@
 # =============================================================================
 # Release Charts — Package and publish Helm charts to GHCR (OCI)
 #
-# Triggered on tags matching v*.
+# Triggered after release-please creates a GitHub release (tag v*).
 # Packages each chart in charts/ and pushes to ghcr.io.
 # =============================================================================
 name: Release Charts

@@ -1,6 +1,7 @@
 # Enable/disable individual security tools
 falco:
   enabled: true
+  fullnameOverride: falco
   resources:
     requests:
       cpu: 50m
@@ -14,6 +15,7 @@ falcosidekick:
 
 tetragon:
   enabled: true
+  fullnameOverride: tetragon
   resources:
     requests:
       cpu: 50m
@@ -24,6 +26,7 @@ tetragon:
 
 trivy-operator:
   enabled: true
+  fullnameOverride: trivy-operator
   resources:
     requests:
       cpu: 50m

@@ -1,6 +1,8 @@
 # VPS-optimized monitoring defaults (8GB single-node)
 kube-prometheus-stack:
+  fullnameOverride: kube-prometheus-stack
   grafana:
+    fullnameOverride: kube-prometheus-stack-grafana
     admin:
       existingSecret: grafana-admin-secret
       userKey: username
@@ -69,6 +71,7 @@ kube-prometheus-stack:
     enabled: false
 
   prometheus-node-exporter:
+    fullnameOverride: kube-prometheus-stack-prometheus-node-exporter
     resources:
       requests:
         cpu: 50m
@@ -78,9 +81,11 @@ kube-prometheus-stack:
         memory: 64Mi
 
   kube-state-metrics:
+    fullnameOverride: kube-prometheus-stack-kube-state-metrics
     enabled: false
 
 loki:
+  fullnameOverride: loki
   deploymentMode: SingleBinary
   loki:
     auth_enabled: false
@@ -130,6 +135,7 @@ loki:
     enabled: false
 
 promtail:
+  fullnameOverride: promtail
   config:
     logLevel: info
     clients:
