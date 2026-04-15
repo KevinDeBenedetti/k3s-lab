@@ -29,9 +29,6 @@ RESET  := \033[0m
 
 include makefiles/00-lib.mk
 include makefiles/10-help.mk
-include makefiles/20-vps.mk
-include makefiles/30-k3s.mk
-include makefiles/35-wireguard.mk
 include makefiles/40-kubeconfig.mk
 include makefiles/45-security.mk
 include makefiles/50-deploy.mk

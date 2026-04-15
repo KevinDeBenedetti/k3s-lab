@@ -1,0 +1,65 @@
+---
+- name: Check if k3s agent is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Get installed k3s version
+  ansible.builtin.command: k3s --version
+  register: k3s_installed_version
+  changed_when: false
+  failed_when: false
+  when: k3s_binary.stat.exists
+
+- name: Download k3s installer
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: "0755"
+  when: >
+    not k3s_binary.stat.exists or
+    k3s_version not in (k3s_installed_version.stdout | default(''))
+
+- name: Install k3s agent
+  ansible.builtin.command:
+    cmd: /tmp/k3s-install.sh
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+    K3S_URL: "{{ k3s_server_url }}"
+    K3S_TOKEN: "{{ k3s_node_token }}"
+    INSTALL_K3S_EXEC: >-
+      agent
+      --node-ip {{ k3s_node_ip }}
+      {{ k3s_extra_agent_args }}
+  when: >
+    not k3s_binary.stat.exists or
+    k3s_version not in (k3s_installed_version.stdout | default(''))
+  changed_when: true
+  notify: Restart k3s-agent
+
+- name: Wait for k3s-agent service to be active
+  ansible.builtin.systemd:
+    name: k3s-agent
+    state: started
+    enabled: true
+
+- name: Open firewall ports for cluster communication
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    from_ip: "{{ k3s_ufw_allow_from }}"
+  loop:
+    - { port: "8472", proto: udp }
+    - { port: "10250", proto: tcp }
+  notify: Reload UFW
+
+- name: Open ingress ports (HTTP/HTTPS)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "80"
+    - "443"
+  notify: Reload UFW

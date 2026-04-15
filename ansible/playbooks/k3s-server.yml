@@ -1,0 +1,15 @@
+---
+# k3s-server.yml — Setup server node only
+# Usage: ansible-playbook -i inventory/hosts.yml playbooks/k3s-server.yml
+- name: Base setup for server node
+  hosts: k3s_servers
+  become: true
+  roles:
+    - common
+
+- name: Install k3s server
+  hosts: k3s_servers
+  become: true
+  roles:
+    - k3s_server
+    - wireguard

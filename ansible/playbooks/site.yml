@@ -1,0 +1,36 @@
+---
+# site.yml — Full cluster provisioning
+# Usage: ansible-playbook -i inventory/hosts.yml playbooks/site.yml
+- name: Base setup for all nodes
+  hosts: all
+  become: true
+  roles:
+    - common
+
+- name: Install k3s server (control-plane)
+  hosts: k3s_servers
+  become: true
+  roles:
+    - k3s_server
+    - wireguard
+
+- name: Install k3s agents (workers)
+  hosts: k3s_agents
+  become: true
+  vars:
+    k3s_server_url: "https://{{ hostvars[groups['k3s_servers'][0]].ansible_host }}:6443"
+    k3s_node_token: "{{ hostvars[groups['k3s_servers'][0]].k3s_node_token }}"
+  roles:
+    - k3s_agent
+
+- name: Save kubeconfig locally
+  hosts: k3s_servers
+  become: true
+  tasks:
+    - name: Write kubeconfig to local file
+      ansible.builtin.copy:
+        content: "{{ k3s_kubeconfig }}"
+        dest: "{{ playbook_dir }}/../../kubeconfig.yaml"
+        mode: "0600"
+      delegate_to: localhost
+      become: false

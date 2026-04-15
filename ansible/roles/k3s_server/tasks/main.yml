@@ -1,0 +1,90 @@
+---
+- name: Check if k3s is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Get installed k3s version
+  ansible.builtin.command: k3s --version
+  register: k3s_installed_version
+  changed_when: false
+  failed_when: false
+  when: k3s_binary.stat.exists
+
+- name: Download k3s installer
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: "0755"
+  when: >
+    not k3s_binary.stat.exists or
+    k3s_version not in (k3s_installed_version.stdout | default(''))
+
+- name: Install k3s server
+  ansible.builtin.command:
+    cmd: /tmp/k3s-install.sh
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+    INSTALL_K3S_EXEC: >-
+      server
+      --node-ip {{ k3s_node_ip }}
+      --cluster-cidr {{ k3s_pod_cidr }}
+      --service-cidr {{ k3s_service_cidr }}
+      --cluster-dns {{ k3s_cluster_dns }}
+      --flannel-backend {{ k3s_flannel_backend }}
+      {% for component in k3s_disable %}--disable {{ component }} {% endfor %}
+      {{ k3s_extra_server_args }}
+  when: >
+    not k3s_binary.stat.exists or
+    k3s_version not in (k3s_installed_version.stdout | default(''))
+  changed_when: true
+  notify: Restart k3s
+
+- name: Wait for k3s to be ready
+  ansible.builtin.command: k3s kubectl get nodes
+  register: k3s_nodes
+  retries: 30
+  delay: 5
+  until: k3s_nodes.rc == 0
+  changed_when: false
+
+- name: Read node token
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: k3s_node_token_raw
+
+- name: Set node token fact
+  ansible.builtin.set_fact:
+    k3s_node_token: "{{ k3s_node_token_raw.content | b64decode | trim }}"
+
+- name: Open firewall ports for agents
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    from_ip: "{{ k3s_ufw_allow_from }}"
+  loop:
+    - { port: "6443", proto: tcp }
+    - { port: "8472", proto: udp }
+    - { port: "10250", proto: tcp }
+  notify: Reload UFW
+
+- name: Open ingress ports (HTTP/HTTPS)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "80"
+    - "443"
+  notify: Reload UFW
+
+- name: Fetch kubeconfig
+  ansible.builtin.slurp:
+    src: /etc/rancher/k3s/k3s.yaml
+  register: k3s_kubeconfig_raw
+
+- name: Set kubeconfig fact (with server IP replaced)
+  ansible.builtin.set_fact:
+    k3s_kubeconfig: >-
+      {{ k3s_kubeconfig_raw.content | b64decode | regex_replace('127\.0\.0\.1', ansible_host) }}

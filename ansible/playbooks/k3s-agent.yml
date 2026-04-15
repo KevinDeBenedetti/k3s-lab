@@ -1,0 +1,30 @@
+---
+# k3s-agent.yml — Add agent nodes to an existing cluster
+# Usage: ansible-playbook -i inventory/hosts.yml playbooks/k3s-agent.yml
+- name: Base setup for agent nodes
+  hosts: k3s_agents
+  become: true
+  roles:
+    - common
+
+- name: Retrieve server token
+  hosts: k3s_servers
+  become: true
+  tasks:
+    - name: Read node token
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: k3s_node_token_raw
+
+    - name: Set node token fact
+      ansible.builtin.set_fact:
+        k3s_node_token: "{{ k3s_node_token_raw.content | b64decode | trim }}"
+
+- name: Install k3s agent
+  hosts: k3s_agents
+  become: true
+  vars:
+    k3s_server_url: "https://{{ hostvars[groups['k3s_servers'][0]].ansible_host }}:6443"
+    k3s_node_token: "{{ hostvars[groups['k3s_servers'][0]].k3s_node_token }}"
+  roles:
+    - k3s_agent

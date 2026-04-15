@@ -13,6 +13,9 @@ kubeconfig-*
 *.crt
 *.p12
 
+# Ansible
+ansible/*.retry
+
 # Helm — downloaded chart dependencies (re-fetched by helm dependency update)
 charts/**/charts/*.tgz
 

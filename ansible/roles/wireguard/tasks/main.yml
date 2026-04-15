@@ -1,0 +1,66 @@
+---
+- name: Skip WireGuard if disabled
+  ansible.builtin.meta: end_role
+  when: not wireguard_enabled
+
+- name: Install WireGuard
+  ansible.builtin.apt:
+    name: wireguard
+    state: present
+    update_cache: true
+
+- name: Generate server private key
+  ansible.builtin.command:
+    cmd: wg genkey
+  register: wg_private_key
+  changed_when: false
+  args:
+    creates: /etc/wireguard/private.key
+
+- name: Save server private key
+  ansible.builtin.copy:
+    content: "{{ wg_private_key.stdout }}"
+    dest: /etc/wireguard/private.key
+    mode: "0600"
+  when: wg_private_key.stdout is defined and wg_private_key.stdout | length > 0
+
+- name: Read server private key
+  ansible.builtin.slurp:
+    src: /etc/wireguard/private.key
+  register: wg_private_key_file
+
+- name: Derive server public key
+  ansible.builtin.shell:
+    cmd: echo "{{ wg_private_key_file.content | b64decode | trim }}" | wg pubkey
+  register: wg_public_key
+  changed_when: false
+
+- name: Set WireGuard public key fact
+  ansible.builtin.set_fact:
+    wireguard_server_public_key: "{{ wg_public_key.stdout | trim }}"
+
+- name: Deploy WireGuard configuration
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: "/etc/wireguard/{{ wireguard_interface }}.conf"
+    mode: "0600"
+  notify: Restart WireGuard
+
+- name: Open WireGuard UDP port in UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ wireguard_port }}"
+    proto: udp
+
+- name: Enable IP forwarding for WireGuard
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-wireguard.conf
+    reload: true
+
+- name: Enable and start WireGuard
+  ansible.builtin.systemd:
+    name: "wg-quick@{{ wireguard_interface }}"
+    state: started
+    enabled: true

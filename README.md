@@ -14,6 +14,7 @@ For cluster-specific configuration, use a private `infra` repository that consum
 
 - **Helm Charts** (OCI) — platform-base, platform-monitoring, platform-security, platform-vault, platform-argocd
 - **Kustomize Bases** — reusable namespace, LimitRange, RBAC, ExternalSecret, and IngressRoute templates
+- **Ansible Roles** — common (VPS base), k3s_server, k3s_agent, wireguard
 - Lightweight Kubernetes via [k3s](https://k3s.io) with automated control-plane and agent bootstrap
 - Ingress + automatic HTTPS via [Traefik](https://traefik.io) and [cert-manager](https://cert-manager.io)
 - Full observability: Prometheus, Grafana, Loki, Promtail (VPS-optimized)
@@ -28,6 +29,18 @@ For cluster-specific configuration, use a private `infra` repository that consum
 
 ```
 k3s-lab/
+├── ansible/                    # Reusable Ansible roles + playbooks
+│   ├── roles/
+│   │   ├── common/             # VPS base: packages, sysctl, kernel modules, UFW
+│   │   ├── k3s_server/         # k3s server installation + configuration
+│   │   ├── k3s_agent/          # k3s agent join
+│   │   └── wireguard/          # Optional WireGuard VPN setup
+│   ├── playbooks/
+│   │   ├── site.yml            # Full cluster provisioning
+│   │   ├── k3s-server.yml      # Server node only
+│   │   ├── k3s-agent.yml       # Add agent nodes
+│   │   └── reset.yml           # Uninstall k3s (destructive)
+│   └── requirements.yml        # Galaxy dependencies
 ├── charts/                     # Helm charts published to ghcr.io (OCI)
 │   ├── platform-base/          # Namespaces, LimitRange, shared RBAC
 │   ├── platform-monitoring/    # Prometheus + Grafana + Loki + Promtail
@@ -46,24 +59,23 @@ k3s-lab/
 
 ## Quick Start
 
-### Direct usage (standalone cluster)
+### Using Ansible (recommended)
+
+In your private `infra` repo, configure inventory and run:
 
 ```bash
-cp .env.example .env          # fill in your values
-make k3s-server               # bootstrap control plane
-make k3s-agent                # join agent node
-make kubeconfig               # fetch kubeconfig
-make deploy                   # deploy Traefik + cert-manager
-make deploy-monitoring        # deploy Prometheus + Grafana + Loki
-make deploy-vault             # (optional) deploy Vault + ESO
+# Install Ansible dependencies
+ansible-galaxy install -r k3s-lab/ansible/requirements.yml
+
+# Provision full cluster
+ansible-playbook -i ansible/inventory/hosts.yml k3s-lab/ansible/playbooks/site.yml
 ```
 
 ### Consumed by a private infra repo
 
 ```bash
-# In your infra repo Makefile:
-K3S_LAB_RAW := https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main
-# Fetches makefiles on-demand from k3s-lab
+# In your infra repo, roles_path in ansible.cfg points to k3s-lab/ansible/roles
+# Terraform provisions Hetzner VPS, Ansible configures nodes using k3s-lab roles
 ```
 
 Charts are consumed via OCI in ArgoCD ApplicationSets:

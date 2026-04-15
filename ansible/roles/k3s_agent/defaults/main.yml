@@ -1,0 +1,19 @@
+---
+# k3s_agent role defaults
+
+k3s_version: "v1.32.2+k3s1"
+
+# Server URL to join (set from k3s_server group)
+k3s_server_url: ""
+
+# Node token from the server (set dynamically)
+k3s_node_token: ""
+
+# Node IP for inter-node communication (private network)
+k3s_node_ip: "{{ ansible_default_ipv4.address }}"
+
+# Extra args for the agent
+k3s_extra_agent_args: ""
+
+# Firewall: allow traffic from private network
+k3s_ufw_allow_from: "10.0.0.0/16"

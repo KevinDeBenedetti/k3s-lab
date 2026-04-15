@@ -1,0 +1,65 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Load kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ common_kernel_modules }}"
+
+- name: Persist kernel modules across reboots
+  ansible.builtin.lineinfile:
+    path: /etc/modules-load.d/k3s.conf
+    line: "{{ item }}"
+    create: true
+    mode: "0644"
+  loop: "{{ common_kernel_modules }}"
+
+- name: Apply sysctl settings
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-k3s.conf
+    reload: true
+    state: present
+  loop: "{{ common_sysctl | dict2items }}"
+
+- name: Disable swap
+  when: common_disable_swap
+  block:
+    - name: Disable swap immediately
+      ansible.builtin.command: swapoff -a
+      changed_when: false
+
+    - name: Remove swap entries from fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        regexp: '\sswap\s'
+        state: absent
+
+- name: Configure UFW
+  when: common_ufw_enabled
+  block:
+    - name: Set UFW default incoming policy
+      community.general.ufw:
+        default: "{{ common_ufw_default_policy }}"
+        direction: incoming
+
+    - name: Allow SSH through UFW
+      community.general.ufw:
+        rule: allow
+        port: "{{ common_ssh_port }}"
+        proto: tcp
+      when: common_ufw_allow_ssh
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
