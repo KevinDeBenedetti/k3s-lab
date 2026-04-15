@@ -73,58 +73,45 @@ See [Configuration](./configuration) for the full variable reference.
 
 ---
 
-## Step 2 — Bootstrap server node
+## Step 2 — Provision the cluster
+
+### Option A: Full provisioning (recommended)
 
 ```bash
-make k3s-server
+make provision
 ```
 
-This installs k3s server on `SERVER_IP` with:
-- Traefik and built-in LB **disabled** (managed via Helm)
-- `--tls-san` set to the public IP for remote `kubectl` access
-- Secrets encryption at rest
-- Flannel VXLAN overlay network
-- UFW rules for HTTP/HTTPS/API server
+This runs Ansible to configure all nodes:
+1. **Common setup** — packages, kernel modules, sysctl, UFW, swap disabled
+2. **k3s server** — installs k3s with Flannel VXLAN, disables Traefik/servicelb
+3. **WireGuard** — optional VPN (if `wireguard_enabled: true` in group_vars)
+4. **k3s agents** — joins agent nodes to the cluster
+5. **Kubeconfig** — saved locally for `kubectl` access
 
-When it completes, `K3S_NODE_TOKEN` is automatically saved to `.env`.
+### Option B: Step by step
 
-> ⏱️ Takes ~5 minutes on a typical VPS.
+```bash
+make provision-server      # Common + k3s server + WireGuard
+make provision-agents      # Join agent nodes
+make kubeconfig            # Merge kubeconfig locally
+```
+
+> Requires Ansible inventory at `ansible/inventory/hosts.yml` — see [Configuration](./configuration).
 
 ---
 
-## Step 3 — Join agent node
+## Step 3 — Verify nodes
 
 ```bash
-make k3s-agent
-```
-
-This:
-1. Opens the server UFW for the agent IP (VXLAN + kubelet ports)
-2. Installs k3s agent on `AGENT_IP`
-
-> ⏱️ Takes ~3 minutes.
-
----
-
-## Step 4 — Fetch kubeconfig
-
-```bash
-make kubeconfig
 kubectl config use-context k3s-lab
-```
-
-Verify both nodes are ready:
-
-```bash
 make nodes
 # NAME     STATUS   ROLES                  AGE   VERSION
 # server   Ready    control-plane,master   5m    v1.32.2+k3s1
-# agent    Ready    <none>                 2m    v1.32.2+k3s1
 ```
 
 ---
 
-## Step 5 — Deploy base stack
+## Step 4 — Deploy base stack
 
 ### Create the dashboard secret
 
@@ -149,7 +136,7 @@ This deploys in order:
 
 ---
 
-## Step 6 — Deploy monitoring
+## Step 5 — Deploy monitoring
 
 ### Create Grafana admin secret
 
@@ -173,7 +160,7 @@ This deploys:
 
 ---
 
-## Step 7 — Verify
+## Step 6 — Verify
 
 ```bash
 make status

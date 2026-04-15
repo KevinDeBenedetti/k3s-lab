@@ -1,19 +1,37 @@
 # Module: makefiles/90-provision.mk
 # ──────────────────────────────────────────────────────────────────────────────
-# Full provisioning workflow
+# Ansible-based provisioning workflow
 # ──────────────────────────────────────────────────────────────────────────────
 
-.PHONY: provision
+# Ansible paths — overridden by consumer repos (e.g. infra/Makefile)
+ANSIBLE_DIR     ?= ansible
+ANSIBLE_PLAYBOOK ?= ansible-playbook
+ANSIBLE_INVENTORY ?= $(ANSIBLE_DIR)/inventory/hosts.yml
+PLAYBOOK_DIR    ?= $(ANSIBLE_DIR)/playbooks
 
-provision: setup-all k3s-server k3s-agent kubeconfig deploy deploy-dashboard-secret deploy-grafana-secret deploy-monitoring deploy-vault vault-init deploy-eso deploy-argocd ## Full provision: VPS → k3s → kubeconfig → stack → secrets → monitoring → vault → argocd
+.PHONY: provision provision-server provision-agents provision-reset
+
+provision: ## Full Ansible provisioning: common + k3s server + agents + kubeconfig
+	@echo "$(YELLOW)→ Running full Ansible provisioning...$(RESET)"
+	@$(ANSIBLE_PLAYBOOK) -i $(ANSIBLE_INVENTORY) $(PLAYBOOK_DIR)/site.yml
 	@echo ""
-	@echo "$(GREEN)🎉 Cluster ready!$(RESET)"
+	@echo "$(GREEN)🎉 Cluster provisioned!$(RESET)"
 	@echo "  kubectl config use-context $(KUBECONFIG_CONTEXT)"
 	@echo "  make nodes"
 	@echo ""
-	@echo "$(YELLOW)Post-provision steps:$(RESET)"
-	@echo "  make vault-seed              # Store OIDC + Grafana secrets in Vault"
-	@echo "  make deploy-eso              # Deploy External Secrets Operator (if not done)"
-	@echo "  make argocd-add-repo         # Register your infra Git repo in ArgoCD"
-	@echo "  make argocd-deploy-apps      # Deploy ArgoCD Applications"
-	@echo "  make health                  # Full cluster health check"
+	@echo "$(YELLOW)Next steps:$(RESET)"
+	@echo "  make deploy                  # Deploy base stack (Traefik + cert-manager)"
+	@echo "  make deploy-monitoring       # Deploy observability stack"
+	@echo "  make status                  # Check all pods"
+
+provision-server: ## Provision server node only (common + k3s server + wireguard)
+	@echo "$(YELLOW)→ Provisioning server node...$(RESET)"
+	@$(ANSIBLE_PLAYBOOK) -i $(ANSIBLE_INVENTORY) $(PLAYBOOK_DIR)/k3s-server.yml
+
+provision-agents: ## Add agent nodes to existing cluster
+	@echo "$(YELLOW)→ Provisioning agent nodes...$(RESET)"
+	@$(ANSIBLE_PLAYBOOK) -i $(ANSIBLE_INVENTORY) $(PLAYBOOK_DIR)/k3s-agent.yml
+
+provision-reset: ## Uninstall k3s from all nodes (DESTRUCTIVE)
+	@echo "$(RED)→ Resetting k3s on all nodes...$(RESET)"
+	@$(ANSIBLE_PLAYBOOK) -i $(ANSIBLE_INVENTORY) $(PLAYBOOK_DIR)/reset.yml

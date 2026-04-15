@@ -19,7 +19,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
 _lib require-vars.sh
 _lib helm-repo.sh
 
-# --- Context (overridable via env for Lima / alternate clusters) ---
+# --- Context (overridable via env for alternate clusters) ---
 KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-infra}"
 
 # --- Pinned versions (overridable via .env) ---

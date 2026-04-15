@@ -68,7 +68,7 @@ log_step "[4/4] ClusterIssuers..."
 envsubst < "$(_k8s_file cert-manager/clusterissuer.yaml)" | kubectl apply -f -
 
 # --- 5. Traefik dashboard (optional) ---
-# Skip on local Lima testing — the domain/cert requires real internet reachability.
+# Skip on non-public clusters — the domain/cert requires real internet reachability.
 # The ACME HTTP-01 challenge cannot complete when the cluster is not publicly accessible.
 if [[ "${SKIP_DASHBOARD:-false}" == "true" ]]; then
   log_info "Traefik dashboard IngressRoute... (skipped — SKIP_DASHBOARD=true)"

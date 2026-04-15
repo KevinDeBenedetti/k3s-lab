@@ -1,4 +1,11 @@
 ---
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - k3s_server_url | length > 0
+      - k3s_node_token | length > 0
+    fail_msg: "k3s_server_url and k3s_node_token must be set (passed from k3s_server role or group_vars)"
+
 - name: Check if k3s agent is already installed
   ansible.builtin.stat:
     path: /usr/local/bin/k3s

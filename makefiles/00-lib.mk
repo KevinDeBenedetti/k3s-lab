@@ -15,10 +15,6 @@
 #   run-local-script(rel-path, args...)
 #     Run a script on the local machine.
 #
-#   lima-run-script(rel-path)
-#     Run a script inside a Lima VM (path relative to k3s-lab root).
-#     Local: Lima mounts $HOME, so direct path access works.
-#     Remote: curl the script from GitHub inside the VM.
 # ──────────────────────────────────────────────────────────────────────────────
 
 ifdef K3S_LAB
@@ -40,11 +36,6 @@ SSH_KEY=$(SSH_KEY) SSH_PORT=$(SSH_PORT) \
 bash $(K3S_LAB)/$(1) $(2)
 endef
 
-# Run a script path inside a Lima VM (Lima mounts $HOME by default).
-define lima-run-script
-bash '$(K3S_LAB)/$(1)'
-endef
-
 else
 
 # ── Remote mode: K3S_LAB is empty — fetch scripts via curl ───────────────────
@@ -63,25 +54,10 @@ SSH_KEY=$(SSH_KEY) SSH_PORT=$(SSH_PORT) \
 bash <(curl -fsSL $(K3S_LAB_RAW)/$(1)) $(2)
 endef
 
-# Run a script inside a Lima VM by curling from GitHub.
-# Uses a pipe instead of process substitution — Lima VMs lack /dev/fd support.
-define lima-run-script
-bash -c 'curl -fsSL "$(K3S_LAB_RAW)/$(1)" | bash'
-endef
-
 endif
 
 # ── kubectl shorthand (used across all .mk modules) ───────────────────────────
 K := kubectl --context $(KUBECONFIG_CONTEXT)
-
-# ── Lima test config path ─────────────────────────────────────────────────────
-# Local mode: use filesystem path.  Remote mode: use raw GitHub URL.
-# Both limactl start and kubectl apply -f support URLs natively.
-ifdef K3S_LAB
-  LIMA_TESTS_DIR := $(K3S_LAB)/tests/lima
-else
-  LIMA_TESTS_DIR := $(K3S_LAB_RAW)/tests/lima
-endif
 
 # ── Shared makefile cache management ──────────────────────────────────────────
 # Available when the consumer defines MK_CACHE + SHARED_MKS (e.g. infra repo).

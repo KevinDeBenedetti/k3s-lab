@@ -51,7 +51,7 @@
 
 ## Install flags explained
 
-The server install script (`k3s/install-server.sh`) uses these key flags:
+The k3s server Ansible role (`ansible/roles/k3s_server`) installs k3s with these key flags:
 
 ```bash
 curl -sfL https://get.k3s.io | \
@@ -120,25 +120,27 @@ kernel.panic_on_oops                = 1
 ### 1. Bootstrap server
 
 ```bash
-make k3s-server
+make provision-server
 ```
 
-This:
-1. Copies `k3s/install-server.sh` to the VPS over SCP
-2. Runs the script as root via SSH
+This runs the Ansible `k3s-server.yml` playbook which:
+1. Applies common setup (packages, kernel modules, sysctl, UFW)
+2. Installs k3s server with configured flags
 3. Waits for the node to be `Ready`
-4. Reads the node token and saves it to `.env` as `K3S_NODE_TOKEN`
+4. Reads the node token (used to join agents)
+5. Fetches kubeconfig with public IP replaced
+6. Optionally sets up WireGuard VPN
 
 ### 2. Bootstrap agent
 
 ```bash
-make k3s-agent
+make provision-agents
 ```
 
-This:
-1. Opens the server UFW firewall for the agent IP
-2. Copies `k3s/install-agent.sh` to the agent VPS
-3. Runs the script with `K3S_TOKEN` and `SERVER_IP`
+This runs the Ansible `k3s-agent.yml` playbook which:
+1. Applies common setup on agent nodes
+2. Installs k3s agent with server URL and node token
+3. Configures UFW for cluster communication
 
 ### 3. Fetch kubeconfig
 
@@ -153,11 +155,10 @@ Fetches `/etc/rancher/k3s/k3s.yaml` from the server, replaces `127.0.0.1` with t
 ## Uninstall
 
 ```bash
-make k3s-uninstall-server   # Remove k3s from server (DESTRUCTIVE)
-make k3s-uninstall-agent    # Remove k3s from agent (DESTRUCTIVE)
+make provision-reset       # Uninstall k3s from all nodes (DESTRUCTIVE)
 ```
 
-The uninstall script (`k3s/uninstall.sh`):
+The Ansible `reset.yml` playbook:
 - Runs the official `k3s-uninstall.sh` or `k3s-agent-uninstall.sh`
 - Cleans up CNI interfaces (`flannel.1`, `cni0`)
 - Flushes iptables rules
@@ -170,7 +171,7 @@ The uninstall script (`k3s/uninstall.sh`):
 The node token is a shared secret that agents use to authenticate with the server API.
 
 - Auto-generated during server install if `K3S_NODE_TOKEN` is empty
-- Automatically saved to `.env` by `make k3s-server`
+- Automatically read from the server by the Ansible `site.yml` playbook
 - Stored on the server at `/var/lib/rancher/k3s/server/node-token`
 
 To rotate: uninstall both nodes and reinstall with a new token.

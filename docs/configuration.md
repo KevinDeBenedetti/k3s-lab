@@ -28,16 +28,16 @@ cp .env.example .env
 | `INITIAL_USER` | `root` | — | User for the very first connection (before bootstrap creates `SSH_USER`) |
 | `SSH_PORT` | `22` | — | SSH port (Makefile default, not in `.env.example`) |
 
-> `INITIAL_USER` is only used for the first `make k3s-server` run. After the VPS is bootstrapped with your regular user, `SSH_USER` takes over.
+> `INITIAL_USER` is only used for the initial Ansible connection. After the VPS is bootstrapped, `SSH_USER` takes over.
 
 ### k3s
 
 | Variable | Example | Required | Description |
 |---|---|---|---|
 | `K3S_VERSION` | `v1.32.2+k3s1` | ✅ | Pinned k3s version — must match on server and agent |
-| `K3S_NODE_TOKEN` | *(auto-filled)* | ✅ | Shared secret for agent join — auto-saved by `make k3s-server` |
+| `K3S_NODE_TOKEN` | *(auto-filled)* | ✅ | Shared secret for agent join — auto-read from server by Ansible |
 
-> `K3S_NODE_TOKEN` is automatically written to `.env` after `make k3s-server` completes. You do not need to generate it manually.
+> `K3S_NODE_TOKEN` is automatically read from the server by the Ansible `site.yml` playbook and passed to agents. You do not need to set it manually.
 
 ### Helm chart versions
 

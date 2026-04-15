@@ -23,7 +23,7 @@ For cluster-specific configuration, use a private `infra` repository that consum
 - GitOps: ArgoCD
 - Makefile-driven workflow with includeable fragments
 - Static CI: ShellCheck, actionlint, kubeconform, Helm lint, resource limits check, Gitleaks
-- Local testing via Lima VMs and Bats
+- Local testing via Bats
 
 ## Repository Structure
 
@@ -53,7 +53,7 @@ k3s-lab/
 ├── makefiles/                  # Includeable Makefile fragments
 ├── scripts/                    # Deployment + validation scripts
 ├── lib/                        # Shared shell libs + default values
-├── tests/                      # Bats + Lima VM tests
+├── tests/                      # Bats tests
 └── docs/                       # Full documentation
 ```
 

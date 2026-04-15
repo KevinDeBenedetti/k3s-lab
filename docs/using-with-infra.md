@@ -9,22 +9,20 @@ This guide explains how to use k3s-lab as a shared toolkit from a **private repo
 ```
 k3s-lab (public)                  infra (private)
 ──────────────────────────────    ──────────────────────────────────
-  makefiles/                        Makefile          ← thin wrapper
-  scripts/                          .env              ← your secrets
-  kubernetes/    (templates)        kubernetes/       ← your apps
-  lib/                              .mk-cache/        ← auto-fetched
-  tests/                              00-lib.mk
-  k3s/                                10-help.mk
-                                       ...
-                                       99-lima.mk
+  ansible/roles/                    Makefile          ← thin wrapper
+  makefiles/                        .env              ← your secrets
+  scripts/                          terraform/        ← Hetzner VPS
+  kubernetes/    (templates)        ansible/          ← inventory + group_vars
+  lib/                              kubernetes/       ← your apps
+  tests/                            .mk-cache/        ← auto-fetched
 ```
 
 **Rule:** Every file you edit lives in `infra/`. You never touch `k3s-lab/` for daily use.
 
 | Repo | What it holds | You edit? |
 |------|--------------|-----------|
-| `k3s-lab` | All scripts, makefiles, manifests, tests | Only to improve the toolkit |
-| `infra` | Your `.env`, your app manifests, `Makefile` | Yes — always |
+| `k3s-lab` | Ansible roles, scripts, makefiles, manifests, tests | Only to improve the toolkit |
+| `infra` | Terraform, Ansible inventory, `.env`, your app manifests, `Makefile` | Yes — always |
 
 k3s-lab makefiles are fetched **on-demand via curl** into `infra/.mk-cache/` the first time you run any `make` target. No clone, no submodule.
 
@@ -73,8 +71,8 @@ RESET  := \033[0m
 
 # ── Shared makefiles (auto-fetched from k3s-lab) ──────────────────────────────
 MK_CACHE   := .mk-cache
-SHARED_MKS := 00-lib 10-help 20-vps 30-k3s 40-kubeconfig 50-deploy \
-              60-status 70-ssh 80-dev 90-provision 99-lima
+SHARED_MKS := 00-lib 10-help 40-kubeconfig 45-security 50-deploy \
+              51-external-dns 52-argocd 55-vault 60-status 70-ssh 80-dev 90-provision
 
 $(foreach f,$(SHARED_MKS),\
   $(if $(wildcard $(MK_CACHE)/$(f).mk),,\
@@ -141,7 +139,7 @@ INITIAL_USER=root
 
 # k3s
 K3S_VERSION=v1.32.2+k3s1
-# K3S_NODE_TOKEN is auto-filled by `make k3s-server`
+# K3S_NODE_TOKEN is auto-read from the server by Ansible
 
 # Helm chart versions (pin to avoid surprise upgrades)
 TRAEFIK_CHART_VERSION=34.4.0
@@ -184,12 +182,11 @@ make provision
 Or step by step:
 
 ```bash
-make setup-all             # bootstrap VPS nodes (dotfiles + packages)
-make k3s-server            # install k3s server + auto-save K3S_NODE_TOKEN
-make k3s-agent             # join agent to cluster
+make provision-server      # common + k3s server + wireguard (Ansible)
+make provision-agents      # join agent to cluster (Ansible)
 make kubeconfig            # merge ~/.kube/config
 kubectl config use-context k3s-infra
-make nodes                 # verify both nodes Ready
+make nodes                 # verify nodes Ready
 
 make deploy-dashboard-secret
 make deploy                # Traefik + cert-manager + ClusterIssuers
@@ -353,24 +350,7 @@ The deploy scripts call `helm upgrade --install`, so running them again is idemp
 
 ---
 
-## 7 — Test locally (Lima VM)
-
-Before deploying to real VPS nodes, test with a local Lima VM:
-
-```bash
-make vm-k3s-full          # create VM → install k3s → kubeconfig (≈5 min)
-make vm-k3s-deploy        # deploy Traefik + cert-manager
-make vm-k3s-smoke         # TLS pipeline smoke test
-make vm-k3s-clean         # tear down when done
-```
-
-The Lima targets read the same `.env` but override environment-specific values (`SERVER_IP=127.0.0.1`, self-signed TLS, NodePort instead of externalIPs).
-
-See the [Local Testing guide](./operations/local-testing.md) for the complete walkthrough.
-
----
-
-## 8 — Override a k3s-lab target
+## 7 — Override a k3s-lab target
 
 If you need to customize a shared target (e.g. `deploy` has special requirements for your stack), add it directly in `infra/Makefile` **after** the `-include` block. Make uses the first definition of a target:
 
@@ -386,7 +366,7 @@ deploy: ## Deploy base stack + myapp
 
 ---
 
-## 9 — Full workflow summary
+## 8 — Full workflow summary
 
 ```bash
 # ── First time ────────────────────────────────────────────────────────────────
@@ -396,7 +376,7 @@ cp .env.example .env     # fill in your IPs, domain, passwords
 make help                # verify all targets loaded from k3s-lab
 
 # ── Provision cluster ─────────────────────────────────────────────────────────
-make provision           # one-shot: VPS → k3s → kubeconfig → deploy → monitoring
+make provision           # one-shot: common → k3s → kubeconfig (via Ansible)
 
 # ── Day-to-day ────────────────────────────────────────────────────────────────
 make nodes               # check node status

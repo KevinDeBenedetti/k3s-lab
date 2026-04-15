@@ -9,20 +9,24 @@
     state: present
     update_cache: true
 
+- name: Check if private key exists
+  ansible.builtin.stat:
+    path: /etc/wireguard/private.key
+  register: wg_key_stat
+
 - name: Generate server private key
   ansible.builtin.command:
     cmd: wg genkey
   register: wg_private_key
-  changed_when: false
-  args:
-    creates: /etc/wireguard/private.key
+  changed_when: true
+  when: not wg_key_stat.stat.exists
 
 - name: Save server private key
   ansible.builtin.copy:
     content: "{{ wg_private_key.stdout }}"
     dest: /etc/wireguard/private.key
     mode: "0600"
-  when: wg_private_key.stdout is defined and wg_private_key.stdout | length > 0
+  when: not wg_key_stat.stat.exists
 
 - name: Read server private key
   ansible.builtin.slurp:
