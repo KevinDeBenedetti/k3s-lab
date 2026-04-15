@@ -4,10 +4,10 @@ falco:
   fullnameOverride: falco
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
       cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 400m
       memory: 512Mi
 
 falcosidekick:
@@ -19,18 +19,24 @@ tetragon:
   resources:
     requests:
       cpu: 50m
-      memory: 128Mi
+      memory: 64Mi
     limits:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 100m
+      memory: 128Mi
 
 trivy-operator:
   enabled: true
   fullnameOverride: trivy-operator
+  operator:
+    scannerReportTTL: "24h"
+  trivy:
+    ignoreUnfixed: true
+  nodeCollector:
+    enabled: false
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
       cpu: 200m
       memory: 256Mi
+    limits:
+      cpu: 400m
+      memory: 512Mi
