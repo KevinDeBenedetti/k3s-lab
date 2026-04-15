@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.2.1...v0.3.0) (2026-04-15)
+
+
+### Features
+
+* implement WireGuard role with configuration, handlers, and tasks ([340cf2f](https://github.com/KevinDeBenedetti/k3s-lab/commit/340cf2f54475771fdbe0348965e7f4a47d806683))
+* update platform chart defaults and resource limits for security and monitoring components ([0683184](https://github.com/KevinDeBenedetti/k3s-lab/commit/0683184f5276424cc819f182844aaf083367ccbe))
+
 ## [0.2.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.2.0...v0.2.1) (2026-04-15)
 
 
