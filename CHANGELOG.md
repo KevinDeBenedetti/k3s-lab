@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.3.0...v0.3.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* refactor provisioning workflow to use Ansible ([cffe97b](https://github.com/KevinDeBenedetti/k3s-lab/commit/cffe97bcc5d230ce55245bd96387afaaa62074da))
+
 ## [0.3.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.2.1...v0.3.0) (2026-04-15)
 
 
