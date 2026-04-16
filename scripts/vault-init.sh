@@ -26,6 +26,11 @@ else
 fi
 unset _src
 
+if ! command -v python3 &> /dev/null; then
+  echo "ERROR: python3 is required but not installed" >&2
+  exit 1
+fi
+
 KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-infra}"
 VAULT_NAMESPACE="${VAULT_NAMESPACE:-vault}"
 VAULT_POD="${VAULT_POD:-vault-0}"
@@ -44,14 +49,20 @@ vault_exec_stdin() {
     -- env VAULT_TOKEN="${VAULT_TOKEN:-}" vault "$@"
 }
 
-# _parse_status <json> <field> <default>
-# Extract a boolean field from Vault status JSON, returns "yes" or "no".
-_parse_status() {
+# _json_field <json> <python-expression>
+# Extract a value from JSON using a Python expression on variable 'd'.
+_json_field() {
   echo "$1" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
-print('yes' if d.get('$2') else 'no')
-" 2>/dev/null || echo "$3"
+print($2)
+" 2>/dev/null
+}
+
+# _parse_status <json> <field> <default>
+# Extract a boolean field from Vault status JSON, returns "yes" or "no".
+_parse_status() {
+  _json_field "$1" "'yes' if d.get('$2') else 'no'" || echo "$3"
 }
 
 # ── Compute total steps (5 base + 2 if OIDC is configured) ───────────────────
@@ -123,9 +134,9 @@ print('Root Token:  ', d['root_token'])
   echo "════════════════════════════════════════════════════════════════"
   echo ""
 
-  UNSEAL_KEY_1=$(echo "${INIT_OUTPUT}" | python3 -c "import sys,json; print(json.load(sys.stdin)['unseal_keys_b64'][0])")
-  UNSEAL_KEY_2=$(echo "${INIT_OUTPUT}" | python3 -c "import sys,json; print(json.load(sys.stdin)['unseal_keys_b64'][1])")
-  ROOT_TOKEN=$(echo "${INIT_OUTPUT}"   | python3 -c "import sys,json; print(json.load(sys.stdin)['root_token'])")
+  UNSEAL_KEY_1=$(_json_field "${INIT_OUTPUT}" "d['unseal_keys_b64'][0]")
+  UNSEAL_KEY_2=$(_json_field "${INIT_OUTPUT}" "d['unseal_keys_b64'][1]")
+  ROOT_TOKEN=$(_json_field "${INIT_OUTPUT}" "d['root_token']")
 
   # ── Unseal ──────────────────────────────────────────────────────────────
   log_step "[2/${TOTAL_STEPS}] Unsealing Vault..."

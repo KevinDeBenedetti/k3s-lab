@@ -59,6 +59,22 @@ endif
 # ── kubectl shorthand (used across all .mk modules) ───────────────────────────
 K := kubectl --context $(KUBECONFIG_CONTEXT)
 
+# ── Validation macros ─────────────────────────────────────────────────────────
+# Usage: $(call require-var,VAR_NAME)
+define require-var
+@[ -n "$($(1))" ] || (echo "$(RED)❌ $(1) is not set$(RESET)"; exit 1)
+endef
+
+# ── Secret creation macro ─────────────────────────────────────────────────────
+# Idempotent secret create via --dry-run=client | apply.
+# Usage: $(call create-k8s-secret,SECRET_NAME,NAMESPACE,--from-literal=key=val ...)
+define create-k8s-secret
+$(K) create secret generic $(1) \
+	$(3) \
+	-n $(2) \
+	--dry-run=client -o yaml | $(K) apply -f -
+endef
+
 # ── Shared makefile cache management ──────────────────────────────────────────
 # Available when the consumer defines MK_CACHE + SHARED_MKS (e.g. infra repo).
 ifdef MK_CACHE

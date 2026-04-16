@@ -2,26 +2,15 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # external-dns — Automatic Cloudflare DNS record management
 #
-# Watches Ingress, Service and Traefik IngressRoute resources and creates/updates
-# DNS A records in Cloudflare automatically.
+# external-dns is deployed via ArgoCD. These targets provide operational
+# visibility into the running deployment.
 #
 # Usage:
-#   make deploy-external-dns     — install / upgrade external-dns
 #   make external-dns-status     — show pod status + recent log lines
 #   make external-dns-logs       — tail live logs
 # ──────────────────────────────────────────────────────────────────────────────
 
-EXTERNAL_DNS_VERSION ?= 1.16.1
-
-.PHONY: deploy-external-dns external-dns-status external-dns-logs
-
-deploy-external-dns: ## ⚠️ DEPRECATED — external-dns is now deployed via ArgoCD
-	@echo "$(RED)❌ 'make deploy-external-dns' is deprecated.$(RESET)"
-	@echo ""
-	@echo "  external-dns should be managed via ArgoCD."
-	@echo "  Add it as an ArgoCD Application or include it in an umbrella chart."
-	@echo ""
-	@exit 1
+.PHONY: external-dns-status external-dns-logs
 
 external-dns-status: ## Show external-dns pod status and recent log lines
 	@echo ""

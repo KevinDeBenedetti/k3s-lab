@@ -66,6 +66,12 @@ fi
 chmod 600 "${TARGET}"
 rm -f "${TMP_KUBECONFIG}"
 
+# Validate the merged kubeconfig
+if ! kubectl config view --kubeconfig="${TARGET}" > /dev/null 2>&1; then
+  log_error "Generated kubeconfig is invalid — check ${TARGET}"
+  exit 1
+fi
+
 log_ok "Context '${CONTEXT_NAME}' added to ${TARGET}"
 echo ""
 echo "Switch to this cluster:"

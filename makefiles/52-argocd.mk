@@ -25,7 +25,7 @@ ARGOCD_MIDDLEWARE   ?= platform/argocd/middleware-vpn-only.yaml
         argocd-status argocd-password argocd-delete-initial-secret argocd-disable-admin
 
 deploy-argocd: ## Deploy ArgoCD (run after make deploy)
-	@[ -n "$(ARGOCD_DOMAIN)" ] || (echo "$(RED)❌ ARGOCD_DOMAIN not set — add to .env$(RESET)"; exit 1)
+	$(call require-var,ARGOCD_DOMAIN)
 	@echo "$(YELLOW)→ Deploying ArgoCD $(ARGOCD_VERSION)...$(RESET)"
 	@helm repo add argo https://argoproj.github.io/argo-helm --force-update
 	@helm repo update argo
@@ -58,29 +58,13 @@ deploy-argocd: ## Deploy ArgoCD (run after make deploy)
 	@echo "  4. Add GitHub webhook: https://$(ARGOCD_DOMAIN)/api/webhook"
 
 argocd-add-repo: ## Register a Git repo in ArgoCD via SSH deploy key (requires ARGOCD_REPO_URL + GITHUB_DEPLOY_KEY)
-	@[ -n "$(ARGOCD_REPO_URL)" ] || (echo "$(RED)❌ ARGOCD_REPO_URL not set — e.g. git@github.com:you/infra.git$(RESET)"; exit 1)
-	@[ -n "$(GITHUB_DEPLOY_KEY)" ] || (echo "$(RED)❌ GITHUB_DEPLOY_KEY not set — e.g. ~/.ssh/deploy_key$(RESET)"; exit 1)
+	$(call require-var,ARGOCD_REPO_URL)
+	$(call require-var,GITHUB_DEPLOY_KEY)
 	@echo "$(YELLOW)→ Registering $(ARGOCD_REPO_URL) in ArgoCD...$(RESET)"
-	@$(K) create secret generic $(ARGOCD_REPO_SECRET_NAME) \
-		--from-literal=type=git \
-		--from-literal=url=$(ARGOCD_REPO_URL) \
-		--from-file=sshPrivateKey="$(GITHUB_DEPLOY_KEY)" \
-		--namespace argocd \
-		--dry-run=client -o yaml \
-		| $(K) apply -f -
+	@$(call create-k8s-secret,$(ARGOCD_REPO_SECRET_NAME),argocd,--from-literal=type=git --from-literal=url=$(ARGOCD_REPO_URL) --from-file=sshPrivateKey="$(GITHUB_DEPLOY_KEY)")
 	@$(K) label secret $(ARGOCD_REPO_SECRET_NAME) \
 		-n argocd argocd.argoproj.io/secret-type=repository --overwrite
 	@echo "$(GREEN)✅ Repo registered$(RESET)"
-
-argocd-deploy-apps: ## ⚠️ DEPRECATED — use ApplicationSets in your infra repo instead
-	@echo "$(RED)❌ argocd-deploy-apps is deprecated.$(RESET)"
-	@echo ""
-	@echo "  ArgoCD Applications are now managed via ApplicationSets."
-	@echo "  In your infra repo, apply:"
-	@echo "    kubectl apply -f argocd/projects/"
-	@echo "    kubectl apply -f argocd/applicationsets/"
-	@echo "    kubectl apply -f argocd/applications/"
-	@exit 1
 
 argocd-status: ## Show ArgoCD app sync and health status
 	@echo "$(CYAN)── ArgoCD Applications ─────────────────────────────────────────$(RESET)"
