@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.1...v0.4.2) (2026-04-16)
+
+
+### Bug Fixes
+
+* improve script initialization by adding dynamic sourcing for script-init.sh ([fa952ac](https://github.com/KevinDeBenedetti/k3s-lab/commit/fa952ac5578d8cf2b7fcbd644a71870c3a90dd6d))
+* restructure documentation and deployment scripts for ArgoCD integration ([ed811d5](https://github.com/KevinDeBenedetti/k3s-lab/commit/ed811d552e6f3e4bf8d0a89e22ee194f31ece75d))
+
 ## [0.4.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.0...v0.4.1) (2026-04-16)
 
 
