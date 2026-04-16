@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.3.1...v0.4.0) (2026-04-16)
+
+
+### Features
+
+* enhance WireGuard role with improved key management and configuration updates ([7d6eb07](https://github.com/KevinDeBenedetti/k3s-lab/commit/7d6eb07233ffae82c4e408559cc3eca47fbf7eda))
+
 ## [0.3.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.3.0...v0.3.1) (2026-04-15)
 
 
