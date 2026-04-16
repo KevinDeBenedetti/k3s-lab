@@ -1,6 +1,6 @@
 # =============================================================================
 # Traefik ServiceMonitor
-# Applied by deploy-monitoring.sh after kube-prometheus-stack CRDs exist.
+# Applied as part of the platform-monitoring chart.
 # Managed independently of the Traefik Helm release to avoid schema conflicts.
 # =============================================================================
 apiVersion: monitoring.coreos.com/v1

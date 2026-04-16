@@ -9,8 +9,9 @@
 # =============================================================================
 
 # ── Paths (allow override from consuming repo) ──────────────────────────────
-SECURITY_DIR      ?= kubernetes/security
-NAMESPACES_FILE   ?= kubernetes/namespaces/namespaces.yaml
+# Default: platform/security/manifests (matches infra repo layout after v0.2.0)
+SECURITY_DIR      ?= platform/security/manifests
+NAMESPACES_FILE   ?= platform/security/manifests/namespaces.yaml
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 

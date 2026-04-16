@@ -9,12 +9,12 @@ automatically deployed by ArgoCD whenever you push to your `infra` repo.
 
 ```
 You push to infra/       GitHub fires webhook      ArgoCD syncs cluster
-kubernetes/apps/myapp/ ──────────────────────────▶ argocd.kevindb.dev ──▶ k8s applies
+apps/myapp/ ─────────────────────────────────────▶ argocd.example.com ──▶ k8s applies
 ```
 
-1. Create app manifests in `infra/kubernetes/apps/<appname>/`
-2. Create an ArgoCD Application in `infra/kubernetes/argocd/apps/<appname>.yaml`
-3. Apply the ArgoCD Application once — from then on, **git push = deploy**
+1. Create app manifests in `infra/apps/<appname>/`
+2. ArgoCD ApplicationSets auto-discover the new app directory
+3. **git push = deploy** — no manual `kubectl apply` needed
 
 ---
 
@@ -24,12 +24,11 @@ Create a directory in your `infra` repo:
 
 ```
 infra/
-  kubernetes/
-    apps/
-      myapp/
-        deployment.yaml
-        service.yaml
-        ingress.yaml
+  apps/
+    myapp/
+      deployment.yaml
+      service.yaml
+      ingress.yaml
 ```
 
 ### deployment.yaml
@@ -123,51 +122,54 @@ spec:
 
 ---
 
-## Step 2 — Create the ArgoCD Application
+## Step 2 — ArgoCD auto-discovers via ApplicationSets
 
-Create `infra/kubernetes/argocd/apps/myapp.yaml`:
+ArgoCD uses **ApplicationSets** with a Git directory generator that automatically
+creates an Application for every subdirectory in `apps/`. No manual Application
+manifest is needed.
+
+The ApplicationSet is defined in `infra/argocd/applicationsets/apps.yaml`:
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
-kind: Application
+kind: ApplicationSet
 metadata:
-  name: myapp
+  name: apps
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
-
-  source:
-    repoURL: git@github.com:KevinDeBenedetti/infra.git
-    targetRevision: main
-    path: kubernetes/apps/myapp
-
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: apps
-
-  syncPolicy:
-    automated:
-      prune: true      # remove resources deleted from Git
-      selfHeal: true   # revert manual kubectl changes
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
+  generators:
+    - git:
+        repoURL: git@github.com:KevinDeBenedetti/infra.git
+        revision: main
+        directories:
+          - path: apps/*
+  template:
+    metadata:
+      name: "{{path.basename}}"
+    spec:
+      project: apps
+      source:
+        repoURL: git@github.com:KevinDeBenedetti/infra.git
+        targetRevision: main
+        path: "{{path}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: apps
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
 ```
 
-> `repoURL` must use the SSH format (`git@github.com:...`) to match the deploy key secret.
+> Add a new directory under `apps/` and push — ArgoCD handles the rest.
 
 ---
 
-## Step 3 — Apply and push
+## Step 3 — Push
 
 ```bash
-# Register the ArgoCD Application in the cluster
-kubectl --context k3s-infra apply -f kubernetes/argocd/apps/myapp.yaml
-
 # Commit and push all manifests
-git add kubernetes/apps/myapp/ kubernetes/argocd/apps/myapp.yaml
+git add apps/myapp/
 git commit -m "feat: add myapp"
 git push
 ```
@@ -205,7 +207,7 @@ After initial setup, deploying a change is just:
 
 ```bash
 # Edit any manifest — e.g. bump the image tag
-vim infra/kubernetes/apps/myapp/deployment.yaml
+vim infra/apps/myapp/deployment.yaml
 
 git add -A && git commit -m "chore: bump myapp to v1.2.3" && git push
 ```
@@ -217,11 +219,8 @@ ArgoCD auto-syncs. No `kubectl apply` needed.
 ## Removing an app
 
 ```bash
-# Delete the ArgoCD Application (triggers prune → removes cluster resources)
-kubectl --context k3s-infra delete application myapp -n argocd
-
-# Remove the manifests from git
-rm -rf kubernetes/apps/myapp/ kubernetes/argocd/apps/myapp.yaml
+# Remove the app directory from git — ArgoCD prunes cluster resources
+rm -rf apps/myapp/
 git add -A && git commit -m "chore: remove myapp" && git push
 ```
 
@@ -230,10 +229,8 @@ git add -A && git commit -m "chore: remove myapp" && git push
 ## Checklist
 
 - [ ] `external-dns.alpha.kubernetes.io/hostname` annotation on IngressRoute (DNS A record auto-created)
-- [ ] `kubernetes/apps/myapp/` directory with deployment, service, ingress
-- [ ] `kubernetes/argocd/apps/myapp.yaml` with SSH `repoURL`
-- [ ] `kubectl apply -f kubernetes/argocd/apps/myapp.yaml` (once)
-- [ ] `git push` — ArgoCD handles the rest
+- [ ] `apps/myapp/` directory with deployment, service, ingress
+- [ ] `git push` — ApplicationSets auto-discover and ArgoCD handles the rest
 
 ---
 
@@ -242,4 +239,4 @@ git add -A && git commit -m "chore: remove myapp" && git push
 - [ArgoCD stack reference](../stack/argocd.md)
 - [Traefik IngressRoute reference](../stack/traefik.md)
 - [cert-manager TLS reference](../stack/cert-manager.md)
-- [whoami example app](https://github.com/KevinDeBenedetti/infra/tree/main/kubernetes/apps/whoami) — working reference implementation
+- [whoami example app](https://github.com/KevinDeBenedetti/infra/tree/main/apps/whoami) — working reference implementation

@@ -11,10 +11,13 @@ k3s-lab (public)                  infra (private)
 ──────────────────────────────    ──────────────────────────────────
   ansible/roles/                    Makefile          ← thin wrapper
   makefiles/                        .env              ← your secrets
-  scripts/                          terraform/        ← Hetzner VPS
-  kubernetes/    (templates)        ansible/          ← inventory + group_vars
-  lib/                              kubernetes/       ← your apps
-  tests/                            .mk-cache/        ← auto-fetched
+  charts/      (Helm charts)        terraform/        ← Hetzner VPS
+  lib/                              ansible/          ← inventory + group_vars
+  kubernetes/  (Kustomize bases)    apps/             ← your apps (GitOps)
+  tests/                            platform/         ← chart value overrides
+                                    argocd/           ← ApplicationSets
+                                    secrets/          ← ExternalSecrets
+                                    .mk-cache/        ← auto-fetched
 ```
 
 **Rule:** Every file you edit lives in `infra/`. You never touch `k3s-lab/` for daily use.
@@ -201,26 +204,29 @@ See [Getting Started](./getting-started.md) for the full step-by-step walkthroug
 
 ## 4 — Deploy your own apps
 
-### 4.1 Using k3s-lab's example app
+### 4.1 Using ArgoCD ApplicationSets (recommended)
 
-k3s-lab ships example manifests in `kubernetes/apps/` that use `${VARIABLE}` placeholders substituted from your `.env`:
-
-```bash
-# Fetch and apply the example app
-curl -fsSL $K3S_LAB_RAW/kubernetes/apps/deployment.yaml \
-  | envsubst | kubectl apply -f -
-
-curl -fsSL $K3S_LAB_RAW/kubernetes/apps/service-ingress.yaml \
-  | envsubst | kubectl apply -f -
-```
-
-### 4.2 Adding your own app manifests
-
-Create a `kubernetes/` directory in your **infra repo** for app-specific manifests. These are purely yours — they never go into k3s-lab.
+Create your app manifests in the `apps/` directory of your infra repo.
+ArgoCD ApplicationSets auto-discover new directories and deploy them:
 
 ```
 infra/
-  kubernetes/
+  apps/
+    myapp/
+      deployment.yaml
+      service.yaml
+      ingress.yaml
+```
+
+Just `git push` — ArgoCD handles the rest. See [Deploying an App](./operations/deploy-app.md).
+
+### 4.2 Adding your own app manifests
+
+Create a directory in your **infra repo** for app-specific manifests. These are purely yours — they never go into k3s-lab.
+
+```
+infra/
+  apps/
     myapp/
       namespace.yaml
       deployment.yaml
@@ -232,7 +238,7 @@ infra/
 **Example IngressRoute + Certificate:**
 
 ```yaml
-# infra/kubernetes/myapp/ingress.yaml
+# infra/apps/myapp/ingress.yaml
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -265,35 +271,13 @@ spec:
     secretName: myapp-tls
 ```
 
-Apply with variable substitution:
-
-```bash
-envsubst < kubernetes/myapp/ingress.yaml | kubectl apply -f -
-```
+With ApplicationSets, these manifests are automatically deployed when pushed to git.
 
 ### 4.3 Add a `make` target for your app (optional)
 
-Add infra-specific targets directly in `infra/Makefile`:
-
-```makefile
-# infra/Makefile — add below the mk-update/mk-clean block
-
-.PHONY: deploy-myapp delete-myapp
-
-deploy-myapp: ## Deploy myapp (Deployment + Service + IngressRoute + Certificate)
-	@echo "$(YELLOW)→ Deploying myapp...$(RESET)"
-	@envsubst < kubernetes/myapp/namespace.yaml   | kubectl apply -f -
-	@envsubst < kubernetes/myapp/deployment.yaml  | kubectl apply -f -
-	@envsubst < kubernetes/myapp/service.yaml     | kubectl apply -f -
-	@envsubst < kubernetes/myapp/ingress.yaml     | kubectl apply -f -
-	@echo "$(GREEN)✅ myapp deployed at https://myapp.$(DOMAIN)$(RESET)"
-
-delete-myapp: ## Remove myapp from the cluster
-	@kubectl delete -f kubernetes/myapp/ --ignore-not-found
-	@echo "$(GREEN)✅ myapp removed$(RESET)"
-```
-
-Now `make help` shows your target alongside all k3s-lab targets.
+> **Note:** With ArgoCD ApplicationSets, manual deploy targets are usually unnecessary.
+> Apps in `apps/` are auto-discovered and deployed. Use make targets only for
+> non-GitOps workflows or bootstrapping.
 
 ---
 
@@ -305,7 +289,7 @@ When k3s-lab ships improvements, update your cache:
 make mk-update
 ```
 
-This re-fetches all shared makefiles from `k3s-lab@main`. Your `.env` and `kubernetes/` app manifests are **untouched**.
+This re-fetches all shared makefiles from `k3s-lab@main`. Your `.env` and `apps/` manifests are **untouched**.
 
 ### Pin to a specific k3s-lab version
 
@@ -327,26 +311,26 @@ Then run `make mk-clean && make mk-update` to re-fetch for the new ref.
 |-----------------------------|---------------|
 | `.mk-cache/` — all shared makefiles | `Makefile` |
 | Scripts fetched at runtime via curl | `.env` |
-| k3s-lab's `kubernetes/` templates | `kubernetes/` — your apps |
+| k3s-lab's `kubernetes/` Kustomize bases | `apps/` — your apps |
+| k3s-lab's `charts/` defaults | `platform/` — your overrides |
 
 ---
 
 ## 6 — Update Helm chart versions
 
-Chart versions are pinned in `.env`. To upgrade:
+Chart versions are pinned in `charts/*/Chart.yaml`. To upgrade:
 
-1. Update the version in `.env`:
+1. Update the version in the chart dependency:
    ```bash
-   TRAEFIK_CHART_VERSION=35.0.0
+   # e.g. in charts/platform-monitoring/Chart.yaml
    ```
 
-2. Re-run the deploy target:
+2. Let ArgoCD sync or re-deploy:
    ```bash
-   make deploy           # for Traefik / cert-manager
-   make deploy-monitoring  # for Prometheus / Grafana / Loki
+   git add -A && git commit -m "chore: bump chart versions" && git push
    ```
 
-The deploy scripts call `helm upgrade --install`, so running them again is idempotent.
+ArgoCD detects the change and syncs automatically.
 
 ---
 
@@ -357,8 +341,8 @@ If you need to customize a shared target (e.g. `deploy` has special requirements
 ```makefile
 # Override the shared deploy target with infra-specific steps
 deploy: ## Deploy base stack + myapp
-	@$(call run-local-script,scripts/deploy-stack.sh)
-	@envsubst < kubernetes/myapp/ingress.yaml | kubectl apply -f -
+	@helm upgrade --install platform-base ./charts/platform-base -n kube-system
+	@kubectl apply -f apps/myapp/
 	@echo "$(GREEN)✅ Stack + myapp deployed$(RESET)"
 ```
 

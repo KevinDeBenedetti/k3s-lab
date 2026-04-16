@@ -25,7 +25,7 @@ helm upgrade --install traefik traefik/traefik \
   --version "${TRAEFIK_CHART_VERSION}" \
   --namespace ingress \
   --create-namespace \
-  --values kubernetes/ingress/traefik-values.yaml \
+  --values charts/platform-base/values.yaml \
   --set service.externalIPs="{${SERVER_IP}}"
 ```
 
@@ -33,7 +33,7 @@ helm upgrade --install traefik traefik/traefik \
 
 ---
 
-## Values explained (`kubernetes/ingress/traefik-values.yaml`)
+## Values explained (`charts/platform-base/values.yaml`)
 
 ### EntryPoints
 
@@ -94,7 +94,7 @@ kubectl create secret generic traefik-dashboard-auth \
 
 ### IngressRoute manifest
 
-The dashboard manifest (`kubernetes/ingress/traefik-dashboard.yaml`) creates:
+The dashboard manifest is managed via ArgoCD or your consuming repo's `platform/` directory. It creates:
 
 1. **`dashboard-basicauth` Middleware** — enforces HTTP Basic Authentication
 2. **`dashboard-redirect-scheme` Middleware** — HTTP → HTTPS redirect
@@ -161,7 +161,7 @@ spec:
     - app.example.com
 ```
 
-See `kubernetes/apps/` for a complete example.
+See `apps/` in your infra repo for a complete example.
 
 ---
 

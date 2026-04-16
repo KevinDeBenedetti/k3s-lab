@@ -19,11 +19,6 @@
 # Exposed helpers
 # ───────────────
 #   _lib  <name>        Source a file from lib/ (e.g. _lib log.sh)
-#   _k8s  <rel-path>    Echo an absolute path or URL to a kubernetes/ manifest
-#                       (safe to pass to `kubectl apply -f`)
-#   _k8s_file <rel-path> Echo a local path to a kubernetes/ file; in remote
-#                        mode the file is downloaded to a shared temp directory.
-#                        The temp directory is cleaned up automatically on EXIT.
 #
 # Prerequisites
 # ─────────────
@@ -61,52 +56,3 @@ _lib() {
     source <(curl -fsSL "${K3S_LAB_RAW}/lib/${name}")
   fi
 }
-
-# _k8s <rel-path>
-# Return the path (or URL) to a kubernetes/ manifest.
-# Local:  absolute filesystem path  → kubectl apply -f, helm --values, etc.
-# Remote: raw GitHub URL            → kubectl apply -f supports URLs natively.
-_k8s() {
-  if [[ "${_RUN_REMOTE}" -eq 0 ]]; then
-    echo "${_RUN_REPO}/kubernetes/$1"
-  else
-    echo "${K3S_LAB_RAW}/kubernetes/$1"
-  fi
-}
-
-# _k8s_file <rel-path>
-# Return a local filesystem path to any kubernetes/ file.
-# Local:  absolute filesystem path (no download needed).
-# Remote: download into a shared temp directory and return the path.
-#         The temp directory is created once in the main shell so the EXIT trap
-#         can clean it up reliably — even though callers use $() subshells.
-#
-# Use this (not _k8s) when you need a real file on disk:
-#   helm upgrade --values "$(_k8s_file ingress/traefik-values.yaml)"
-#   envsubst < "$(_k8s_file cert-manager/clusterissuer.yaml)" | kubectl apply -f -
-#
-# macOS note: BSD mktemp requires X's at the very end of the template (no suffix).
-# Using a directory sidesteps the issue entirely — files are named by their path.
-if [[ "${_RUN_REMOTE}" -eq 1 ]]; then
-  _run_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/k8s-XXXXXXXX")"
-else
-  _run_tmp_dir=""
-fi
-
-_k8s_file() {
-  if [[ "${_RUN_REMOTE}" -eq 0 ]]; then
-    echo "${_RUN_REPO}/kubernetes/$1"
-  else
-    # Flatten the relative path to a safe filename (e.g. ingress/foo.yaml → ingress-foo.yaml)
-    local dst
-    dst="${_run_tmp_dir}/$(echo "$1" | tr '/' '-')"
-    curl -fsSL "${K3S_LAB_RAW}/kubernetes/$1" -o "${dst}"
-    echo "${dst}"
-  fi
-}
-
-# Cleanup: remove the shared temp directory on script exit.
-_run_mode_cleanup() {
-  [[ -n "${_run_tmp_dir:-}" ]] && rm -rf "${_run_tmp_dir}" 2>/dev/null || true
-}
-trap _run_mode_cleanup EXIT

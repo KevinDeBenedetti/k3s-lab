@@ -5,13 +5,8 @@
 # Deploys ArgoCD via Helm using Traefik for ingress and cert-manager for TLS.
 # The UI and gRPC are VPN-only; the GitHub webhook endpoint stays public.
 #
-# Manifests used (resolved relative to make CWD):
-#   kubernetes/argocd/helm-values.yaml    — Helm chart overrides
-#   kubernetes/argocd/ingressroute.yaml   — Traefik IngressRoute + TLS cert
-#   kubernetes/argocd/middleware-vpn-only.yaml — WireGuard subnet restriction
-#
-# Consuming repos (e.g. infra) can override helm-values.yaml by providing
-# their own copy at kubernetes/argocd/helm-values.yaml (path resolution wins).
+# Consuming repos override values via ARGOCD_VALUES_FILE and
+# ARGOCD_INGRESSROUTE / ARGOCD_MIDDLEWARE variables.
 # ──────────────────────────────────────────────────────────────────────────────
 
 ARGOCD_VERSION          ?= 7.8.26
@@ -21,7 +16,12 @@ ARGOCD_REPO_SECRET_NAME ?= argocd-repo
 # ADMIN_EMAIL is shared with other modules (e.g. 55-vault.mk RBAC allow-list).
 ADMIN_EMAIL             ?=
 
-.PHONY: deploy-argocd argocd-add-repo argocd-deploy-apps \
+# ── Paths (allow override from consuming repo) ──────────────────────────────
+ARGOCD_VALUES_FILE  ?= platform/argocd/values.yaml
+ARGOCD_INGRESSROUTE ?= platform/argocd/ingressroute.yaml
+ARGOCD_MIDDLEWARE   ?= platform/argocd/middleware-vpn-only.yaml
+
+.PHONY: deploy-argocd argocd-add-repo \
         argocd-status argocd-password argocd-delete-initial-secret argocd-disable-admin
 
 deploy-argocd: ## Deploy ArgoCD (run after make deploy)
@@ -33,15 +33,17 @@ deploy-argocd: ## Deploy ArgoCD (run after make deploy)
 		--version "$(ARGOCD_VERSION)" \
 		--namespace argocd \
 		--create-namespace \
-		--values kubernetes/argocd/helm-values.yaml \
+		--values $(ARGOCD_VALUES_FILE) \
 		--set "global.domain=$(ARGOCD_DOMAIN)" \
 		--set "configs.cm.url=https://$(ARGOCD_DOMAIN)" \
 		--wait \
 		--timeout 300s
-	@$(K) apply \
-		-f kubernetes/argocd/middleware-vpn-only.yaml
-	@ARGOCD_DOMAIN=$(ARGOCD_DOMAIN) envsubst < kubernetes/argocd/ingressroute.yaml \
-		| $(K) apply -f -
+	@if [ -f "$(ARGOCD_MIDDLEWARE)" ]; then \
+		$(K) apply -f $(ARGOCD_MIDDLEWARE); \
+	fi
+	@if [ -f "$(ARGOCD_INGRESSROUTE)" ]; then \
+		ARGOCD_DOMAIN=$(ARGOCD_DOMAIN) envsubst < $(ARGOCD_INGRESSROUTE) | $(K) apply -f -; \
+	fi
 	@echo ""
 	@echo "$(GREEN)✅ ArgoCD deployed$(RESET)"
 	@echo ""
@@ -52,7 +54,7 @@ deploy-argocd: ## Deploy ArgoCD (run after make deploy)
 	@echo "$(YELLOW)Next steps:$(RESET)"
 	@echo "  1. Add DNS: $(ARGOCD_DOMAIN) → $(SERVER_IP)"
 	@echo "  2. Register Git repo:  make argocd-add-repo ARGOCD_REPO_URL=git@github.com:you/infra.git GITHUB_DEPLOY_KEY=~/.ssh/deploy_key"
-	@echo "  3. Apply apps:         make argocd-deploy-apps"
+	@echo "  3. Apply AppProjects + ApplicationSets from your infra repo"
 	@echo "  4. Add GitHub webhook: https://$(ARGOCD_DOMAIN)/api/webhook"
 
 argocd-add-repo: ## Register a Git repo in ArgoCD via SSH deploy key (requires ARGOCD_REPO_URL + GITHUB_DEPLOY_KEY)
@@ -70,12 +72,15 @@ argocd-add-repo: ## Register a Git repo in ArgoCD via SSH deploy key (requires A
 		-n argocd argocd.argoproj.io/secret-type=repository --overwrite
 	@echo "$(GREEN)✅ Repo registered$(RESET)"
 
-argocd-deploy-apps: ## Apply all ArgoCD Application manifests from kubernetes/argocd/apps/
-	@echo "$(YELLOW)→ Applying ArgoCD Applications...$(RESET)"
-	@$(K) apply -f kubernetes/argocd/apps/
-	@echo "$(GREEN)✅ Applications submitted$(RESET)"
+argocd-deploy-apps: ## ⚠️ DEPRECATED — use ApplicationSets in your infra repo instead
+	@echo "$(RED)❌ argocd-deploy-apps is deprecated.$(RESET)"
 	@echo ""
-	@$(K) get applications -n argocd
+	@echo "  ArgoCD Applications are now managed via ApplicationSets."
+	@echo "  In your infra repo, apply:"
+	@echo "    kubectl apply -f argocd/projects/"
+	@echo "    kubectl apply -f argocd/applicationsets/"
+	@echo "    kubectl apply -f argocd/applications/"
+	@exit 1
 
 argocd-status: ## Show ArgoCD app sync and health status
 	@echo "$(CYAN)── ArgoCD Applications ─────────────────────────────────────────$(RESET)"

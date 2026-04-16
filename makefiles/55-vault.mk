@@ -30,23 +30,21 @@ OIDC_API_URL       ?=
 
 .PHONY: deploy-vault vault-init vault-unseal vault-configure vault-seed vault-status deploy-eso
 
-deploy-vault: ## Deploy HashiCorp Vault via Helm (sealed — run make vault-init next)
-	@[ -n "$(VAULT_DOMAIN)" ] || (echo "$(RED)❌ VAULT_DOMAIN not set — add to .env$(RESET)"; exit 1)
-	@echo "$(YELLOW)→ Deploying Vault $(VAULT_CHART_VERSION)...$(RESET)"
-	@DEPLOY_VAULT=true DEPLOY_ESO=false \
-	  VAULT_CHART_VERSION=$(VAULT_CHART_VERSION) \
-	  VAULT_DOMAIN=$(VAULT_DOMAIN) \
-	  $(call run-local-script,scripts/deploy-vault.sh)
+deploy-vault: ## ⚠️ DEPRECATED — Vault is now deployed via charts/platform-vault + ArgoCD
+	@echo "$(RED)❌ 'make deploy-vault' is deprecated.$(RESET)"
 	@echo ""
-	@echo "$(GREEN)✅ Vault deployed$(RESET)"
-	@echo "$(YELLOW)Next: make vault-init$(RESET)"
+	@echo "  Vault is now deployed via the platform-vault chart + ArgoCD."
+	@echo "  See: charts/platform-vault/"
+	@echo "  After deploy, run: make vault-init"
+	@echo ""
+	@exit 1
 
-deploy-eso: ## Deploy External Secrets Operator via Helm
-	@echo "$(YELLOW)→ Deploying External Secrets Operator $(ESO_CHART_VERSION)...$(RESET)"
-	@DEPLOY_VAULT=false DEPLOY_ESO=true \
-	  ESO_CHART_VERSION=$(ESO_CHART_VERSION) \
-	  $(call run-local-script,scripts/deploy-vault.sh)
-	@echo "$(GREEN)✅ External Secrets Operator deployed$(RESET)"
+deploy-eso: ## ⚠️ DEPRECATED — ESO is now deployed via ArgoCD
+	@echo "$(RED)❌ 'make deploy-eso' is deprecated.$(RESET)"
+	@echo ""
+	@echo "  External Secrets Operator is now deployed via ArgoCD."
+	@echo ""
+	@exit 1
 
 vault-init: ## Initialize Vault, unseal, enable K8s auth, create policies + ESO role
 	@echo "$(YELLOW)→ Initializing Vault...$(RESET)"

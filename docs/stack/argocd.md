@@ -46,7 +46,8 @@ make deploy-argocd
 ```
 
 This installs `argo/argo-cd` chart at the version pinned in `ARGOCD_VERSION`
-(default: `7.8.26`) with values from `kubernetes/argocd/helm-values.yaml`.
+(default: `7.8.26`) with values from `platform/argocd/values.yaml`
+(consuming repo override) or `charts/platform-argocd/values.yaml` (k3s-lab defaults).
 
 ### Key configuration choices
 
@@ -93,43 +94,60 @@ The public key must be added to GitHub:
 
 ## Applications
 
-ArgoCD Applications live in `infra/kubernetes/argocd/apps/`.
-Each file is an `Application` manifest declaring what to sync and where to deploy it.
+ArgoCD Applications are managed via **ApplicationSets** that auto-discover
+app directories. In the consuming `infra` repo:
 
-Apply once to register an app with ArgoCD:
-
-```bash
-kubectl --context k3s-infra apply -f kubernetes/argocd/apps/myapp.yaml
+```
+infra/
+  argocd/
+    projects/         ← AppProjects (RBAC boundaries)
+    applicationsets/  ← Git directory generators (auto-discover apps/ and platform/)
+    applications/     ← Standalone Applications (security, secrets)
+  apps/               ← App manifests (one dir per app)
+  platform/           ← Platform component overrides
 ```
 
-After that, all updates come from `git push`.
+ApplicationSets are applied once during bootstrap:
 
-### Example Application
+```bash
+kubectl --context k3s-infra apply -f argocd/projects/
+kubectl --context k3s-infra apply -f argocd/applicationsets/
+kubectl --context k3s-infra apply -f argocd/applications/
+```
+
+After that, adding a new app is just `mkdir apps/myapp/ && git push`.
+
+### Example ApplicationSet
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
-kind: Application
+kind: ApplicationSet
 metadata:
-  name: whoami
+  name: apps
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io   # prune on delete
 spec:
-  project: default
-  source:
-    repoURL: git@github.com:KevinDeBenedetti/infra.git
-    targetRevision: main
-    path: kubernetes/apps/whoami
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: apps
-  syncPolicy:
-    automated:
-      prune: true      # delete resources removed from Git
-      selfHeal: true   # revert manual kubectl changes
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
+  generators:
+    - git:
+        repoURL: git@github.com:KevinDeBenedetti/infra.git
+        revision: main
+        directories:
+          - path: apps/*
+  template:
+    metadata:
+      name: "{{path.basename}}"
+    spec:
+      project: apps
+      source:
+        repoURL: git@github.com:KevinDeBenedetti/infra.git
+        targetRevision: main
+        path: "{{path}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: apps
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
 ```
 
 ---

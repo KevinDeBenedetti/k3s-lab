@@ -57,13 +57,8 @@ This creates a `grafana-admin-secret` in the `monitoring` namespace with:
 make deploy-monitoring
 ```
 
-This runs `scripts/deploy-monitoring.sh` which:
-1. Adds `prometheus-community` and `grafana` Helm repos
-2. Installs `kube-prometheus-stack` (Prometheus + Grafana + Alertmanager)
-3. Installs `Loki` (single-binary, filesystem storage)
-4. Installs `Promtail` (log collector DaemonSet on every node)
-5. Applies the Grafana `IngressRoute` + TLS `Certificate`
-6. Imports the Grafana logs dashboard
+This deploys the monitoring stack via the `platform-monitoring` Helm chart (managed by ArgoCD).
+The chart installs:
 
 ---
 
@@ -160,7 +155,7 @@ kubectl rollout restart deployment/kube-prometheus-stack-grafana -n monitoring
 
 [Loki](https://grafana.com/oss/loki/) stores logs indexed by labels (no full-text indexing). It is queried from Grafana using [LogQL](https://grafana.com/docs/loki/latest/query/).
 
-Configuration (`kubernetes/monitoring/loki-values.yaml`): deployed in single-binary mode with filesystem storage — suitable for single-node homelab use.
+Configuration (`charts/platform-monitoring/values.yaml` under the `loki:` key): deployed in single-binary mode with filesystem storage — suitable for single-node homelab use.
 
 ### Query logs in Grafana
 
@@ -189,7 +184,7 @@ http://loki.monitoring.svc.cluster.local:3100
 2. Attaches Kubernetes labels (namespace, pod, container, app)
 3. Pushes log streams to Loki
 
-Configuration (`kubernetes/monitoring/promtail-values.yaml`): uses the default pipeline stages to extract structured labels from Kubernetes metadata.
+Configuration (`charts/platform-monitoring/values.yaml` under the `promtail:` key): uses the default pipeline stages to extract structured labels from Kubernetes metadata.
 
 ---
 
@@ -239,11 +234,11 @@ metrics:
 helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
   --version <NEW_VERSION> \
   --namespace monitoring \
-  --values kubernetes/monitoring/kube-prometheus-values.yaml \
+  --values charts/platform-monitoring/values.yaml \
   --reuse-values
 ```
 
-Update the version in `.env` (`KUBE_PROMETHEUS_VERSION`) and re-run `make deploy-monitoring`.
+Update the version in `charts/platform-monitoring/Chart.yaml` and let ArgoCD sync.
 
 ---
 

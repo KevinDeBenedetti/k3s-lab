@@ -127,7 +127,7 @@ make deploy
 
 This deploys in order:
 1. **Namespaces** — `ingress`, `cert-manager`, `monitoring`, `apps`
-2. **Traefik** — Helm chart with values from `kubernetes/ingress/traefik-values.yaml`
+2. **Traefik** — Helm chart with values from `charts/platform-base/values.yaml`
 3. **cert-manager** — with CRDs installed
 4. **ClusterIssuers** — Let's Encrypt staging + production
 5. **Traefik dashboard** — secured IngressRoute at `DASHBOARD_DOMAIN`
@@ -180,12 +180,14 @@ All pods should be `Running` or `Completed`.
 
 ## Deploy an example app
 
-The `kubernetes/apps/` directory contains an example app:
+Create your app manifests in `apps/` (for infra repo) or follow the
+[Deploying an App](./operations/deploy-app) guide:
 
 ```bash
-# Deploy example app with ingress + TLS
-envsubst < kubernetes/apps/deployment.yaml | kubectl apply -f -
-envsubst < kubernetes/apps/service-ingress.yaml | kubectl apply -f -
+# ArgoCD auto-discovers apps/ directories — just push to git
+mkdir -p apps/myapp/
+# Add deployment.yaml, service.yaml, ingress.yaml
+git add apps/myapp/ && git commit -m "feat: add myapp" && git push
 ```
 
 See [Traefik → Deploying your own services](./stack/traefik#deploying-your-own-services) for the IngressRoute pattern.

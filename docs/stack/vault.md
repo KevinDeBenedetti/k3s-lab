@@ -131,10 +131,9 @@ Installs the `external-secrets/external-secrets` Helm chart into the `external-s
 ## Step 5 — Apply ClusterSecretStore + ExternalSecrets
 
 ```bash
-kubectl apply -f kubernetes/external-secrets/cluster-secret-store.yaml
-
 # In your infra repo:
-kubectl apply -f kubernetes/vault/external-secrets/
+kubectl apply -f secrets/cluster-secret-store.yaml
+kubectl apply -f secrets/
 ```
 
 ESO immediately begins syncing. Check status:

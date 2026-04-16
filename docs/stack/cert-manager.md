@@ -44,7 +44,7 @@ helm upgrade --install cert-manager jetstack/cert-manager \
 
 ## ClusterIssuers
 
-Two `ClusterIssuer` resources are created (`kubernetes/cert-manager/clusterissuer.yaml`):
+Two `ClusterIssuer` resources are defined in your consuming repo's `platform/` directory (or managed via ArgoCD):
 
 ### Staging (for testing)
 

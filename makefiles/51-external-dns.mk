@@ -15,15 +15,13 @@ EXTERNAL_DNS_VERSION ?= 1.16.1
 
 .PHONY: deploy-external-dns external-dns-status external-dns-logs
 
-deploy-external-dns: ## Deploy external-dns (Cloudflare provider, traefik-proxy source)
-	@[ -n "$(DOMAIN)" ] || (echo "$(RED)❌ DOMAIN not set — add to .env$(RESET)"; exit 1)
-	@[ -n "$(SERVER_IP)" ] || (echo "$(RED)❌ SERVER_IP not set — add to .env$(RESET)"; exit 1)
-	@echo "$(YELLOW)→ Deploying external-dns $(EXTERNAL_DNS_VERSION)...$(RESET)"
-	@EXTERNAL_DNS_VERSION=$(EXTERNAL_DNS_VERSION) \
-	  $(call run-local-script,scripts/deploy-external-dns.sh)
-	@echo "$(GREEN)✅ external-dns deployed$(RESET)"
-	@echo "$(YELLOW)   Add annotation to IngressRoutes/Services to create DNS records:$(RESET)"
-	@echo "     external-dns.alpha.kubernetes.io/hostname: app.$(DOMAIN)"
+deploy-external-dns: ## ⚠️ DEPRECATED — external-dns is now deployed via ArgoCD
+	@echo "$(RED)❌ 'make deploy-external-dns' is deprecated.$(RESET)"
+	@echo ""
+	@echo "  external-dns should be managed via ArgoCD."
+	@echo "  Add it as an ArgoCD Application or include it in an umbrella chart."
+	@echo ""
+	@exit 1
 
 external-dns-status: ## Show external-dns pod status and recent log lines
 	@echo ""
