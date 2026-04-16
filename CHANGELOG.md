@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.3...v0.4.4) (2026-04-16)
+
+
+### Bug Fixes
+
+* add scripts for Grafana OAuth deployment and Cloudflare API token seeding, enhance inventory generation ([62ca74e](https://github.com/KevinDeBenedetti/k3s-lab/commit/62ca74e013276a92432a2a152175d59e4c098859))
+
 ## [0.4.3](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.2...v0.4.3) (2026-04-16)
 
 
