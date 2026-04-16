@@ -28,7 +28,7 @@ OIDC_AUTH_URL      ?=
 OIDC_TOKEN_URL     ?=
 OIDC_API_URL       ?=
 
-.PHONY: vault-init vault-unseal vault-configure vault-seed vault-status
+.PHONY: vault-init vault-unseal vault-configure vault-seed vault-seed-cloudflare vault-status
 
 vault-init: ## Initialize Vault, unseal, enable K8s auth, create policies + ESO role
 	@echo "$(YELLOW)→ Initializing Vault...$(RESET)"
@@ -139,6 +139,13 @@ vault-seed: ## Seed secrets into Vault (reads from .env, prompts only if missing
 	  || echo "  (skipped traefik/dashboard)"
 	@echo ""
 	@echo "$(GREEN)✅ Vault secrets seeded$(RESET)"
+
+vault-seed-cloudflare: ## Seed Cloudflare API token into Vault for cert-manager DNS-01
+	$(call require-var,VAULT_ROOT_TOKEN)
+	@VAULT_POD="$(VAULT_POD)" \
+	 VAULT_NAMESPACE="$(VAULT_NAMESPACE)" \
+	 VAULT_ROOT_TOKEN="$(VAULT_ROOT_TOKEN)" \
+	 $(call run-local-script,scripts/vault-seed-cloudflare.sh)
 
 vault-status: ## Show Vault seal status, ESO sync status, and managed secrets
 	@echo ""

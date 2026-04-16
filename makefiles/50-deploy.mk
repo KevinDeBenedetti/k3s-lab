@@ -8,7 +8,7 @@
 DASHBOARD_USER ?= admin
 GRAFANA_USER   ?= admin
 
-.PHONY: deploy-dashboard-secret deploy-grafana-secret
+.PHONY: deploy-dashboard-secret deploy-grafana-secret deploy-grafana-oauth uninstall
 
 deploy-dashboard-secret: ## Create Traefik dashboard BasicAuth secret (requires DASHBOARD_PASSWORD)
 	$(call require-var,DASHBOARD_PASSWORD)
@@ -25,3 +25,11 @@ deploy-grafana-secret: ## Create Grafana admin secret (requires GRAFANA_PASSWORD
 		| $(K) apply -f -
 	@$(call create-k8s-secret,grafana-admin-secret,monitoring,--from-literal=username=$(GRAFANA_USER) --from-literal=password="$(GRAFANA_PASSWORD)")
 	@echo "$(GREEN)✅ Grafana admin secret created$(RESET)"
+
+deploy-grafana-oauth: ## Restart Grafana to pick up OAuth secret from Vault
+	$(call require-var,GRAFANA_DOMAIN)
+	@GRAFANA_DOMAIN="$(GRAFANA_DOMAIN)" \
+	 $(call run-local-script,scripts/deploy-grafana-oauth.sh)
+
+uninstall: ## Tear down all deployed workloads (DESTRUCTIVE)
+	@$(call run-local-script,scripts/uninstall.sh)

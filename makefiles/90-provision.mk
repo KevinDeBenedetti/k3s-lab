@@ -8,8 +8,18 @@ ANSIBLE_DIR     ?= ansible
 ANSIBLE_PLAYBOOK ?= ansible-playbook
 ANSIBLE_INVENTORY ?= $(ANSIBLE_DIR)/inventory/hosts.yml
 PLAYBOOK_DIR    ?= $(ANSIBLE_DIR)/playbooks
+TF_DIR          ?= terraform
+CLUSTER_ENV     ?=
 
-.PHONY: provision provision-server provision-agents provision-reset
+.PHONY: inventory provision provision-server provision-agents provision-reset
+
+inventory: ## Generate Ansible inventory from Terraform outputs (requires CLUSTER_ENV)
+	$(call require-var,CLUSTER_ENV)
+	@echo "$(YELLOW)→ Generating Ansible inventory...$(RESET)"
+	@CLUSTER_ENV="$(CLUSTER_ENV)" \
+	 TF_DIR="$(TF_DIR)" \
+	 ANSIBLE_DIR="$(ANSIBLE_DIR)" \
+	 $(call run-local-script,scripts/generate-inventory.sh)
 
 provision: ## Full Ansible provisioning: common + k3s server + agents + kubeconfig
 	@echo "$(YELLOW)→ Running full Ansible provisioning...$(RESET)"
