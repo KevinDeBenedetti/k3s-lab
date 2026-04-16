@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.5](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.4...v0.4.5) (2026-04-16)
+
+
+### Bug Fixes
+
+* refactor Makefiles and Scripts for Improved Structure and Functionality ([7d01cb9](https://github.com/KevinDeBenedetti/k3s-lab/commit/7d01cb98245b13904e4d1a3a887e985c3fc3fe43))
+
 ## [0.4.4](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.3...v0.4.4) (2026-04-16)
 
 
