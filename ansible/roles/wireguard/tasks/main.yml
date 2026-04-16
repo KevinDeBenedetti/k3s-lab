@@ -1,70 +1,86 @@
 ---
-- name: Skip WireGuard if disabled
-  ansible.builtin.meta: end_role
-  when: not wireguard_enabled
+- name: Configure WireGuard VPN
+  when: wireguard_enabled | default(false) | bool
+  block:
+    - name: Install WireGuard
+      ansible.builtin.apt:
+        name: wireguard
+        state: present
+        update_cache: true
 
-- name: Install WireGuard
-  ansible.builtin.apt:
-    name: wireguard
-    state: present
-    update_cache: true
+    - name: Check if private key file exists
+      ansible.builtin.stat:
+        path: /etc/wireguard/private.key
+      register: wg_key_stat
 
-- name: Check if private key exists
-  ansible.builtin.stat:
-    path: /etc/wireguard/private.key
-  register: wg_key_stat
+    - name: Extract existing private key from wg0.conf
+      ansible.builtin.shell:
+        cmd: grep -oP '(?<=PrivateKey\s=\s).+' /etc/wireguard/{{ wireguard_interface }}.conf
+      register: wg_existing_key
+      changed_when: false
+      failed_when: false
+      when: not wg_key_stat.stat.exists
 
-- name: Generate server private key
-  ansible.builtin.command:
-    cmd: wg genkey
-  register: wg_private_key
-  changed_when: true
-  when: not wg_key_stat.stat.exists
+    - name: Save existing private key to file
+      ansible.builtin.copy:
+        content: "{{ wg_existing_key.stdout | trim }}"
+        dest: /etc/wireguard/private.key
+        mode: "0600"
+      when:
+        - not wg_key_stat.stat.exists
+        - wg_existing_key.rc == 0
+        - wg_existing_key.stdout | trim | length > 0
 
-- name: Save server private key
-  ansible.builtin.copy:
-    content: "{{ wg_private_key.stdout }}"
-    dest: /etc/wireguard/private.key
-    mode: "0600"
-  when: not wg_key_stat.stat.exists
+    - name: Generate server private key
+      ansible.builtin.command:
+        cmd: wg genkey
+      register: wg_new_key
+      changed_when: true
+      when:
+        - not wg_key_stat.stat.exists
+        - wg_existing_key.rc != 0 or wg_existing_key.stdout | trim | length == 0
 
-- name: Read server private key
-  ansible.builtin.slurp:
-    src: /etc/wireguard/private.key
-  register: wg_private_key_file
+    - name: Save new private key to file
+      ansible.builtin.copy:
+        content: "{{ wg_new_key.stdout }}"
+        dest: /etc/wireguard/private.key
+        mode: "0600"
+      when:
+        - not wg_key_stat.stat.exists
+        - wg_new_key is changed
 
-- name: Derive server public key
-  ansible.builtin.shell:
-    cmd: echo "{{ wg_private_key_file.content | b64decode | trim }}" | wg pubkey
-  register: wg_public_key
-  changed_when: false
+    - name: Read server private key
+      ansible.builtin.slurp:
+        src: /etc/wireguard/private.key
+      register: wg_private_key_file
 
-- name: Set WireGuard public key fact
-  ansible.builtin.set_fact:
-    wireguard_server_public_key: "{{ wg_public_key.stdout | trim }}"
+    - name: Derive server public key
+      ansible.builtin.shell:
+        cmd: echo "{{ wg_private_key_file.content | b64decode | trim }}" | wg pubkey
+      register: wg_public_key
+      changed_when: false
 
-- name: Deploy WireGuard configuration
-  ansible.builtin.template:
-    src: wg0.conf.j2
-    dest: "/etc/wireguard/{{ wireguard_interface }}.conf"
-    mode: "0600"
-  notify: Restart WireGuard
+    - name: Set WireGuard key facts
+      ansible.builtin.set_fact:
+        wireguard_server_public_key: "{{ wg_public_key.stdout | trim }}"
+        wireguard_server_private_key: "{{ wg_private_key_file.content | b64decode | trim }}"
 
-- name: Open WireGuard UDP port in UFW
-  community.general.ufw:
-    rule: allow
-    port: "{{ wireguard_port }}"
-    proto: udp
+    - name: Deploy WireGuard configuration
+      ansible.builtin.template:
+        src: wg0.conf.j2
+        dest: "/etc/wireguard/{{ wireguard_interface }}.conf"
+        mode: "0600"
+      notify: Restart WireGuard
 
-- name: Enable IP forwarding for WireGuard
-  ansible.posix.sysctl:
-    name: net.ipv4.ip_forward
-    value: "1"
-    sysctl_file: /etc/sysctl.d/99-wireguard.conf
-    reload: true
+    - name: Enable IP forwarding for WireGuard
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        sysctl_file: /etc/sysctl.d/99-wireguard.conf
+        reload: true
 
-- name: Enable and start WireGuard
-  ansible.builtin.systemd:
-    name: "wg-quick@{{ wireguard_interface }}"
-    state: started
-    enabled: true
+    - name: Enable and start WireGuard
+      ansible.builtin.systemd:
+        name: "wg-quick@{{ wireguard_interface }}"
+        state: started
+        enabled: true
