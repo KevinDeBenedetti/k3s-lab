@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.0...v0.4.1) (2026-04-16)
+
+
+### Bug Fixes
+
+* replace hardcoded vault pod name with variable for improved flexibility ([b859050](https://github.com/KevinDeBenedetti/k3s-lab/commit/b8590503fea5d033af5298b1080e65936253165d))
+
 ## [0.4.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.3.1...v0.4.0) (2026-04-16)
 
 
