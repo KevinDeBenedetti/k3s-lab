@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.2...v0.4.3) (2026-04-16)
+
+
+### Bug Fixes
+
+* update Makefile and scripts for improved validation and secret management ([e88cfb9](https://github.com/KevinDeBenedetti/k3s-lab/commit/e88cfb900fd0541a2ac41ef3c5f879abcde8e675))
+
 ## [0.4.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.1...v0.4.2) (2026-04-16)
 
 
