@@ -101,7 +101,7 @@ cat >> "$INVENTORY_FILE" << EOF
 EOF
 
 if [ "$AGENT_COUNT" -gt 0 ]; then
-  for i in $(seq 0 $((AGENT_COUNT - 1))); do
+  for ((i=0; i<AGENT_COUNT; i++)); do
     NAME=$(echo "$AGENT_NAMES" | jq -r ".[$i]")
     IP=$(echo "$AGENT_IPS" | jq -r ".[$i]")
     PRIV_IP=$(echo "$AGENT_PRIVATE_IPS" | jq -r "if length > $i then .[$i] else \"\" end")

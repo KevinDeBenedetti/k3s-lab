@@ -27,15 +27,15 @@ CYAN   := \033[0;36m
 RED    := \033[0;31m
 RESET  := \033[0m
 
-include makefiles/00-lib.mk
-include makefiles/10-help.mk
-include makefiles/40-kubeconfig.mk
-include makefiles/45-security.mk
-include makefiles/50-deploy.mk
-include makefiles/51-external-dns.mk
-include makefiles/52-argocd.mk
-include makefiles/55-vault.mk
-include makefiles/60-status.mk
-include makefiles/70-ssh.mk
-include makefiles/80-dev.mk
-include makefiles/90-provision.mk
+include makefiles/lib.mk
+include makefiles/help.mk
+include makefiles/kubeconfig.mk
+include makefiles/security.mk
+include makefiles/deploy.mk
+include makefiles/external-dns.mk
+include makefiles/argocd.mk
+include makefiles/vault.mk
+include makefiles/status.mk
+include makefiles/ssh.mk
+include makefiles/dev.mk
+include makefiles/provision.mk

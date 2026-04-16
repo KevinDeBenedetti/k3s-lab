@@ -26,19 +26,22 @@ _lib require-vars.sh
 require_vars GRAFANA_DOMAIN
 
 KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-lab}"
-K="${K:-kubectl --context ${KUBECONFIG_CONTEXT}}"
+K="${K:-kubectl --context "${KUBECONFIG_CONTEXT}"}"
 
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-monitoring}"
 GRAFANA_SECRET="${GRAFANA_SECRET:-grafana-oauth-secret}"
 GRAFANA_DEPLOYMENT="${GRAFANA_DEPLOYMENT:-kube-prometheus-stack-grafana}"
 
+# shellcheck disable=SC2086
 if ! $K get secret "$GRAFANA_SECRET" -n "$GRAFANA_NAMESPACE" >/dev/null 2>&1; then
   log_warn "Skipping Grafana OAuth — ${GRAFANA_SECRET} not found in ${GRAFANA_NAMESPACE}"
   exit 0
 fi
 
 log_warn "Restarting Grafana for OAuth2..."
+# shellcheck disable=SC2086
 $K rollout restart deployment/"$GRAFANA_DEPLOYMENT" -n "$GRAFANA_NAMESPACE"
+# shellcheck disable=SC2086
 $K rollout status deployment/"$GRAFANA_DEPLOYMENT" -n "$GRAFANA_NAMESPACE" --timeout=120s
 
 log_ok "Grafana OAuth2 enabled (${GRAFANA_DOMAIN})"

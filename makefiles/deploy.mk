@@ -1,4 +1,4 @@
-# Module: makefiles/50-deploy.mk
+# Module: makefiles/deploy.mk
 # ──────────────────────────────────────────────────────────────────────────────
 # Stack Deployment — Secret creation targets
 #
@@ -13,7 +13,7 @@ GRAFANA_USER   ?= admin
 deploy-dashboard-secret: ## Create Traefik dashboard BasicAuth secret (requires DASHBOARD_PASSWORD)
 	$(call require-var,DASHBOARD_PASSWORD)
 	@echo "$(YELLOW)→ Creating dashboard auth secret...$(RESET)"
-	@$(call create-k8s-secret,traefik-dashboard-auth,ingress,--from-literal=users="$$(htpasswd -nb $(DASHBOARD_USER) $(DASHBOARD_PASSWORD))")
+	@$(call create-k8s-secret,traefik-dashboard-auth,ingress,--from-literal=users="$$(htpasswd -nb '$(DASHBOARD_USER)' '$(DASHBOARD_PASSWORD)')")
 	@echo "$(GREEN)✅ Dashboard secret created$(RESET)"
 
 deploy-grafana-secret: ## Create Grafana admin secret (requires GRAFANA_PASSWORD)

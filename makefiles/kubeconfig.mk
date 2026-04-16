@@ -1,7 +1,7 @@
-# Module: makefiles/40-kubeconfig.mk
+# Module: makefiles/kubeconfig.mk
 # ──────────────────────────────────────────────────────────────────────────────
 # Kubeconfig
-# Uses run-local-script from 00-lib.mk (local bash or remote curl, transparent).
+# Uses run-local-script from lib.mk (local bash or remote curl, transparent).
 # ──────────────────────────────────────────────────────────────────────────────
 
 .PHONY: kubeconfig

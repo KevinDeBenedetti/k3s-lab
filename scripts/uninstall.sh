@@ -23,7 +23,7 @@ fi
 unset _src
 
 KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-lab}"
-K="${K:-kubectl --context ${KUBECONFIG_CONTEXT}}"
+K="${K:-kubectl --context "${KUBECONFIG_CONTEXT}"}"
 
 # Default Helm releases (override via HELM_RELEASES env var)
 DEFAULT_HELM_RELEASES=(
@@ -56,8 +56,7 @@ else
 fi
 
 for release_ns in "${_releases[@]}"; do
-  r=$(echo "$release_ns" | awk '{print $1}')
-  n=$(echo "$release_ns" | awk '{print $2}')
+  read -r r n <<< "$release_ns"
   echo "  → helm uninstall $r -n $n"
   helm uninstall "$r" -n "$n" --kube-context "${KUBECONFIG_CONTEXT}" 2>/dev/null || true
 done
@@ -72,6 +71,7 @@ else
 fi
 
 for ns in "${_namespaces[@]}"; do
+  # shellcheck disable=SC2086
   $K delete namespace "$ns" --ignore-not-found 2>/dev/null || true
 done
 

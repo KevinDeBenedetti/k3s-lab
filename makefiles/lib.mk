@@ -1,4 +1,4 @@
-# Module: makefiles/00-lib.mk
+# Module: makefiles/lib.mk
 # ──────────────────────────────────────────────────────────────────────────────
 # Dual-mode script execution helpers
 #

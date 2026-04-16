@@ -1,4 +1,4 @@
-# Module: makefiles/60-status.mk
+# Module: makefiles/status.mk
 # ──────────────────────────────────────────────────────────────────────────────
 # Cluster Status
 # ──────────────────────────────────────────────────────────────────────────────
@@ -9,7 +9,7 @@ nodes: ## Show cluster nodes
 	@$(K) get nodes -o wide
 
 status: ## Show all running pods across namespaces
-	@$(K) get pods -A | grep -v Completed
+	@$(K) get pods -A --field-selector=status.phase!=Succeeded | grep -v Completed
 
 pods: ## Show pods with resource usage
 	@$(K) top pods -A 2>/dev/null \

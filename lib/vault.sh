@@ -17,11 +17,12 @@ VAULT_POD="${VAULT_POD:-vault-0}"
 VAULT_TOKEN="${VAULT_TOKEN:-${VAULT_ROOT_TOKEN:-}}"
 
 # kubectl shorthand
-K="${K:-kubectl --context ${KUBECONFIG_CONTEXT}}"
+K="${K:-kubectl --context "${KUBECONFIG_CONTEXT}"}"
 
 # vault_exec <vault-args...>
 # Run a vault CLI command inside the Vault pod (no stdin).
 vault_exec() {
+  # shellcheck disable=SC2086
   $K exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
     -- env VAULT_TOKEN="${VAULT_TOKEN}" vault "$@"
 }
@@ -29,6 +30,7 @@ vault_exec() {
 # vault_exec_stdin <vault-args...>
 # Run a vault CLI command inside the Vault pod (with stdin for heredocs).
 vault_exec_stdin() {
+  # shellcheck disable=SC2086
   $K exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
     -- env VAULT_TOKEN="${VAULT_TOKEN}" vault "$@"
 }

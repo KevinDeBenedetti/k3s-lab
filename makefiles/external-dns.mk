@@ -1,4 +1,4 @@
-# Module: makefiles/51-external-dns.mk
+# Module: makefiles/external-dns.mk
 # ──────────────────────────────────────────────────────────────────────────────
 # external-dns — Automatic Cloudflare DNS record management
 #

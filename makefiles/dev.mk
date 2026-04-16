@@ -1,4 +1,4 @@
-# Module: makefiles/80-dev.mk
+# Module: makefiles/dev.mk
 # ──────────────────────────────────────────────────────────────────────────────
 # Developer workflow
 # Requires: brew install bats-core prek

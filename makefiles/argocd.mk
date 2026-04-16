@@ -1,4 +1,4 @@
-# Module: makefiles/52-argocd.mk
+# Module: makefiles/argocd.mk
 # ──────────────────────────────────────────────────────────────────────────────
 # ArgoCD — GitOps Continuous Delivery
 #
@@ -13,7 +13,7 @@ ARGOCD_VERSION          ?= 7.8.26
 ARGOCD_DOMAIN           ?=
 ARGOCD_REPO_URL         ?=
 ARGOCD_REPO_SECRET_NAME ?= argocd-repo
-# ADMIN_EMAIL is shared with other modules (e.g. 55-vault.mk RBAC allow-list).
+# ADMIN_EMAIL is shared with other modules (e.g. vault.mk RBAC allow-list).
 ADMIN_EMAIL             ?=
 
 # ── Paths (allow override from consuming repo) ──────────────────────────────
@@ -39,10 +39,10 @@ deploy-argocd: ## Deploy ArgoCD (run after make deploy)
 		--wait \
 		--timeout 300s
 	@if [ -f "$(ARGOCD_MIDDLEWARE)" ]; then \
-		$(K) apply -f $(ARGOCD_MIDDLEWARE); \
+		$(K) apply -f "$(ARGOCD_MIDDLEWARE)"; \
 	fi
 	@if [ -f "$(ARGOCD_INGRESSROUTE)" ]; then \
-		ARGOCD_DOMAIN=$(ARGOCD_DOMAIN) envsubst < $(ARGOCD_INGRESSROUTE) | $(K) apply -f -; \
+		ARGOCD_DOMAIN=$(ARGOCD_DOMAIN) envsubst < "$(ARGOCD_INGRESSROUTE)" | $(K) apply -f -; \
 	fi
 	@echo ""
 	@echo "$(GREEN)✅ ArgoCD deployed$(RESET)"

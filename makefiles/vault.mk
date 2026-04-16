@@ -1,4 +1,4 @@
-# Module: makefiles/55-vault.mk
+# Module: makefiles/vault.mk
 # ──────────────────────────────────────────────────────────────────────────────
 # HashiCorp Vault + External Secrets Operator
 # ──────────────────────────────────────────────────────────────────────────────

@@ -16,6 +16,6 @@ load_env() {
     [[ "$key" =~ ^[[:space:]]*# ]] && continue
     [[ -z "${key// /}" ]]          && continue
     key="${key// /}"
-    [[ -n "${!key+defined}" ]] || export "$key=$value"
+    [[ -n "${!key+defined}" ]] || export "${key}=${value}"
   done < "${env_file}"
 }
