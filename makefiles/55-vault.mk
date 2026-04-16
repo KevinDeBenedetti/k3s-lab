@@ -6,6 +6,7 @@
 VAULT_CHART_VERSION ?= 0.29.1
 ESO_CHART_VERSION   ?= 0.14.3
 VAULT_POD           ?= vault-0
+VAULT_NAMESPACE     ?= vault
 DASHBOARD_USER      ?= admin
 # VAULT_DOMAIN and VAULT_ROOT_TOKEN intentionally have no default here.
 # Set them in the consuming Makefile or .env.
@@ -50,7 +51,9 @@ deploy-eso: ## Deploy External Secrets Operator via Helm
 vault-init: ## Initialize Vault, unseal, enable K8s auth, create policies + ESO role
 	@echo "$(YELLOW)→ Initializing Vault...$(RESET)"
 	@echo "$(YELLOW)⚠️  Save the unseal keys and root token — they will not be shown again$(RESET)"
-	@OIDC_CLIENT_ID="$(OIDC_CLIENT_ID)" \
+	@VAULT_POD="$(VAULT_POD)" \
+	 VAULT_NAMESPACE="$(VAULT_NAMESPACE)" \
+	 OIDC_CLIENT_ID="$(OIDC_CLIENT_ID)" \
 	 OIDC_CLIENT_SECRET="$(OIDC_CLIENT_SECRET)" \
 	 OIDC_ISSUER_URL="$(OIDC_ISSUER_URL)" \
 	 VAULT_DOMAIN="$(VAULT_DOMAIN)" \

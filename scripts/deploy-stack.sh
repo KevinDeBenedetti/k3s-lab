@@ -8,7 +8,14 @@ set -euo pipefail
 # =============================================================================
 
 # shellcheck source=lib/script-init.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
+_src="${BASH_SOURCE[0]:-}"
+if [[ -n "${_src}" && "${_src}" != /dev/fd/* && -f "${_src}" ]]; then
+  source "$(cd "$(dirname "${_src}")" && pwd)/../lib/script-init.sh"
+else
+  # shellcheck source=/dev/null
+  source <(curl -fsSL "${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}/lib/script-init.sh")
+fi
+unset _src
 _lib require-vars.sh
 _lib helm-repo.sh
 

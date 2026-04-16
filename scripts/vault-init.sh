@@ -17,11 +17,18 @@ set -euo pipefail
 # =============================================================================
 
 # shellcheck source=lib/script-init.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
+_src="${BASH_SOURCE[0]:-}"
+if [[ -n "${_src}" && "${_src}" != /dev/fd/* && -f "${_src}" ]]; then
+  source "$(cd "$(dirname "${_src}")" && pwd)/../lib/script-init.sh"
+else
+  # shellcheck source=/dev/null
+  source <(curl -fsSL "${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}/lib/script-init.sh")
+fi
+unset _src
 
 KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-infra}"
 VAULT_NAMESPACE="${VAULT_NAMESPACE:-vault}"
-VAULT_POD="vault-0"
+VAULT_POD="${VAULT_POD:-vault-0}"
 ESO_NAMESPACE="${ESO_NAMESPACE:-external-secrets}"
 ESO_SA="${ESO_SA:-external-secrets}"
 
