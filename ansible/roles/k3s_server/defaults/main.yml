@@ -21,7 +21,13 @@ k3s_disable:
   - servicelb
 
 # Extra args appended to k3s server install
-k3s_extra_server_args: ""
+# Includes API server audit logging and kubelet hardening
+k3s_extra_server_args: >-
+  --kube-apiserver-arg=audit-log-path=/var/log/k3s-audit.log
+  --kube-apiserver-arg=audit-log-maxage=30
+  --kube-apiserver-arg=audit-log-maxbackup=10
+  --kube-apiserver-arg=audit-log-maxsize=100
+  --protect-kernel-defaults
 
 # Firewall: ports to open for agent communication
 k3s_ufw_allow_from: "10.0.0.0/16"

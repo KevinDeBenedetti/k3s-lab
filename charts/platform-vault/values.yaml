@@ -2,7 +2,7 @@ vault:
   fullnameOverride: vault
   global:
     enabled: true
-    tlsDisable: true
+    tlsDisable: false
   injector:
     enabled: false
   server:
@@ -17,7 +17,9 @@ vault:
       size: 5Gi
       storageClass: local-path
     auditStorage:
-      enabled: false
+      enabled: true
+      size: 2Gi
+      storageClass: local-path
     resources:
       requests:
         cpu: 50m
@@ -40,9 +42,11 @@ vault:
         ui = true
 
         listener "tcp" {
-          tls_disable     = 1
+          tls_disable     = 0
           address         = "[::]:8200"
           cluster_address = "[::]:8201"
+          tls_cert_file   = "/vault/userconfig/vault-tls/tls.crt"
+          tls_key_file    = "/vault/userconfig/vault-tls/tls.key"
         }
 
         storage "raft" {
@@ -52,7 +56,7 @@ vault:
 
         service_registration "kubernetes" {}
 
-        disable_mlock = true
+        disable_mlock = false
   ui:
     enabled: true
     serviceType: ClusterIP

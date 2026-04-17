@@ -15,10 +15,12 @@
       ansible.builtin.slurp:
         src: /var/lib/rancher/k3s/server/node-token
       register: k3s_node_token_raw
+      no_log: true
 
     - name: Set node token fact
       ansible.builtin.set_fact:
         k3s_node_token: "{{ k3s_node_token_raw.content | b64decode | trim }}"
+      no_log: true
 
 - name: Install k3s agent
   hosts: k3s_agents

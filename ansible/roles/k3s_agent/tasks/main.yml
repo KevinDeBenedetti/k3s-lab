@@ -22,7 +22,8 @@
   ansible.builtin.get_url:
     url: https://get.k3s.io
     dest: /tmp/k3s-install.sh
-    mode: "0755"
+    mode: "0700"
+    checksum: "sha256:https://get.k3s.io/sha256sum"
   when: >
     not k3s_binary.stat.exists or
     k3s_version not in (k3s_installed_version.stdout | default(''))
@@ -30,6 +31,7 @@
 - name: Install k3s agent
   ansible.builtin.command:
     cmd: /tmp/k3s-install.sh
+  no_log: true
   environment:
     INSTALL_K3S_VERSION: "{{ k3s_version }}"
     K3S_URL: "{{ k3s_server_url }}"
@@ -61,9 +63,9 @@
     - { port: "10250", proto: tcp }
   notify: Reload UFW
 
-- name: Open ingress ports (HTTP/HTTPS)
+- name: Open ingress ports (HTTP/HTTPS) with rate limiting
   community.general.ufw:
-    rule: allow
+    rule: limit
     port: "{{ item }}"
     proto: tcp
   loop:
