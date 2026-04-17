@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.5.3...v0.6.0) (2026-04-17)
+
+
+### Features
+
+* add platform-cert-manager and platform-external-secrets Helm charts with initial configurations ([6976456](https://github.com/KevinDeBenedetti/k3s-lab/commit/6976456ad238a2077d7096859c7db033b31f69a9))
+
 ## [0.5.3](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.5.2...v0.5.3) (2026-04-17)
 
 
