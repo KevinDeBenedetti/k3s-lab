@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.3](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.5.2...v0.5.3) (2026-04-17)
+
+
+### Bug Fixes
+
+* add .editorconfig and ansible.cfg files, update SSH_USER in configuration, and implement unit tests for logging and variable requirements ([5d93a7a](https://github.com/KevinDeBenedetti/k3s-lab/commit/5d93a7ae61cd44c0fb288c24062a119a2f692860))
+* update platform-monitoring charts to version 0.6.0 and add new Grafana dashboards for Falco, Kubernetes, Tetragon, and Trivy ([aa2f621](https://github.com/KevinDeBenedetti/k3s-lab/commit/aa2f6218901d0d4f9325a144962a311179b75da7))
+
 ## [0.5.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.5.1...v0.5.2) (2026-04-17)
 
 
