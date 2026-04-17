@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.5.1...v0.5.2) (2026-04-17)
+
+
+### Bug Fixes
+
+* disable CodeQL analysis due to unsupported languages in the repository ([8c94631](https://github.com/KevinDeBenedetti/k3s-lab/commit/8c94631eb90c3174b7bfbc9f3e07c6997ebfb9e5))
+* enable CodeQL analysis, improve error handling in k3s checks, and update WireGuard configuration ([71ac577](https://github.com/KevinDeBenedetti/k3s-lab/commit/71ac5773867cd87290e0b7482f7dbf4cdc9126e0))
+
 ## [0.5.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.5.0...v0.5.1) (2026-04-17)
 
 
