@@ -23,7 +23,7 @@ cp .env.example .env
 
 | Variable | Default | Required | Description |
 |---|---|---|---|
-| `SSH_USER` | `ubuntu` | ✅ | SSH user after bootstrap (regular user, not root) |
+| `SSH_USER` | `debian` | ✅ | SSH user after bootstrap (regular user, not root) |
 | `SSH_KEY` | `~/.ssh/id_ed25519` | ✅ | Path to your SSH private key |
 | `INITIAL_USER` | `root` | — | User for the very first connection (before bootstrap creates `SSH_USER`) |
 | `SSH_PORT` | `22` | — | SSH port (Makefile default, not in `.env.example`) |
@@ -102,7 +102,7 @@ SERVER_IP=1.2.3.4
 AGENT_IP=5.6.7.8
 
 # SSH
-SSH_USER=ubuntu
+SSH_USER=debian
 SSH_KEY=~/.ssh/id_ed25519
 
 # k3s

@@ -39,11 +39,11 @@ log_info "Fetching kubeconfig from ${SSH_USER}@${SERVER_IP} (port ${SSH_PORT})..
 # Fetch, rewrite the localhost address and cluster/context/user names
 ssh "${SSH_OPTS[@]}" "${SSH_USER}@${SERVER_IP}" \
   "sudo cat /etc/rancher/k3s/k3s.yaml" \
-  | sed "s/127\.0\.0\.1/${SERVER_IP}/g" \
-  | sed "s/name: default/name: ${CONTEXT_NAME}/g" \
-  | sed "s/cluster: default/cluster: ${CONTEXT_NAME}/g" \
-  | sed "s/user: default/user: ${CONTEXT_NAME}/g" \
-  | sed "s/current-context: default/current-context: ${CONTEXT_NAME}/g" \
+  | sed "s|127\.0\.0\.1|${SERVER_IP}|g" \
+  | sed "s|name: default|name: ${CONTEXT_NAME}|g" \
+  | sed "s|cluster: default|cluster: ${CONTEXT_NAME}|g" \
+  | sed "s|user: default|user: ${CONTEXT_NAME}|g" \
+  | sed "s|current-context: default|current-context: ${CONTEXT_NAME}|g" \
   > "${TMP_KUBECONFIG}"
 
 chmod 600 "${TMP_KUBECONFIG}"

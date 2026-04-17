@@ -60,6 +60,7 @@ deploy-argocd: ## Deploy ArgoCD (run after make deploy)
 argocd-add-repo: ## Register a Git repo in ArgoCD via SSH deploy key (requires ARGOCD_REPO_URL + GITHUB_DEPLOY_KEY)
 	$(call require-var,ARGOCD_REPO_URL)
 	$(call require-var,GITHUB_DEPLOY_KEY)
+	@[ -f "$(GITHUB_DEPLOY_KEY)" ] || (echo "$(RED)❌ GITHUB_DEPLOY_KEY file not found: $(GITHUB_DEPLOY_KEY)$(RESET)"; exit 1)
 	@echo "$(YELLOW)→ Registering $(ARGOCD_REPO_URL) in ArgoCD...$(RESET)"
 	@$(call create-k8s-secret,$(ARGOCD_REPO_SECRET_NAME),argocd,--from-literal=type=git --from-literal=url=$(ARGOCD_REPO_URL) --from-file=sshPrivateKey="$(GITHUB_DEPLOY_KEY)")
 	@$(K) label secret $(ARGOCD_REPO_SECRET_NAME) \
