@@ -64,7 +64,8 @@ jobs:
       run-node-audit: false
       run-python-audit: false
       run-secret-scan: true
-      run-codeql: true
+      # CodeQL disabled — no supported languages in this repo (Shell/YAML only)
+      run-codeql: false
 
   # ─── Helm chart linting ────────────────────────────────────────────────────
   helm-lint:
