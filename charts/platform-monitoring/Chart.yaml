@@ -1,15 +1,15 @@
 apiVersion: v2
 name: platform-monitoring
 description: Observability stack — Grafana, Loki, Promtail
-version: 0.4.5
+version: 0.4.6
 type: application
 dependencies:
   - name: grafana
-    version: "10.5.15"
+    version: 10.5.15
     repository: https://grafana.github.io/helm-charts
   - name: loki
-    version: "6.35.1"
+    version: 6.35.1
     repository: https://grafana.github.io/helm-charts
   - name: promtail
-    version: "6.17.1"
+    version: 6.17.1
     repository: https://grafana.github.io/helm-charts

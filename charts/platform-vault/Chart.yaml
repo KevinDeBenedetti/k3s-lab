@@ -1,9 +1,9 @@
 apiVersion: v2
 name: platform-vault
 description: Secret management — Vault (ESO managed separately)
-version: 0.4.5
+version: 0.4.6
 type: application
 dependencies:
   - name: vault
-    version: "0.29.1"
+    version: 0.29.1
     repository: https://helm.releases.hashicorp.com
