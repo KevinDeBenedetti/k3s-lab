@@ -25,13 +25,6 @@ grafana:
       label: grafana_dashboard
     datasources:
       enabled: true
-  additionalDataSources:
-    - name: Loki
-      uid: loki
-      type: loki
-      access: proxy
-      url: http://loki.monitoring.svc.cluster.local:3100
-      isDefault: false
   envFromSecrets:
     - name: grafana-oauth-secret
       optional: true
