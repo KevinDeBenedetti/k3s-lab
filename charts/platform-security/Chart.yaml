@@ -1,7 +1,7 @@
 apiVersion: v2
 name: platform-security
 description: Runtime security — Falco, Tetragon, Trivy Operator
-version: 0.4.6
+version: 0.5.0
 type: application
 dependencies:
   - name: falco
