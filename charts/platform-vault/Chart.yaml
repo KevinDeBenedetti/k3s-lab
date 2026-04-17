@@ -1,7 +1,7 @@
 apiVersion: v2
 name: platform-vault
 description: Secret management — Vault (ESO managed separately)
-version: 0.5.0
+version: 0.5.1
 type: application
 dependencies:
   - name: vault

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.5.0...v0.5.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* enhance security and logging configurations across k3s and WireGuard setups ([0d1eac2](https://github.com/KevinDeBenedetti/k3s-lab/commit/0d1eac25c639972c7f25201385e1c9ee2a9176ce))
+
 ## [0.5.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.6...v0.5.0) (2026-04-17)
 
 
