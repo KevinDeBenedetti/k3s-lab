@@ -49,7 +49,8 @@ hooks = [
 # ─── Docs link safety ────────────────────────────────────────────────────────
 [[repos]]
 repo = "https://github.com/KevinDeBenedetti/github-workflows"
-rev = "bfa0ca537a45e0d359ed3050005fe06a5ea11cbc"
+# renovate: datasource=github-tags depName=KevinDeBenedetti/github-workflows
+rev = "v0.6.0"
 hooks = [
   { id = "check-docs-links" },
 ]

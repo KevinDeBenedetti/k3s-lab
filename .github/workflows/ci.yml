@@ -67,30 +67,19 @@ jobs:
       # CodeQL disabled — no supported languages in this repo (Shell/YAML only)
       run-codeql: false
 
-  # ─── Helm chart linting ────────────────────────────────────────────────────
+  # ─── Helm chart linting ─────────────────────────────────────────────────────
   helm-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Install Helm
-        uses: azure/setup-helm@v5
-        with:
-          version: v3.17.0
-      - name: Lint all charts
-        run: |
-          for chart in charts/*/; do
-            if [ -f "$chart/Chart.yaml" ]; then
-              echo "::group::Linting $chart"
-              helm lint "$chart"
-              echo "::endgroup::"
-            fi
-          done
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-helm.yml@main
+    with:
+      run-lint: true
+      chart-paths: charts/*
+      helm-version: v3.17.0
 
   # ─── Resource limits check ────────────────────────────────────────────────
   resource-limits:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
       - name: Check resource limits in chart values
         run: ./scripts/check-resource-limits.sh
 

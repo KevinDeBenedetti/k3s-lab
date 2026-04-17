@@ -17,6 +17,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: release-charts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   packages: write
   contents: read
