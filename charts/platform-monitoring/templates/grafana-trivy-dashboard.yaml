@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-trivy-dashboard
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    grafana_dashboard: "1"
+data:
+  trivy-vulnerabilities.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "fixed", "fixedColor": "red"}, "unit": "short"},
+            "overrides": [
+              {"matcher": {"id": "byName", "options": "Critical"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "dark-red"}}]},
+              {"matcher": {"id": "byName", "options": "High"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+              {"matcher": {"id": "byName", "options": "Medium"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]},
+              {"matcher": {"id": "byName", "options": "Low"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]}
+            ]
+          },
+          "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+          "id": 1,
+          "targets": [
+            {
+              "expr": "sum(trivy_image_vulnerabilities{severity=\"Critical\"})",
+              "legendFormat": "Critical",
+              "refId": "A"
+            }
+          ],
+          "title": "Critical Vulnerabilities",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "fixed", "fixedColor": "red"}, "unit": "short"},
+            "overrides": []
+          },
+          "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+          "id": 2,
+          "targets": [
+            {
+              "expr": "sum(trivy_image_vulnerabilities{severity=\"High\"})",
+              "legendFormat": "High",
+              "refId": "A"
+            }
+          ],
+          "title": "High Vulnerabilities",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "fixed", "fixedColor": "orange"}, "unit": "short"},
+            "overrides": []
+          },
+          "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+          "id": 3,
+          "targets": [
+            {
+              "expr": "sum(trivy_image_vulnerabilities{severity=\"Medium\"})",
+              "legendFormat": "Medium",
+              "refId": "A"
+            }
+          ],
+          "title": "Medium Vulnerabilities",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "fixed", "fixedColor": "yellow"}, "unit": "short"},
+            "overrides": []
+          },
+          "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+          "id": 4,
+          "targets": [
+            {
+              "expr": "sum(trivy_image_vulnerabilities{severity=\"Low\"})",
+              "legendFormat": "Low",
+              "refId": "A"
+            }
+          ],
+          "title": "Low Vulnerabilities",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisBorderShow": false, "fillOpacity": 20, "lineWidth": 1, "stacking": {"mode": "normal"}}, "unit": "short"},
+            "overrides": []
+          },
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 6},
+          "id": 5,
+          "targets": [
+            {
+              "expr": "sum by (namespace, severity) (trivy_image_vulnerabilities)",
+              "legendFormat": "{{ "{{namespace}}" }} — {{ "{{severity}}" }}",
+              "refId": "A"
+            }
+          ],
+          "title": "Vulnerabilities by Namespace & Severity",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"},
+            "overrides": []
+          },
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 16},
+          "id": 6,
+          "options": {
+            "showHeader": true,
+            "sortBy": [{"desc": true, "displayName": "Critical"}]
+          },
+          "targets": [
+            {
+              "expr": "sum by (image_repository) (trivy_image_vulnerabilities{severity=\"Critical\"})",
+              "format": "table",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ],
+          "title": "Images with Critical Vulnerabilities",
+          "type": "table",
+          "transformations": [
+            {"id": "sortBy", "options": {"fields": {}, "sort": [{"desc": true, "field": "Value"}]}}
+          ]
+        }
+      ],
+      "refresh": "5m",
+      "schemaVersion": 39,
+      "tags": ["trivy", "security", "vulnerabilities"],
+      "templating": {"list": []},
+      "time": {"from": "now-1h", "to": "now"},
+      "title": "Trivy Vulnerabilities",
+      "uid": "trivy-vulnerabilities",
+      "version": 1
+    }

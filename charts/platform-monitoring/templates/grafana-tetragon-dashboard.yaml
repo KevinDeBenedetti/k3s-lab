@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-tetragon-dashboard
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    grafana_dashboard: "1"
+data:
+  tetragon-observability.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "fixed", "fixedColor": "blue"}, "unit": "short"},
+            "overrides": []
+          },
+          "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
+          "id": 1,
+          "targets": [
+            {
+              "expr": "sum(rate(tetragon_events_total[5m]))",
+              "legendFormat": "Events/s",
+              "refId": "A"
+            }
+          ],
+          "title": "Event Rate",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "fixed", "fixedColor": "green"}, "unit": "short"},
+            "overrides": []
+          },
+          "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0},
+          "id": 2,
+          "targets": [
+            {
+              "expr": "sum(rate(tetragon_events_total{event_type=\"process_exec\"}[5m]))",
+              "legendFormat": "Process Exec/s",
+              "refId": "A"
+            }
+          ],
+          "title": "Process Executions Rate",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "fixed", "fixedColor": "purple"}, "unit": "short"},
+            "overrides": []
+          },
+          "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0},
+          "id": 3,
+          "targets": [
+            {
+              "expr": "sum(rate(tetragon_policy_events_total[5m]))",
+              "legendFormat": "Policy Events/s",
+              "refId": "A"
+            }
+          ],
+          "title": "Policy Events Rate",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisBorderShow": false, "fillOpacity": 20, "lineWidth": 1, "stacking": {"mode": "normal"}}, "unit": "ops"},
+            "overrides": []
+          },
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 6},
+          "id": 4,
+          "targets": [
+            {
+              "expr": "sum by (event_type) (rate(tetragon_events_total[5m]))",
+              "legendFormat": "{{ "{{event_type}}" }}",
+              "refId": "A"
+            }
+          ],
+          "title": "Events by Type",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisBorderShow": false, "fillOpacity": 20, "lineWidth": 1, "stacking": {"mode": "normal"}}, "unit": "ops"},
+            "overrides": []
+          },
+          "gridPos": {"h": 10, "w": 12, "x": 0, "y": 16},
+          "id": 5,
+          "targets": [
+            {
+              "expr": "sum by (namespace) (rate(tetragon_events_total{event_type=\"process_exec\"}[5m]))",
+              "legendFormat": "{{ "{{namespace}}" }}",
+              "refId": "A"
+            }
+          ],
+          "title": "Process Executions by Namespace",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisBorderShow": false, "fillOpacity": 20, "lineWidth": 1, "stacking": {"mode": "none"}}, "unit": "bytes"},
+            "overrides": []
+          },
+          "gridPos": {"h": 10, "w": 12, "x": 12, "y": 16},
+          "id": 6,
+          "targets": [
+            {
+              "expr": "process_resident_memory_bytes{job=~\".*tetragon.*\"}",
+              "legendFormat": "Tetragon RSS",
+              "refId": "A"
+            }
+          ],
+          "title": "Tetragon Memory Usage",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["tetragon", "security", "ebpf"],
+      "templating": {"list": []},
+      "time": {"from": "now-1h", "to": "now"},
+      "title": "Tetragon Observability",
+      "uid": "tetragon-observability",
+      "version": 1
+    }

@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-falco-dashboard
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    grafana_dashboard: "1"
+data:
+  falco-alerts.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "fixed", "fixedColor": "red"}, "unit": "short"},
+            "overrides": []
+          },
+          "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
+          "id": 1,
+          "targets": [
+            {
+              "expr": "sum(increase(falcosidekick_inputs_total[24h]))",
+              "legendFormat": "Total (24h)",
+              "refId": "A"
+            }
+          ],
+          "title": "Falco Alerts (24h)",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"},
+            "overrides": [
+              {"matcher": {"id": "byName", "options": "emergency"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "dark-red"}}]},
+              {"matcher": {"id": "byName", "options": "critical"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+              {"matcher": {"id": "byName", "options": "warning"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]},
+              {"matcher": {"id": "byName", "options": "notice"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]}
+            ]
+          },
+          "gridPos": {"h": 6, "w": 16, "x": 8, "y": 0},
+          "id": 2,
+          "targets": [
+            {
+              "expr": "sum by (priority) (increase(falcosidekick_inputs_total[1h]))",
+              "legendFormat": "{{ "{{priority}}" }}",
+              "refId": "A"
+            }
+          ],
+          "title": "Alerts by Priority (1h)",
+          "type": "piechart"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {
+            "defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisBorderShow": false, "fillOpacity": 20, "lineWidth": 1, "stacking": {"mode": "normal"}}, "unit": "short"},
+            "overrides": []
+          },
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 6},
+          "id": 3,
+          "targets": [
+            {
+              "expr": "sum by (rule) (increase(falcosidekick_inputs_total[5m]))",
+              "legendFormat": "{{ "{{rule}}" }}",
+              "refId": "A"
+            }
+          ],
+          "title": "Alert Rate by Rule (5m)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"h": 12, "w": 24, "x": 0, "y": 16},
+          "id": 4,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "expr": "{namespace=\"falco\"} | json | priority =~ \"warning|error|critical|emergency\"",
+              "refId": "A"
+            }
+          ],
+          "title": "Live Falco Alerts (Loki)",
+          "type": "logs"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["falco", "security", "runtime"],
+      "templating": {"list": []},
+      "time": {"from": "now-6h", "to": "now"},
+      "title": "Falco Runtime Security",
+      "uid": "falco-runtime-security",
+      "version": 1
+    }
