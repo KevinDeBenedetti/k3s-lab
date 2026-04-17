@@ -30,7 +30,7 @@ K="${K:-kubectl --context "${KUBECONFIG_CONTEXT}"}"
 
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-monitoring}"
 GRAFANA_SECRET="${GRAFANA_SECRET:-grafana-oauth-secret}"
-GRAFANA_DEPLOYMENT="${GRAFANA_DEPLOYMENT:-kube-prometheus-stack-grafana}"
+GRAFANA_DEPLOYMENT="${GRAFANA_DEPLOYMENT:-monitoring-grafana}"
 
 # shellcheck disable=SC2086
 if ! $K get secret "$GRAFANA_SECRET" -n "$GRAFANA_NAMESPACE" >/dev/null 2>&1; then

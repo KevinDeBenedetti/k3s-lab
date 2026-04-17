@@ -28,7 +28,7 @@ K="${K:-kubectl --context "${KUBECONFIG_CONTEXT}"}"
 # Default Helm releases (override via HELM_RELEASES env var)
 DEFAULT_HELM_RELEASES=(
   "argocd argocd"
-  "kube-prometheus-stack monitoring"
+  "monitoring monitoring"
   "loki monitoring"
   "promtail monitoring"
   "vault vault"

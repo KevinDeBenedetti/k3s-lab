@@ -41,7 +41,7 @@ helm upgrade --install traefik traefik/traefik \
 |---|---|---|---|
 | `web` | 8000 | 80 | HTTP traffic |
 | `websecure` | 8443 | 443 | HTTPS + TLS |
-| `metrics` | 9100 | No | Prometheus scrape |
+| `metrics` | 9100 | No | Internal metrics endpoint |
 
 > **No global HTTP→HTTPS redirect.** A global redirect on the `web` entrypoint would intercept cert-manager's HTTP-01 ACME challenge before the solver can respond, breaking TLS issuance. Use a per-route `redirectScheme` middleware instead.
 

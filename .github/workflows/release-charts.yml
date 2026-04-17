@@ -1,15 +1,21 @@
 # =============================================================================
 # Release Charts — Package and publish Helm charts to GHCR (OCI)
 #
-# Triggered after release-please creates a GitHub release (tag v*).
-# Packages each chart in charts/ and pushes to ghcr.io.
+# Triggers:
+#   - workflow_run: automatically after CI passes on main (avoids GITHUB_TOKEN
+#     tag limitation — workflow_run is a platform event that always fires)
+#   - workflow_dispatch: manual re-run from Actions tab
+#
+# Only publishes charts whose version is NOT already on GHCR (idempotent).
 # =============================================================================
 name: Release Charts
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   packages: write
@@ -17,14 +23,18 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  # GHCR requires a lowercase owner — compute it at job level (see steps)
-  REGISTRY_PATH: ghcr.io/${{ github.repository_owner }}/charts
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set lowercase registry path
         id: registry
@@ -42,35 +52,71 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} \
             --username ${{ github.actor }} --password-stdin
 
-      - name: Package and push charts
+      - name: Package and push new chart versions
+        id: publish
         run: |
+          published=""
+          skipped=""
+
           for chart in charts/*/; do
             if [ -f "$chart/Chart.yaml" ]; then
               chart_name=$(basename "$chart")
-              echo "::group::Publishing $chart_name"
+              version=$(grep '^version:' "$chart/Chart.yaml" | awk '{print $2}')
+              registry_path="${{ steps.registry.outputs.path }}"
 
-              # Update dependencies
+              # Check if this version already exists on GHCR
+              if helm show chart "oci://${registry_path}/${chart_name}" --version "$version" > /dev/null 2>&1; then
+                echo "⏭️  $chart_name v$version already published — skipping"
+                skipped="${skipped}${chart_name}:${version} "
+                continue
+              fi
+
+              echo "::group::Publishing $chart_name v$version"
               helm dependency update "$chart"
-
-              # Package
               helm package "$chart" -d /tmp/charts/
-
-              # Push to GHCR
               pkg=$(ls /tmp/charts/"${chart_name}"-*.tgz)
-              helm push "$pkg" "oci://${{ steps.registry.outputs.path }}"
-
+              helm push "$pkg" "oci://${registry_path}"
+              published="${published}${chart_name}:${version} "
               echo "::endgroup::"
             fi
           done
 
+          echo "published=$published" >> "$GITHUB_OUTPUT"
+          echo "skipped=$skipped" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$published" ]; then
+            echo "ℹ️  No new chart versions to publish"
+          else
+            echo "✅ Published: $published"
+          fi
+
       - name: Summary
         run: |
-          echo "## Published Charts" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Chart Release Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          for chart in charts/*/; do
-            if [ -f "$chart/Chart.yaml" ]; then
-              name=$(basename "$chart")
-              version=$(grep '^version:' "$chart/Chart.yaml" | awk '{print $2}')
-              echo "- **$name** v$version → \`${{ steps.registry.outputs.path }}/$name\`" >> "$GITHUB_STEP_SUMMARY"
-            fi
-          done
+
+          published="${{ steps.publish.outputs.published }}"
+          skipped="${{ steps.publish.outputs.skipped }}"
+
+          if [ -n "$published" ]; then
+            echo "### ✅ Published" >> "$GITHUB_STEP_SUMMARY"
+            for entry in $published; do
+              name="${entry%%:*}"
+              ver="${entry##*:}"
+              echo "- **$name** v$ver → \`${{ steps.registry.outputs.path }}/$name\`" >> "$GITHUB_STEP_SUMMARY"
+            done
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ -n "$skipped" ]; then
+            echo "### ⏭️ Already published (skipped)" >> "$GITHUB_STEP_SUMMARY"
+            for entry in $skipped; do
+              name="${entry%%:*}"
+              ver="${entry##*:}"
+              echo "- $name v$ver" >> "$GITHUB_STEP_SUMMARY"
+            done
+          fi
+
+          if [ -z "$published" ] && [ -z "$skipped" ]; then
+            echo "No charts found." >> "$GITHUB_STEP_SUMMARY"
+          fi

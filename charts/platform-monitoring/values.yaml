@@ -1,88 +1,40 @@
 # VPS-optimized monitoring defaults (8GB single-node)
-kube-prometheus-stack:
-  fullnameOverride: kube-prometheus-stack
-  grafana:
-    fullnameOverride: kube-prometheus-stack-grafana
-    admin:
-      existingSecret: grafana-admin-secret
-      userKey: username
-      passwordKey: password
-    persistence:
+grafana:
+  fullnameOverride: monitoring-grafana
+  admin:
+    existingSecret: grafana-admin-secret
+    userKey: username
+    passwordKey: password
+  persistence:
+    enabled: true
+    size: 2Gi
+  initChownData:
+    enabled: false
+  ingress:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 150Mi
+    limits:
+      cpu: 100m
+      memory: 300Mi
+  sidecar:
+    dashboards:
       enabled: true
-      size: 2Gi
-    initChownData:
-      enabled: false
-    ingress:
-      enabled: false
-    resources:
-      requests:
-        cpu: 50m
-        memory: 150Mi
-      limits:
-        cpu: 100m
-        memory: 300Mi
-    sidecar:
-      dashboards:
-        enabled: true
-        label: grafana_dashboard
-      datasources:
-        enabled: true
-    additionalDataSources:
-      - name: Loki
-        uid: loki
-        type: loki
-        access: proxy
-        url: http://loki.monitoring.svc.cluster.local:3100
-        isDefault: false
-    envFromSecrets:
-      - name: grafana-oauth-secret
-        optional: true
-
-  prometheus:
-    prometheusSpec:
-      retention: 7d
-      retentionSize: "5GB"
-      walCompression: true
-      scrapeInterval: "60s"
-      serviceMonitorSelectorNilUsesHelmValues: false
-      serviceMonitorSelector: {}
-      serviceMonitorNamespaceSelector: {}
-      podMonitorSelectorNilUsesHelmValues: false
-      podMonitorSelector: {}
-      podMonitorNamespaceSelector: {}
-      ruleSelectorNilUsesHelmValues: false
-      storageSpec:
-        volumeClaimTemplate:
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 8Gi
-      resources:
-        requests:
-          cpu: 50m
-          memory: 128Mi
-        limits:
-          cpu: 300m
-          memory: 400Mi
-
-  alertmanager:
-    enabled: false
-
-  prometheus-node-exporter:
-    fullnameOverride: kube-prometheus-stack-prometheus-node-exporter
-    resources:
-      requests:
-        cpu: 50m
-        memory: 32Mi
-      limits:
-        cpu: 100m
-        memory: 64Mi
-
-  kube-state-metrics:
-    fullnameOverride: kube-prometheus-stack-kube-state-metrics
-    enabled: false
+      label: grafana_dashboard
+    datasources:
+      enabled: true
+  additionalDataSources:
+    - name: Loki
+      uid: loki
+      type: loki
+      access: proxy
+      url: http://loki.monitoring.svc.cluster.local:3100
+      isDefault: false
+  envFromSecrets:
+    - name: grafana-oauth-secret
+      optional: true
 
 loki:
   fullnameOverride: loki

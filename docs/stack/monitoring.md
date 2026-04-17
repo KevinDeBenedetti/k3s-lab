@@ -1,12 +1,12 @@
 # Monitoring & Observability
 
-The observability stack provides metrics, dashboards, and centralized logging for the entire cluster.
+The observability stack provides dashboards and centralized logging for the entire cluster.
 
 ## Stack components
 
 | Component | Role | Helm chart |
 |---|---|---|
-| [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) | Prometheus + Grafana + Alertmanager + exporters | `prometheus-community/kube-prometheus-stack` |
+| [Grafana](https://grafana.com/grafana/) | Visualization dashboards | `grafana/grafana` |
 | [Loki](https://grafana.com/oss/loki/) | Centralized log storage | `grafana/loki` |
 | [Promtail](https://grafana.com/docs/loki/latest/send-data/promtail/) | Log collector (DaemonSet) | `grafana/promtail` |
 
@@ -18,15 +18,15 @@ The observability stack provides metrics, dashboards, and centralized logging fo
 ┌──────────────────────────────────────────────────────────┐
 │                   monitoring namespace                    │
 │                                                          │
-│  ┌──────────────┐    ┌───────────┐    ┌──────────────┐  │
-│  │  Prometheus  │◄───│ Exporters │    │    Loki      │  │
-│  │  (metrics)   │    │ (node,    │    │  (log store) │  │
-│  └──────┬───────┘    │  cadvisor)│    └──────▲───────┘  │
-│         │            └───────────┘           │          │
-│  ┌──────▼───────┐                    ┌───────┴──────┐   │
-│  │   Grafana    │◄───────────────────│   Promtail   │   │
-│  │  (dashboards)│                    │  (DaemonSet) │   │
-│  └──────────────┘                    └──────────────┘   │
+│  ┌──────────────┐                    ┌──────────────┐   │
+│  │   Grafana    │◄───────────────────│     Loki     │   │
+│  │  (dashboards)│                    │  (log store) │   │
+│  └──────────────┘                    └──────▲───────┘   │
+│                                             │           │
+│                                      ┌──────┴──────┐   │
+│                                      │   Promtail  │   │
+│                                      │  (DaemonSet)│   │
+│                                      └─────────────┘   │
 │                                                          │
 └──────────────────────────────────────────────────────────┘
          ▲ HTTPS via Traefik IngressRoute + cert-manager
@@ -58,20 +58,6 @@ make deploy-monitoring
 ```
 
 This deploys the monitoring stack via the `platform-monitoring` Helm chart (managed by ArgoCD).
-The chart installs:
-
----
-
-## kube-prometheus-stack
-
-The `kube-prometheus-stack` Helm chart installs:
-
-- **Prometheus** — metrics collection and storage
-- **Grafana** — visualization dashboards
-- **Alertmanager** — alert routing and silencing
-- **kube-state-metrics** — Kubernetes object metrics
-- **node-exporter** — host-level metrics (CPU, memory, disk)
-- **Prometheus Operator** — manages `ServiceMonitor` and `PrometheusRule` CRDs
 
 ### Grafana access
 
@@ -79,20 +65,6 @@ The `kube-prometheus-stack` Helm chart installs:
 URL:      https://<GRAFANA_DOMAIN>
 Username: admin
 Password: <GRAFANA_PASSWORD>
-```
-
-### Prometheus access (port-forward)
-
-```bash
-kubectl port-forward svc/prometheus-operated -n monitoring 9090:9090
-# Open: http://localhost:9090
-```
-
-### Alertmanager access (port-forward)
-
-```bash
-kubectl port-forward svc/alertmanager-operated -n monitoring 9093:9093
-# Open: http://localhost:9093
 ```
 
 ---
@@ -104,7 +76,7 @@ All provider settings are injected at runtime via a Kubernetes Secret.
 
 ### How it works
 
-The `kube-prometheus-values.yaml` mounts `grafana-oauth-secret` as an **optional** secret:
+The monitoring values mount `grafana-oauth-secret` as an **optional** secret:
 
 - **Secret absent** → Grafana starts normally with admin/password login
 - **Secret present** → Grafana reads all `GF_AUTH_GENERIC_OAUTH_*` env vars from it
@@ -137,7 +109,7 @@ Entra ID, etc.) simply by creating the secret with the right values.
 2. Restart Grafana:
 
    ```bash
-   kubectl rollout restart deployment/kube-prometheus-stack-grafana -n monitoring
+   kubectl rollout restart deployment/monitoring-grafana -n monitoring
    ```
 
 ### Disable OAuth2
@@ -146,7 +118,7 @@ Delete the secret and restart Grafana to revert to admin/password login:
 
 ```bash
 kubectl delete secret grafana-oauth-secret -n monitoring
-kubectl rollout restart deployment/kube-prometheus-stack-grafana -n monitoring
+kubectl rollout restart deployment/monitoring-grafana -n monitoring
 ```
 
 ---
@@ -190,14 +162,9 @@ Configuration (`charts/platform-monitoring/values.yaml` under the `promtail:` ke
 
 ## Grafana dashboards
 
-The following dashboards are available after deploy:
-
 | Dashboard | Source | What it shows |
 |---|---|---|
-| Kubernetes cluster overview | kube-prometheus built-in | Node CPU/memory, pod counts |
-| Node exporter | kube-prometheus built-in | Host CPU, memory, disk, network |
-| Traefik | ServiceMonitor auto-discovery | Request rates, latencies, errors |
-| Logs — Errors | `grafana-logs-dashboard.yaml` | Error-focused log explorer |
+| Logs — Errors | `grafana-logs-dashboard.yaml` | Error-focused log explorer (Loki) |
 
 ### Import additional dashboards
 
@@ -205,47 +172,19 @@ Grafana has a large community dashboard library. Import by ID from **Dashboards 
 
 | ID | Name |
 |---|---|
-| `315` | Kubernetes cluster monitoring |
-| `1860` | Node exporter full |
 | `13713` | Loki log summary |
-| `17501` | Traefik |
-
----
-
-## Traefik metrics integration
-
-Traefik exposes Prometheus metrics on port `9100`. The `serviceMonitor` in `traefik-values.yaml` creates a `ServiceMonitor` resource that tells Prometheus Operator to scrape Traefik automatically:
-
-```yaml
-metrics:
-  prometheus:
-    serviceMonitor:
-      enabled: true
-      namespace: ingress
-      jobLabel: traefik
-      interval: 30s
-```
 
 ---
 
 ## Upgrade
 
-```bash
-helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-  --version <NEW_VERSION> \
-  --namespace monitoring \
-  --values charts/platform-monitoring/values.yaml \
-  --reuse-values
-```
-
-Update the version in `charts/platform-monitoring/Chart.yaml` and let ArgoCD sync.
+Update the chart version in `charts/platform-monitoring/Chart.yaml` and let ArgoCD sync.
 
 ---
 
 ## References
 
-- [kube-prometheus-stack chart](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
+- [Grafana documentation](https://grafana.com/docs/grafana/latest/)
 - [Loki documentation](https://grafana.com/docs/loki/latest/)
 - [Promtail documentation](https://grafana.com/docs/loki/latest/send-data/promtail/)
 - [LogQL query language](https://grafana.com/docs/loki/latest/query/)
-- [Grafana documentation](https://grafana.com/docs/grafana/latest/)

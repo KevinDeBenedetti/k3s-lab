@@ -45,7 +45,7 @@ cp .env.example .env
 |---|---|---|
 | `TRAEFIK_CHART_VERSION` | `34.4.0` | Traefik Helm chart version |
 | `CERT_MANAGER_VERSION` | `v1.17.1` | cert-manager Helm chart version |
-| `KUBE_PROMETHEUS_VERSION` | `82.10.3` | kube-prometheus-stack chart version |
+| `GRAFANA_VERSION` | `10.5.15` | Grafana Helm chart version |
 | `LOKI_VERSION` | `6.35.1` | Loki Helm chart version |
 | `PROMTAIL_VERSION` | `6.17.1` | Promtail Helm chart version |
 

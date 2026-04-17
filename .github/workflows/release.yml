@@ -3,7 +3,7 @@
 #
 # On push to main: creates/updates a release PR with changelog.
 # On merge of release PR: creates a GitHub release + tag.
-# Then triggers release-charts.yml to publish OCI charts.
+# Chart publishing is handled by release-charts.yml via workflow_run on CI.
 # =============================================================================
 name: Release
 

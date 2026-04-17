@@ -151,7 +151,7 @@ make deploy-monitoring
 ```
 
 This deploys:
-1. **kube-prometheus-stack** — Prometheus + Grafana + Alertmanager
+1. **Grafana** — visualization dashboards
 2. **Loki** — centralized log storage
 3. **Promtail** — log collector DaemonSet
 4. **Grafana IngressRoute** — HTTPS at `GRAFANA_DOMAIN`
@@ -174,7 +174,6 @@ All pods should be `Running` or `Completed`.
 |---|---|---|
 | Traefik dashboard | `https://DASHBOARD_DOMAIN/dashboard/` | `admin` / `DASHBOARD_PASSWORD` |
 | Grafana | `https://GRAFANA_DOMAIN` | `admin` / `GRAFANA_PASSWORD` |
-| Prometheus | `kubectl port-forward svc/prometheus-operated -n monitoring 9090:9090` | — |
 
 ---
 

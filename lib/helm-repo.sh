@@ -4,7 +4,7 @@
 # Usage:
 #   _lib helm-repo.sh
 #   helm_add_repo traefik https://helm.traefik.io/traefik
-#   helm_add_repo prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm_add_repo grafana https://grafana.github.io/helm-charts
 # ──────────────────────────────────────────────────────────────────────────────
 
 helm_add_repo() {
