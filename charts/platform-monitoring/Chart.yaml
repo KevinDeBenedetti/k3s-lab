@@ -1,7 +1,7 @@
 apiVersion: v2
 name: platform-monitoring
 description: Observability stack — Grafana, Loki, Promtail
-version: 0.5.0
+version: 0.5.1
 type: application
 dependencies:
   - name: grafana

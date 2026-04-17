@@ -1,5 +1,5 @@
 apiVersion: v2
 name: platform-base
 description: Base platform resources — namespaces, LimitRange, shared RBAC
-version: 0.5.0
+version: 0.5.1
 type: application
