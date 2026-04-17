@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.6...v0.5.0) (2026-04-17)
+
+
+### Features
+
+* add Grafana Loki datasource configuration and remove legacy datasource entries ([4c3e8d6](https://github.com/KevinDeBenedetti/k3s-lab/commit/4c3e8d630940f251db15eb0f71fc448d7e10a039))
+
 ## [0.4.6](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.5...v0.4.6) (2026-04-17)
 
 
