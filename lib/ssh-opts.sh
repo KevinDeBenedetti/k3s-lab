@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # lib/ssh-opts.sh — Build the SSH_OPTS array from environment variables.
 # Source this file, then call: build_ssh_opts [port] [StrictHostKeyChecking] [ConnectTimeout]
 #

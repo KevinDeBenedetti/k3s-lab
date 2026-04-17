@@ -64,7 +64,7 @@ jobs:
       run-node-audit: false
       run-python-audit: false
       run-secret-scan: true
-      run-codeql: false
+      run-codeql: true
 
   # ─── Helm chart linting ────────────────────────────────────────────────────
   helm-lint:

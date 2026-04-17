@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # lib/load-env.sh — Load a .env file without overwriting already-set variables.
 # Source this file, then call: load_env [path/to/.env]
 #

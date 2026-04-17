@@ -14,6 +14,9 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: app-ingress
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: k3s-lab
 spec:
   entryPoints:
     - websecure
@@ -32,6 +35,9 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: app-http-redirect
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: k3s-lab
 spec:
   entryPoints:
     - web
@@ -50,6 +56,9 @@ apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: redirect-to-https
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: k3s-lab
 spec:
   redirectScheme:
     scheme: https
@@ -61,6 +70,9 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: app-tls
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: k3s-lab
 spec:
   secretName: app-tls
   issuerRef:

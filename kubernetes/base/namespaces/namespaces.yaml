@@ -9,6 +9,8 @@ metadata:
   name: apps
   labels:
     kubernetes.io/metadata.name: apps
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: k3s-lab
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
@@ -20,6 +22,8 @@ metadata:
   name: ingress
   labels:
     kubernetes.io/metadata.name: ingress
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: k3s-lab
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
@@ -31,6 +35,8 @@ metadata:
   name: cert-manager
   labels:
     kubernetes.io/metadata.name: cert-manager
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: k3s-lab
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
@@ -42,6 +48,8 @@ metadata:
   name: monitoring
   labels:
     kubernetes.io/metadata.name: monitoring
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: k3s-lab
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
@@ -53,6 +61,8 @@ metadata:
   name: vault
   labels:
     kubernetes.io/metadata.name: vault
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: k3s-lab
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
@@ -64,6 +74,8 @@ metadata:
   name: external-dns
   labels:
     kubernetes.io/metadata.name: external-dns
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: k3s-lab
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted

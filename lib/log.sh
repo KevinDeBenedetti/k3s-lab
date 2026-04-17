@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # lib/log.sh — Shared logging helpers for infra scripts.
 # Source this file at the top of any script:
 #   source "$(dirname "$0")/../lib/log.sh"

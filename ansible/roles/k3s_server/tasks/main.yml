@@ -8,7 +8,7 @@
   ansible.builtin.command: k3s --version
   register: k3s_installed_version
   changed_when: false
-  failed_when: false
+  failed_when: k3s_installed_version.rc not in [0, 1, 2, 127]
   when: k3s_binary.stat.exists
 
 - name: Download k3s installer

@@ -11,7 +11,17 @@ falco:
       memory: 512Mi
 
 falcosidekick:
-  enabled: false
+  enabled: true
+  config:
+    webhook:
+      address: ""       # override in infra-private (e.g. Slack, PagerDuty URL)
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
 
 tetragon:
   enabled: true
@@ -32,7 +42,7 @@ trivy-operator:
   trivy:
     ignoreUnfixed: true
   nodeCollector:
-    enabled: false
+    enabled: true
   resources:
     requests:
       cpu: 200m
