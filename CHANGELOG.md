@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.6](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.5...v0.4.6) (2026-04-17)
+
+
+### Bug Fixes
+
+* update Helm chart versions to 0.4.5, refactor CI workflows, and enhance Grafana OAuth deployment ([74efec3](https://github.com/KevinDeBenedetti/k3s-lab/commit/74efec3406ea0ca0519af0e12ebc4afe8f52f24b))
+
 ## [0.4.5](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.4.4...v0.4.5) (2026-04-16)
 
 
