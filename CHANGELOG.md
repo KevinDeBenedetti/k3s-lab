@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.7.1...v0.7.2) (2026-04-18)
+
+
+### Bug Fixes
+
+* update Prometheus queries in Grafana Falco dashboard to use correct metric names ([e0e50c6](https://github.com/KevinDeBenedetti/k3s-lab/commit/e0e50c605c818743ddea21953bf74d028ed7b9b7))
+
 ## [0.7.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.7.0...v0.7.1) (2026-04-18)
 
 
