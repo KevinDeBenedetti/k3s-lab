@@ -1,0 +1,9 @@
+apiVersion: v2
+name: platform-traefik
+description: Ingress controller — Traefik with CRDs and dashboard
+version: 0.1.0
+type: application
+dependencies:
+  - name: traefik
+    version: 39.0.0
+    repository: https://traefik.github.io/charts
