@@ -1,7 +1,7 @@
 apiVersion: v2
 name: platform-cert-manager
 description: TLS certificate management — cert-manager with CRDs
-version: 0.1.0
+version: 0.7.0
 type: application
 dependencies:
   - name: cert-manager
