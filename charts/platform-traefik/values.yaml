@@ -3,20 +3,20 @@
 # Override per-cluster in infra/platform/traefik/values.yaml
 # =============================================================================
 traefik:
-  fullnameOverride: traefik
-
-  # Install Traefik CRDs (IngressRoute, Middleware, etc.)
   ingressRoute:
     dashboard:
       enabled: false
 
-  # Entrypoints
+  # HTTP → HTTPS redirect
   ports:
     web:
       port: 8000
       exposedPort: 80
-      redirectTo:
-        port: websecure
+      http:
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
     websecure:
       port: 8443
       exposedPort: 443
