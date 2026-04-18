@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.7.0...v0.7.1) (2026-04-18)
+
+
+### Bug Fixes
+
+* remove unnecessary issues permission from release workflow ([99d4945](https://github.com/KevinDeBenedetti/k3s-lab/commit/99d4945daaf8775397bf31f1d36ece15af1be817))
+* restore issues permission in release workflow ([78a703a](https://github.com/KevinDeBenedetti/k3s-lab/commit/78a703aba90e511f21f54c3390b297ca20fd1523))
+
 ## [0.7.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.6.0...v0.7.0) (2026-04-18)
 
 
