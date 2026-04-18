@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.6.0...v0.7.0) (2026-04-18)
+
+
+### Features
+
+* add platform-traefik Helm chart with initial configuration and values ([00f3c34](https://github.com/KevinDeBenedetti/k3s-lab/commit/00f3c34fc2330bcf8437e06d91489258735517dd))
+
+
+### Bug Fixes
+
+* update release-please config to include platform-cert-manager and platform-external-secrets, and update platform-traefik version to 0.1.1 ([610ff0b](https://github.com/KevinDeBenedetti/k3s-lab/commit/610ff0b7bc61cc62ea88cdcbd1ed26c67a6128b9))
+* update Traefik values.yaml to correct HTTP to HTTPS redirection configuration ([9aeaf00](https://github.com/KevinDeBenedetti/k3s-lab/commit/9aeaf00a8f50e3886fa655bbe0812a9f28f57f0c))
+
 ## [0.6.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.5.3...v0.6.0) (2026-04-17)
 
 
