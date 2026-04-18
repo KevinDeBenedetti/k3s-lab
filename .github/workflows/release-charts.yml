@@ -76,7 +76,17 @@ jobs:
               fi
 
               echo "::group::Publishing $chart_name v$version"
-              helm dependency update "$chart"
+              for attempt in 1 2 3 4 5; do
+                if helm dependency update "$chart"; then
+                  break
+                fi
+                echo "⚠️  helm dependency update failed (attempt $attempt/5) — retrying in 10s…"
+                sleep 10
+                if [ "$attempt" -eq 5 ]; then
+                  echo "::error::helm dependency update failed after 5 attempts"
+                  exit 1
+                fi
+              done
               helm package "$chart" -d /tmp/charts/
               pkg=$(ls /tmp/charts/"${chart_name}"-*.tgz)
               helm push "$pkg" "oci://${registry_path}"
