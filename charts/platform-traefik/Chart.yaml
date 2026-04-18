@@ -1,7 +1,7 @@
 apiVersion: v2
 name: platform-traefik
 description: Ingress controller — Traefik with CRDs and dashboard
-version: 0.7.0
+version: 0.7.1
 type: application
 dependencies:
   - name: traefik
