@@ -24,7 +24,7 @@ data:
           "id": 1,
           "targets": [
             {
-              "expr": "sum(increase(falcosidekick_inputs_total[24h]))",
+              "expr": "sum(increase(falcosecurity_falcosidekick_inputs_total[24h]))",
               "legendFormat": "Total (24h)",
               "refId": "A"
             }
@@ -47,7 +47,7 @@ data:
           "id": 2,
           "targets": [
             {
-              "expr": "sum by (priority) (increase(falcosidekick_inputs_total[1h]))",
+              "expr": "sum by (priority) (increase(falcosecurity_falcosidekick_inputs_total[1h]))",
               "legendFormat": "{{ "{{priority}}" }}",
               "refId": "A"
             }
@@ -65,7 +65,7 @@ data:
           "id": 3,
           "targets": [
             {
-              "expr": "sum by (rule) (increase(falcosidekick_inputs_total[5m]))",
+              "expr": "sum by (rule) (increase(falcosecurity_falcosidekick_inputs_total[5m]))",
               "legendFormat": "{{ "{{rule}}" }}",
               "refId": "A"
             }
