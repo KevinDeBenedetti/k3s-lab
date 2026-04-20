@@ -1,9 +1,9 @@
 apiVersion: v2
 name: platform-external-secrets
 description: External secrets management — External Secrets Operator
-version: 0.7.3
+version: 0.8.0
 type: application
 dependencies:
   - name: external-secrets
-    version: 0.14.3
+    version: 2.3.0
     repository: https://charts.external-secrets.io
