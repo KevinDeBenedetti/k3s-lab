@@ -1,4 +1,14 @@
 # VPS-optimized monitoring defaults (8GB single-node)
+
+# ─── Dashboard toggles (disable dashboards for components not deployed) ───
+dashboards:
+  falco:
+    enabled: true
+  tetragon:
+    enabled: true
+  trivy:
+    enabled: true
+
 grafana:
   fullnameOverride: monitoring-grafana
   admin:
