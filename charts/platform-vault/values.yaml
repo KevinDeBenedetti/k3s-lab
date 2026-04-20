@@ -56,7 +56,7 @@ vault:
 
         service_registration "kubernetes" {}
 
-        disable_mlock = false
+        disable_mlock = true
   ui:
     enabled: true
     serviceType: ClusterIP
