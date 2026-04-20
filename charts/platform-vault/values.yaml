@@ -8,7 +8,7 @@ vault:
   server:
     image:
       repository: hashicorp/vault
-      tag: "1.19.0"
+      tag: "1.21.2"
       pullPolicy: IfNotPresent
     ha:
       enabled: false
