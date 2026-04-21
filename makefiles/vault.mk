@@ -47,9 +47,9 @@ vault-unseal: ## Unseal Vault after a node reboot (requires VAULT_UNSEAL_KEY_1 +
 	$(call require-var,VAULT_UNSEAL_KEY_2)
 	@echo "$(YELLOW)→ Unsealing Vault...$(RESET)"
 	@$(K) exec -n vault $(VAULT_POD) -- \
-	  vault operator unseal $(VAULT_UNSEAL_KEY_1)
+	  env VAULT_SKIP_VERIFY=true vault operator unseal $(VAULT_UNSEAL_KEY_1) | grep -E "Sealed|Progress"
 	@$(K) exec -n vault $(VAULT_POD) -- \
-	  vault operator unseal $(VAULT_UNSEAL_KEY_2)
+	  env VAULT_SKIP_VERIFY=true vault operator unseal $(VAULT_UNSEAL_KEY_2) | grep -E "Sealed|Progress"
 	@echo "$(GREEN)✅ Vault unsealed$(RESET)"
 
 vault-configure: ## (Re)create Vault policies and Kubernetes roles (idempotent)
@@ -76,7 +76,7 @@ vault-seed: ## Seed secrets into Vault (reads from .env, prompts only if missing
 	 [ -z "$$_oidc_secret" ] && read -p "  OIDC_CLIENT_SECRET: " _oidc_secret < /dev/tty; \
 	 [ -n "$$_oidc_id" ] && \
 	   $(K) exec -n vault $(VAULT_POD) -- \
-	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
+	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) VAULT_SKIP_VERIFY=true \
 	     vault kv put secret/argocd/oidc \
 	       clientID="$$_oidc_id" \
 	       clientSecret="$$_oidc_secret" \
@@ -87,7 +87,7 @@ vault-seed: ## Seed secrets into Vault (reads from .env, prompts only if missing
 	 [ -z "$$_grafana_pw" ] && read -p "  GRAFANA_PASSWORD  : " _grafana_pw < /dev/tty; \
 	 [ -n "$$_grafana_pw" ] && \
 	   $(K) exec -n vault $(VAULT_POD) -- \
-	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
+	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) VAULT_SKIP_VERIFY=true \
 	     vault kv put secret/grafana/admin \
 	       username="admin" \
 	       password="$$_grafana_pw" \
@@ -106,7 +106,7 @@ vault-seed: ## Seed secrets into Vault (reads from .env, prompts only if missing
 	 [ -z "$$_gf_api_url" ] && read -p "  OIDC_API_URL      : " _gf_api_url < /dev/tty; \
 	 [ -n "$$_gf_id" ] && \
 	   $(K) exec -n vault $(VAULT_POD) -- \
-	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
+	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) VAULT_SKIP_VERIFY=true \
 	     vault kv put secret/grafana/oauth \
 	       GF_AUTH_GENERIC_OAUTH_ENABLED="true" \
 	       GF_AUTH_GENERIC_OAUTH_NAME="$(OIDC_PROVIDER_NAME)" \
@@ -132,7 +132,7 @@ vault-seed: ## Seed secrets into Vault (reads from .env, prompts only if missing
 	 [ -z "$$_dash_users" ] && read -p "  DASHBOARD_USERS (htpasswd): " _dash_users < /dev/tty; \
 	 [ -n "$$_dash_users" ] && \
 	   $(K) exec -n vault $(VAULT_POD) -- \
-	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) \
+	     env VAULT_TOKEN=$(VAULT_ROOT_TOKEN) VAULT_SKIP_VERIFY=true \
 	     vault kv put secret/traefik/dashboard \
 	       users="$$_dash_users" \
 	  && echo "  ✓ traefik/dashboard" \
@@ -151,7 +151,7 @@ vault-status: ## Show Vault seal status, ESO sync status, and managed secrets
 	@echo ""
 	@echo "$(CYAN)── Vault ────────────────────────────────────────────────────────$(RESET)"
 	@$(K) exec -n vault $(VAULT_POD) -- \
-	  vault status 2>/dev/null || echo "$(RED)❌ Vault pod not reachable$(RESET)"
+	  env VAULT_SKIP_VERIFY=true vault status 2>/dev/null || echo "$(RED)❌ Vault pod not reachable$(RESET)"
 	@echo ""
 	@echo "$(CYAN)── External Secrets (sync status) ──────────────────────────────$(RESET)"
 	@$(K) get externalsecrets -A \

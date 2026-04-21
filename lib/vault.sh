@@ -15,6 +15,11 @@ KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-lab}"
 VAULT_NAMESPACE="${VAULT_NAMESPACE:-vault}"
 VAULT_POD="${VAULT_POD:-vault-0}"
 VAULT_TOKEN="${VAULT_TOKEN:-${VAULT_ROOT_TOKEN:-}}"
+# Vault's self-signed TLS cert (CN=vault.<ns>.svc.cluster.local) is not trusted
+# by the pod's system CA bundle, so every `vault` CLI call from inside the pod
+# fails with x509 errors. Skip verification — safe since we only talk to
+# localhost:8200 over the pod loopback. Override by exporting VAULT_SKIP_VERIFY=false.
+VAULT_SKIP_VERIFY="${VAULT_SKIP_VERIFY:-true}"
 
 # kubectl shorthand
 K="${K:-kubectl --context "${KUBECONFIG_CONTEXT}"}"
@@ -24,7 +29,7 @@ K="${K:-kubectl --context "${KUBECONFIG_CONTEXT}"}"
 vault_exec() {
   # shellcheck disable=SC2086
   $K exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-    -- env VAULT_TOKEN="${VAULT_TOKEN}" vault "$@"
+    -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY="${VAULT_SKIP_VERIFY}" vault "$@"
 }
 
 # vault_exec_stdin <vault-args...>
@@ -32,7 +37,7 @@ vault_exec() {
 vault_exec_stdin() {
   # shellcheck disable=SC2086
   $K exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-    -- env VAULT_TOKEN="${VAULT_TOKEN}" vault "$@"
+    -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY="${VAULT_SKIP_VERIFY}" vault "$@"
 }
 
 # vault_kv_put <path> <key=value...>

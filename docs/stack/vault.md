@@ -154,7 +154,7 @@ make vault-unseal   # requires VAULT_UNSEAL_KEY_1 + VAULT_UNSEAL_KEY_2 in .env
 
 Or interactively:
 ```bash
-kubectl exec -n vault vault-0 -- vault operator unseal
+kubectl exec -it -n vault vault-0 -- env VAULT_SKIP_VERIFY=true vault operator unseal
 ```
 
 ---
@@ -164,7 +164,7 @@ kubectl exec -n vault vault-0 -- vault operator unseal
 1. Write to Vault:
    ```bash
    kubectl exec -n vault vault-0 -- \
-     env VAULT_TOKEN=<root-token> \
+     env VAULT_TOKEN=<root-token> VAULT_SKIP_VERIFY=true \
      vault kv put secret/myapp/config \
        DB_PASSWORD=secret123 \
        API_KEY=key456

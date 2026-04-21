@@ -38,11 +38,11 @@ VAULT_TOKEN="${VAULT_ROOT_TOKEN}"
 # ── Helpers ───────────────────────────────────────────────────────────────────
 vault_exec() {
   kubectl --context "${KUBECONFIG_CONTEXT}" exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-    -- env VAULT_TOKEN="${VAULT_TOKEN}" vault "$@"
+    -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
 }
 vault_exec_stdin() {
   kubectl --context "${KUBECONFIG_CONTEXT}" exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-    -- env VAULT_TOKEN="${VAULT_TOKEN}" vault "$@"
+    -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
 }
 
 # ── 1. ESO read policy + Kubernetes role ──────────────────────────────────────
