@@ -163,11 +163,11 @@ kubectl exec -it -n vault vault-0 -- env VAULT_SKIP_VERIFY=true vault operator u
 
 1. Write to Vault:
    ```bash
-   kubectl exec -n vault vault-0 -- \
-     env VAULT_TOKEN=<root-token> VAULT_SKIP_VERIFY=true \
-     vault kv put secret/myapp/config \
-       DB_PASSWORD=secret123 \
-       API_KEY=key456
+    kubectl exec -n vault vault-0 -- \
+      env VAULT_TOKEN="${VAULT_TOKEN:?set-from-vault-init}" VAULT_SKIP_VERIFY=true \
+      vault kv put secret/myapp/config \
+        DB_PASSWORD=secret123 \
+        API_KEY=key456
    ```
 
 2. Create an ExternalSecret manifest:
