@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# =============================================================================
+# kine-vacuum — reclaim disk space from the k3s kine SQLite backing store
+# =============================================================================
+# k3s ships with kine (https://github.com/k3s-io/kine) as its default datastore
+# when embedded etcd is not used. Kine auto-compacts rows every 5 minutes, but
+# SQLite never returns freelist pages to the OS without a VACUUM. On busy
+# clusters `state.db` can grow to tens of GiB while holding only a few
+# thousand live rows.
+#
+# This script:
+#   1. Exits early if DB size is below $KINE_VACUUM_THRESHOLD_BYTES
+#   2. Stops k3s, VACUUMs via `VACUUM INTO` (atomic, uses ~live-data bytes
+#      of temp space instead of 2× the current DB)
+#   3. Atomically swaps the compacted copy in place
+#   4. Restarts k3s
+#
+# Safe to re-run: idempotent and a no-op when the DB is already small.
+#
+# Managed by Ansible (k3s-lab role: k3s_server). Do not edit by hand.
+# =============================================================================
+set -euo pipefail
+
+DB_DIR="{{ kine_vacuum_db_dir }}"
+DB_FILE="${DB_DIR}/state.db"
+THRESHOLD_BYTES="{{ kine_vacuum_threshold_bytes }}"
+SERVICE="{{ kine_vacuum_k3s_service }}"
+
+log() { printf '%s kine-vacuum: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
+
+if [[ ! -f "$DB_FILE" ]]; then
+  log "no state.db at ${DB_FILE} (embedded-etcd cluster?) — nothing to do"
+  exit 0
+fi
+
+size_bytes=$(stat -c%s "$DB_FILE")
+size_human=$(numfmt --to=iec --suffix=B "$size_bytes")
+log "state.db size: ${size_human} (threshold: $(numfmt --to=iec --suffix=B "$THRESHOLD_BYTES"))"
+
+if (( size_bytes < THRESHOLD_BYTES )); then
+  log "below threshold — skipping"
+  exit 0
+fi
+
+log "stopping ${SERVICE}…"
+systemctl stop "$SERVICE"
+# give kine a moment to flush
+sleep 3
+
+# checkpoint WAL so all data is in the main DB file
+sqlite3 "$DB_FILE" 'PRAGMA wal_checkpoint(TRUNCATE);' >/dev/null || true
+
+tmp="${DB_FILE}.compacting.$$"
+trap 'rm -f "$tmp"' EXIT
+
+log "compacting via VACUUM INTO → ${tmp}"
+sqlite3 "$DB_FILE" "VACUUM INTO '${tmp}';"
+
+new_size=$(stat -c%s "$tmp")
+new_human=$(numfmt --to=iec --suffix=B "$new_size")
+log "compacted size: ${new_human} (reclaimed $(numfmt --to=iec --suffix=B "$((size_bytes - new_size))"))"
+
+# atomic swap — any crash here leaves the old DB intact
+backup="${DB_FILE}.pre-vacuum"
+mv "$DB_FILE" "$backup"
+mv "$tmp" "$DB_FILE"
+trap - EXIT
+# remove stale WAL/SHM so kine rebuilds them on start
+rm -f "${DB_DIR}/state.db-wal" "${DB_DIR}/state.db-shm"
+# keep the pre-vacuum file only until we confirm k3s is healthy
+chown --reference="$backup" "$DB_FILE" 2>/dev/null || true
+chmod --reference="$backup" "$DB_FILE" 2>/dev/null || true
+
+log "starting ${SERVICE}…"
+systemctl start "$SERVICE"
+
+# wait for k3s to come back (max 2 min)
+for i in $(seq 1 24); do
+  if systemctl is-active --quiet "$SERVICE" && \
+     k3s kubectl get --raw=/healthz >/dev/null 2>&1; then
+    log "${SERVICE} healthy"
+    rm -f "$backup"
+    log "removed pre-vacuum backup"
+    log "done"
+    exit 0
+  fi
+  sleep 5
+done
+
+log "ERROR: ${SERVICE} did not become healthy within 2 minutes"
+log "pre-vacuum DB preserved at ${backup} for manual recovery"
+exit 1

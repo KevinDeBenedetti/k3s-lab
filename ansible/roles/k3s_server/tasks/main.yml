@@ -16,7 +16,6 @@
     url: https://get.k3s.io
     dest: /tmp/k3s-install.sh
     mode: "0700"
-    checksum: "sha256:https://get.k3s.io/sha256sum"
   when: >
     not k3s_binary.stat.exists or
     k3s_version not in (k3s_installed_version.stdout | default(''))
@@ -91,3 +90,7 @@
   ansible.builtin.set_fact:
     k3s_kubeconfig: >-
       {{ k3s_kubeconfig_raw.content | b64decode | regex_replace('127\.0\.0\.1', ansible_host) }}
+
+- name: Configure kine-vacuum timer
+  ansible.builtin.import_tasks: kine-vacuum.yml
+  tags: [kine-vacuum]

@@ -1,0 +1,13 @@
+[Unit]
+Description=Monthly kine-vacuum to reclaim k3s datastore disk space
+
+[Timer]
+OnCalendar={{ kine_vacuum_schedule }}
+# spread across clusters if ever run on multiple nodes
+RandomizedDelaySec={{ kine_vacuum_randomized_delay }}
+# run on next boot if we missed the window (e.g. host was off)
+Persistent=true
+Unit=kine-vacuum.service
+
+[Install]
+WantedBy=timers.target

@@ -1,7 +1,7 @@
 ---
 # k3s_server role defaults
 
-k3s_version: "v1.32.2+k3s1"
+k3s_version: "v1.32.13+k3s1"
 
 # Networking
 k3s_pod_cidr: "10.42.0.0/16"
@@ -21,8 +21,14 @@ k3s_disable:
   - servicelb
 
 # Extra args appended to k3s server install
-# Includes API server audit logging and kubelet hardening
+# Includes secrets encryption at rest, API server audit logging, kubelet hardening
+#
+# IMPORTANT: --secrets-encryption must remain enabled. Once the cluster is
+# initialized with aescbc encryption, removing this flag switches k3s to the
+# identity provider and all subsequent reads of encrypted secrets fail with
+# "identity transformer tried to read encrypted data".
 k3s_extra_server_args: >-
+  --secrets-encryption=true
   --kube-apiserver-arg=audit-log-path=/var/log/k3s-audit.log
   --kube-apiserver-arg=audit-log-maxage=30
   --kube-apiserver-arg=audit-log-maxbackup=10
@@ -31,3 +37,27 @@ k3s_extra_server_args: >-
 
 # Firewall: ports to open for agent communication
 k3s_ufw_allow_from: "10.0.0.0/16"
+
+# =============================================================================
+# kine-vacuum — periodic SQLite VACUUM of the kine datastore
+# =============================================================================
+# kine (k3s's default datastore) auto-compacts rows but SQLite never returns
+# freelist space to the OS without VACUUM. On busy clusters `state.db` can
+# grow to tens of GiB while holding only a few thousand live rows.
+kine_vacuum_enabled: true
+
+# Path to the kine database directory
+kine_vacuum_db_dir: /var/lib/rancher/k3s/server/db
+
+# Only VACUUM if state.db exceeds this size (bytes). Default: 2 GiB.
+# Below this threshold the task is a no-op.
+kine_vacuum_threshold_bytes: 2147483648
+
+# systemd OnCalendar expression. Default: 1st of each month at 03:30.
+kine_vacuum_schedule: "*-*-01 03:30:00"
+
+# Randomize actual run within this window (seconds). Default: 1h.
+kine_vacuum_randomized_delay: 3600
+
+# k3s systemd unit name (override to `k3s-agent.service` or similar if needed)
+kine_vacuum_k3s_service: k3s.service
