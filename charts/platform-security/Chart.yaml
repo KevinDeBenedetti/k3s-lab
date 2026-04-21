@@ -1,7 +1,7 @@
 apiVersion: v2
 name: platform-security
-description: Runtime security — Falco, Tetragon, Trivy Operator
-version: 0.7.3
+description: Runtime security — Falco, Tetragon, Trivy Operator, Kyverno
+version: 0.8.0
 type: application
 dependencies:
   - name: falco
@@ -20,3 +20,7 @@ dependencies:
     version: 0.32.1
     repository: https://aquasecurity.github.io/helm-charts
     condition: trivy-operator.enabled
+  - name: kyverno
+    version: 3.7.1
+    repository: https://kyverno.github.io/kyverno/
+    condition: kyverno.enabled

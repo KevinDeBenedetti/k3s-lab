@@ -18,7 +18,8 @@ For cluster-specific configuration, use a private `infra` repository that consum
 - Lightweight Kubernetes via [k3s](https://k3s.io) with automated control-plane and agent bootstrap
 - Ingress + automatic HTTPS via [Traefik](https://traefik.io) and [cert-manager](https://cert-manager.io)
 - Full observability: Prometheus, Grafana, Loki, Promtail (VPS-optimized)
-- Runtime security: Falco, Tetragon, Trivy Operator
+- Runtime security: Falco, Tetragon, Trivy Operator, Kyverno
+- Policy enforcement: Kyverno with Pod Security Standards and best practices
 - Secret management: HashiCorp Vault + External Secrets Operator
 - GitOps: ArgoCD
 - Makefile-driven workflow with includeable fragments
@@ -44,7 +45,7 @@ k3s-lab/
 ├── charts/                     # Helm charts published to ghcr.io (OCI)
 │   ├── platform-base/          # Namespaces, LimitRange, shared RBAC
 │   ├── platform-monitoring/    # Prometheus + Grafana + Loki + Promtail
-│   ├── platform-security/      # Falco + Tetragon + Trivy
+│   ├── platform-security/      # Falco + Tetragon + Trivy + Kyverno
 │   ├── platform-vault/         # Vault + External Secrets Operator
 │   └── platform-argocd/        # ArgoCD
 ├── kubernetes/                 # Kustomize bases

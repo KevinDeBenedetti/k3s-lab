@@ -113,3 +113,30 @@ promtail:
     limits:
       cpu: 150m
       memory: 128Mi
+
+kube-prometheus-stack:
+  # Disable components already provided by this chart or not needed on a single-node VPS
+  grafana:
+    enabled: false
+  alertmanager:
+    enabled: false
+  prometheus:
+    prometheusSpec:
+      retention: 7d
+      scrapeInterval: 60s
+      walCompression: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+  prometheusOperator:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi

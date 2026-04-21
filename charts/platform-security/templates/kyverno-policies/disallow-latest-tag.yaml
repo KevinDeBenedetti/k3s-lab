@@ -1,0 +1,55 @@
+{{- if .Values.kyverno.enabled }}
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow Latest Image Tag
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Using :latest tag makes deployments unpredictable and difficult to roll back.
+      This policy requires all images to use a specific tag or digest.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+      validate:
+        message: "Using :latest or no tag is not allowed. Specify a valid image tag."
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
+    - name: require-tag-or-digest
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+      validate:
+        message: "Images must have a tag or digest specified (e.g., nginx:1.21 or nginx@sha256:...)."
+        pattern:
+          spec:
+            containers:
+              - image: "*:*|*@sha256:*"
+{{- end }}

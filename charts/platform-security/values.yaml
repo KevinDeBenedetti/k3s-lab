@@ -2,6 +2,8 @@
 falco:
   enabled: true
   fullnameOverride: falco
+  driver:
+    kind: modern_ebpf
   resources:
     requests:
       cpu: 200m
@@ -11,7 +13,7 @@ falco:
       memory: 512Mi
 
 falcosidekick:
-  enabled: true
+  enabled: false
   config:
     webhook:
       address: ""       # override in infra-private (e.g. Slack, PagerDuty URL)
@@ -39,10 +41,11 @@ trivy-operator:
   fullnameOverride: trivy-operator
   operator:
     scannerReportTTL: "24h"
+    backgroundScanInterval: "24h"
   trivy:
     ignoreUnfixed: true
   nodeCollector:
-    enabled: true
+    enabled: false
   resources:
     requests:
       cpu: 200m
@@ -50,3 +53,60 @@ trivy-operator:
     limits:
       cpu: 400m
       memory: 512Mi
+
+kyverno:
+  enabled: true
+  fullnameOverride: kyverno
+  # Admission controller configuration
+  admissionController:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 400m
+        memory: 512Mi
+  # Background controller configuration (applies policies to existing resources)
+  backgroundController:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  # Cleanup controller configuration (manages policy reports and resources)
+  cleanupController:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  # Reports controller configuration (generates policy reports)
+  reportsController:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  # Metrics and monitoring
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true       # Creates ServiceMonitor for Prometheus Operator
+      interval: 30s
+      additionalLabels:
+        release: prometheus  # Match Prometheus selector
+  # Generate events for policy violations
+  generateSuccessEvents: false  # Only generate events for failures to reduce noise

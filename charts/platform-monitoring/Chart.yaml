@@ -1,6 +1,6 @@
 apiVersion: v2
 name: platform-monitoring
-description: Observability stack — Grafana, Loki, Promtail
+description: Observability stack — Grafana, Loki, Promtail, Prometheus
 version: 0.8.1
 type: application
 dependencies:
@@ -13,3 +13,6 @@ dependencies:
   - name: promtail
     version: 6.17.1
     repository: https://grafana.github.io/helm-charts
+  - name: kube-prometheus-stack
+    version: 83.6.0
+    repository: https://prometheus-community.github.io/helm-charts

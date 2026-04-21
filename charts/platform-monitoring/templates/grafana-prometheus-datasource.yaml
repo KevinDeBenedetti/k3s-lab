@@ -13,7 +13,7 @@ data:
         uid: prometheus
         type: prometheus
         access: proxy
-        url: http://prometheus-kube-prometheus-prometheus.{{ .Release.Namespace }}.svc.cluster.local:9090
+        url: http://{{ .Release.Name }}-kube-prometheus-prometheus.{{ .Release.Namespace }}.svc.cluster.local:9090
         isDefault: false
         jsonData:
           timeInterval: "30s"
