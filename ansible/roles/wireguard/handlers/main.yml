@@ -3,3 +3,7 @@
   ansible.builtin.systemd:
     name: "wg-quick@{{ wireguard_interface }}"
     state: restarted
+
+- name: Reload UFW
+  community.general.ufw:
+    state: reloaded

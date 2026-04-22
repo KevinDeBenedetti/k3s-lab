@@ -65,6 +65,13 @@
         wireguard_server_public_key: "{{ wg_public_key.stdout | trim }}"
         wireguard_server_private_key: "{{ wg_private_key_file.content | b64decode | trim }}"
 
+    - name: Open WireGuard port in UFW
+      community.general.ufw:
+        rule: allow
+        port: "{{ wireguard_port }}"
+        proto: udp
+      notify: Reload UFW
+
     - name: Deploy WireGuard configuration
       ansible.builtin.template:
         src: wg0.conf.j2
@@ -78,6 +85,7 @@
         value: "1"
         sysctl_file: /etc/sysctl.d/99-wireguard.conf
         reload: true
+      when: wireguard_subnet_v6 is defined
 
     - name: Enable and start WireGuard
       ansible.builtin.systemd:
