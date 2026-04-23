@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.4](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.7.3...v0.7.4) (2026-04-23)
+
+
+### Bug Fixes
+
+* enhance Falco dashboard with improved metrics, dynamic data sources, and updated visualizations ([76d56d4](https://github.com/KevinDeBenedetti/k3s-lab/commit/76d56d482ba69fa4ad26def11c801b7503f3f5b9))
+
 ## [0.7.3](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.7.2...v0.7.3) (2026-04-18)
 
 
