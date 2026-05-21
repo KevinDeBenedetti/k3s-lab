@@ -28,6 +28,14 @@ OIDC_AUTH_URL      ?=
 OIDC_TOKEN_URL     ?=
 OIDC_API_URL       ?=
 
+# ── Override hooks ────────────────────────────────────────────────────────────
+# Set these in your consuming Makefile BEFORE including this file to replace the
+# default inline recipes with a local script, suppressing the override warning.
+#   VAULT_CONFIGURE_SCRIPT := scripts/vault-configure.sh
+#   VAULT_SEED_SCRIPT      := scripts/vault-seed-all.sh
+VAULT_CONFIGURE_SCRIPT ?=
+VAULT_SEED_SCRIPT      ?=
+
 .PHONY: vault-init vault-unseal vault-configure vault-seed vault-seed-cloudflare vault-status
 
 vault-init: ## Initialize Vault, unseal, enable K8s auth, create policies + ESO role
@@ -52,6 +60,7 @@ vault-unseal: ## Unseal Vault after a node reboot (requires VAULT_UNSEAL_KEY_1 +
 	  env VAULT_SKIP_VERIFY=true vault operator unseal $(VAULT_UNSEAL_KEY_2) | grep -E "Sealed|Progress"
 	@echo "$(GREEN)✅ Vault unsealed$(RESET)"
 
+ifndef VAULT_CONFIGURE_SCRIPT
 vault-configure: ## (Re)create Vault policies and Kubernetes roles (idempotent)
 	$(call require-var,VAULT_ROOT_TOKEN)
 	@echo "$(YELLOW)→ Configuring Vault policies and roles...$(RESET)"
@@ -65,7 +74,9 @@ vault-configure: ## (Re)create Vault policies and Kubernetes roles (idempotent)
 	 ADMIN_EMAIL="$(ADMIN_EMAIL)" \
 	 $(call run-local-script,scripts/vault-configure.sh)
 	@echo "$(GREEN)✅ Vault configured$(RESET)"
+endif
 
+ifndef VAULT_SEED_SCRIPT
 vault-seed: ## Seed secrets into Vault (reads from .env, prompts only if missing)
 	$(call require-var,VAULT_ROOT_TOKEN)
 	@echo "$(YELLOW)→ Seeding secrets into Vault...$(RESET)"
@@ -139,6 +150,7 @@ vault-seed: ## Seed secrets into Vault (reads from .env, prompts only if missing
 	  || echo "  (skipped traefik/dashboard)"
 	@echo ""
 	@echo "$(GREEN)✅ Vault secrets seeded$(RESET)"
+endif
 
 vault-seed-cloudflare: ## Seed Cloudflare API token into Vault for cert-manager DNS-01
 	$(call require-var,VAULT_ROOT_TOKEN)
