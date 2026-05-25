@@ -1,0 +1,46 @@
+# =============================================================================
+# Taskfile.yml — k3s-lab standalone root
+#
+# Usage: task <namespace>:<task>   e.g. task provision:site
+#
+# This file is for using k3s-lab as a standalone repo.
+# For consumption from a private infra repo, use:
+#   includes:
+#     provision:
+#       taskfile: ./vendor/k3s-lab/taskfiles/provision.yml
+#
+# Config: copy .env.example to .env and fill in your values.
+# =============================================================================
+version: '3'
+
+dotenv:
+  - .env
+
+vars:
+  ANSIBLE_DIR: ansible
+  PLAYBOOK_DIR: '{{.TASKFILE_DIR}}/ansible/playbooks'
+  CLUSTER_ENV: '{{.TASKFILE_DIR}}/.env'
+
+includes:
+  provision:
+    taskfile: ./taskfiles/provision.yml
+    vars:
+      ANSIBLE_DIR: '{{.ANSIBLE_DIR}}'
+      PLAYBOOK_DIR: '{{.PLAYBOOK_DIR}}'
+      CLUSTER_ENV: '{{.CLUSTER_ENV}}'
+  vault:
+    taskfile: ./taskfiles/vault.yml
+  argocd:
+    taskfile: ./taskfiles/argocd.yml
+  deploy:
+    taskfile: ./taskfiles/deploy.yml
+  ssh:
+    taskfile: ./taskfiles/ssh.yml
+  status:
+    taskfile: ./taskfiles/status.yml
+
+tasks:
+  default:
+    desc: Show available tasks
+    silent: true
+    cmds: [task --list]
