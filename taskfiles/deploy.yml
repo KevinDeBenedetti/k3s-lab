@@ -1,0 +1,73 @@
+# =============================================================================
+# taskfiles/deploy.yml — Stack deployment helpers (secrets + grafana oauth)
+#
+# Namespace: deploy
+# Usage (standalone):  task deploy:grafana-secret
+# Usage (from infra):  includes: deploy: taskfile: ./vendor/k3s-lab/taskfiles/deploy.yml
+#
+# Required env (from .env):
+#   KUBECONFIG_CONTEXT
+#   DASHBOARD_PASSWORD   for dashboard-secret
+#   GRAFANA_PASSWORD     for grafana-secret
+#   GRAFANA_DOMAIN       for grafana-oauth
+#
+# Vars (override via includes vars:):
+#   DASHBOARD_USER       default: admin
+#   GRAFANA_USER         default: admin
+# =============================================================================
+version: '3'
+
+vars:
+  DASHBOARD_USER: '{{.DASHBOARD_USER | default "admin"}}'
+  GRAFANA_USER: '{{.GRAFANA_USER | default "admin"}}'
+
+tasks:
+  dashboard-secret:
+    desc: Create Traefik dashboard BasicAuth secret (requires DASHBOARD_PASSWORD in .env)
+    preconditions:
+      - sh: test -n "$DASHBOARD_PASSWORD"
+        msg: "DASHBOARD_PASSWORD is not set — add it to .env"
+      - sh: command -v htpasswd
+        msg: "htpasswd not found — brew install httpd"
+    cmds:
+      - |
+        kubectl --context $KUBECONFIG_CONTEXT \
+          create secret generic traefik-dashboard-auth \
+          --from-literal=users="$(htpasswd -nb '{{.DASHBOARD_USER}}' "$DASHBOARD_PASSWORD")" \
+          -n ingress \
+          --dry-run=client -o yaml \
+        | kubectl --context $KUBECONFIG_CONTEXT apply -f -
+
+  grafana-secret:
+    desc: Create Grafana admin secret in monitoring namespace (requires GRAFANA_PASSWORD in .env)
+    preconditions:
+      - sh: test -n "$GRAFANA_PASSWORD"
+        msg: "GRAFANA_PASSWORD is not set — add it to .env"
+      - sh: kubectl --context $KUBECONFIG_CONTEXT cluster-info --request-timeout=5s >/dev/null 2>&1
+        msg: "Cannot reach cluster $KUBECONFIG_CONTEXT — is k3s running?"
+    cmds:
+      - kubectl --context $KUBECONFIG_CONTEXT create namespace monitoring --dry-run=client -o yaml | kubectl --context $KUBECONFIG_CONTEXT apply -f -
+      - |
+        kubectl --context $KUBECONFIG_CONTEXT \
+          create secret generic grafana-admin-secret \
+          --from-literal=username={{.GRAFANA_USER}} \
+          --from-literal=password="$GRAFANA_PASSWORD" \
+          -n monitoring \
+          --dry-run=client -o yaml \
+        | kubectl --context $KUBECONFIG_CONTEXT apply -f -
+
+  grafana-oauth:
+    desc: Restart Grafana to pick up OAuth secret from Vault
+    preconditions:
+      - sh: test -n "$GRAFANA_DOMAIN"
+        msg: "GRAFANA_DOMAIN is not set — add it to cluster.env"
+    cmds:
+      - bash {{.TASKFILE_DIR}}/../scripts/deploy-grafana-oauth.sh
+    env:
+      GRAFANA_DOMAIN: $GRAFANA_DOMAIN
+
+  uninstall:
+    desc: "[DESTRUCTIVE] Tear down all deployed workloads"
+    prompt: "This will uninstall all Helm releases and workloads. Continue?"
+    cmds:
+      - bash {{.TASKFILE_DIR}}/../scripts/uninstall.sh
