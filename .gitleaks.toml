@@ -4,6 +4,17 @@ title = "k3s-lab gitleaks config"
 useDefault = true
 
 # ---------------------------------------------------------------------------
+# Global allowlist — historical commits with placeholder values only
+# ---------------------------------------------------------------------------
+# Commit a52f88897: docs/stack/vault.md used `VAULT_TOKEN=<root-token>` as a
+# documentation placeholder. The current file uses a proper variable reference.
+# The commit is in imported history (renamed from k3s-homelab) and cannot be
+# amended without a force-push. This suppresses the false-positive fingerprint.
+[allowlist]
+description = "Historical doc commits with placeholder token values"
+commits = ["a52f88897648fcc7b30df716c1bb9c44931d6c37"]
+
+# ---------------------------------------------------------------------------
 # Rule-specific allowlists
 # ---------------------------------------------------------------------------
 # Extend the built-in curl-auth-user rule to ignore lines where the
