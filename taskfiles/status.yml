@@ -1,0 +1,55 @@
+# =============================================================================
+# taskfiles/status.yml — Cluster status and health checks
+#
+# Namespace: status
+# Usage (standalone):  task status:all
+# Usage (from infra):  includes: status: taskfile: ./vendor/k3s-lab/taskfiles/status.yml
+#
+# Required env:
+#   KUBECONFIG_CONTEXT   kubectl context name
+# =============================================================================
+version: '3'
+
+tasks:
+  nodes:
+    desc: Show cluster nodes
+    cmds:
+      - kubectl --context $KUBECONFIG_CONTEXT get nodes -o wide
+
+  all:
+    desc: Show all non-completed pods across namespaces
+    cmds:
+      - kubectl --context $KUBECONFIG_CONTEXT get pods -A --field-selector=status.phase!=Succeeded | grep -v Completed
+
+  pods:
+    desc: Show pod resource usage (requires metrics-server)
+    cmds:
+      - cmd: kubectl --context $KUBECONFIG_CONTEXT top pods -A
+        ignore_error: true
+      - cmd: kubectl --context $KUBECONFIG_CONTEXT get pods -A
+        ignore_error: true
+
+  certs:
+    desc: Show cert-manager certificate status across all namespaces
+    cmds:
+      - cmd: 'printf "\033[0;36m── Certificates ────────────────────────────────────────────────\033[0m\n"'
+        silent: true
+      - cmd: >-
+          kubectl --context $KUBECONFIG_CONTEXT get certificates -A
+          -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[0].status,EXPIRY:.status.notAfter'
+          2>/dev/null || echo "  ❌ cert-manager not reachable"
+        ignore_error: true
+
+  security:
+    desc: Show NetworkPolicies and Pod Security Standards labels
+    cmds:
+      - cmd: 'printf "\033[0;36m── NetworkPolicies ──────────────────────────────────────────────\033[0m\n"'
+        silent: true
+      - kubectl --context $KUBECONFIG_CONTEXT get networkpolicies -A
+      - cmd: 'echo ""'
+        silent: true
+      - cmd: 'printf "\033[0;36m── Pod Security Standards ───────────────────────────────────────\033[0m\n"'
+        silent: true
+      - >-
+        kubectl --context $KUBECONFIG_CONTEXT get namespaces
+        -o custom-columns='NAMESPACE:.metadata.name,PSS-ENFORCE:.metadata.labels.pod-security\.kubernetes\.io/enforce'
