@@ -1,0 +1,67 @@
+# =============================================================================
+# taskfiles/provision.yml — Ansible-based provisioning
+#
+# Namespace: provision
+# Usage (standalone):  task provision:site
+# Usage (from infra):  includes: provision: taskfile: ./vendor/k3s-lab/taskfiles/provision.yml
+#
+# Vars (override via includes vars: or .env):
+#   ANSIBLE_DIR       default: ansible
+#   PLAYBOOK_DIR      default: <taskfile_dir>/../ansible/playbooks
+#   TF_DIR            default: terraform
+#   CLUSTER_ENV       required by inventory task
+# =============================================================================
+version: '3'
+
+vars:
+  ANSIBLE_DIR: '{{.ANSIBLE_DIR | default "ansible"}}'
+  ANSIBLE_INVENTORY: '{{.ANSIBLE_DIR}}/inventory/hosts.yml'
+  PLAYBOOK_DIR: '{{.PLAYBOOK_DIR | default (printf "%s/../ansible/playbooks" .TASKFILE_DIR)}}'
+  TF_DIR: '{{.TF_DIR | default "terraform"}}'
+  CLUSTER_ENV: '{{.CLUSTER_ENV | default ""}}'
+
+tasks:
+  inventory:
+    desc: Generate Ansible inventory from Terraform outputs
+    preconditions:
+      - sh: test -n "{{.CLUSTER_ENV}}"
+        msg: "CLUSTER_ENV is not set — point it to clusters/<name>/cluster.env"
+    cmds:
+      - bash {{.TASKFILE_DIR}}/../scripts/generate-inventory.sh
+    env:
+      CLUSTER_ENV: '{{.CLUSTER_ENV}}'
+      TF_DIR: '{{.TF_DIR}}'
+      ANSIBLE_DIR: '{{.ANSIBLE_DIR}}'
+
+  server:
+    desc: Provision server node (common + k3s + wireguard)
+    preconditions:
+      - sh: test -f "{{.ANSIBLE_INVENTORY}}"
+        msg: "{{.ANSIBLE_INVENTORY}} not found — run: task provision:inventory"
+    cmds:
+      - ansible-playbook -i {{.ANSIBLE_INVENTORY}} {{.PLAYBOOK_DIR}}/k3s-server.yml
+
+  agents:
+    desc: Add agent nodes to an existing cluster
+    preconditions:
+      - sh: test -f "{{.ANSIBLE_INVENTORY}}"
+        msg: "{{.ANSIBLE_INVENTORY}} not found — run: task provision:inventory"
+    cmds:
+      - ansible-playbook -i {{.ANSIBLE_INVENTORY}} {{.PLAYBOOK_DIR}}/k3s-agent.yml
+
+  site:
+    desc: Full provisioning (common + k3s server + agents + kubeconfig)
+    preconditions:
+      - sh: test -f "{{.ANSIBLE_INVENTORY}}"
+        msg: "{{.ANSIBLE_INVENTORY}} not found — run: task provision:inventory"
+    cmds:
+      - ansible-playbook -i {{.ANSIBLE_INVENTORY}} {{.PLAYBOOK_DIR}}/site.yml
+
+  reset:
+    desc: "[DESTRUCTIVE] Uninstall k3s from all nodes"
+    preconditions:
+      - sh: test -f "{{.ANSIBLE_INVENTORY}}"
+        msg: "{{.ANSIBLE_INVENTORY}} not found"
+    prompt: "This will uninstall k3s from ALL nodes. Continue?"
+    cmds:
+      - ansible-playbook -i {{.ANSIBLE_INVENTORY}} {{.PLAYBOOK_DIR}}/reset.yml
