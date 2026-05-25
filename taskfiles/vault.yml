@@ -20,6 +20,7 @@ version: '3'
 vars:
   VAULT_POD: '{{.VAULT_POD | default "vault-0"}}'
   VAULT_NAMESPACE: '{{.VAULT_NAMESPACE | default "vault"}}'
+  VAULT_CONFIGURE_SCRIPT: '{{.VAULT_CONFIGURE_SCRIPT | default (printf "%s/../scripts/vault-configure.sh" .TASKFILE_DIR)}}'
 
 tasks:
   init:
@@ -65,7 +66,7 @@ tasks:
       - sh: test -n "$VAULT_ROOT_TOKEN"
         msg: "VAULT_ROOT_TOKEN is not set — add it to .env"
     cmds:
-      - bash {{.TASKFILE_DIR}}/../scripts/vault-configure.sh
+      - bash {{.VAULT_CONFIGURE_SCRIPT}}
     env:
       VAULT_POD: '{{.VAULT_POD}}'
       VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
