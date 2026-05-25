@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.8.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.7.4...v0.8.0) (2026-05-25)
+
+
+### Features
+
+* add root Taskfile.yml for standalone k3s-lab usage ([2fc313e](https://github.com/KevinDeBenedetti/k3s-lab/commit/2fc313e6cfa1c20735eece5b3db81bc031616acc))
+* **scripts:** add vault-seed.sh — extracted from vault.mk inline shell ([d6ad15e](https://github.com/KevinDeBenedetti/k3s-lab/commit/d6ad15e29810432ed244fb5c7d6cbe6b0b1291d0))
+* **taskfiles:** add argocd.yml — ArgoCD deployment and management tasks ([ae60dc2](https://github.com/KevinDeBenedetti/k3s-lab/commit/ae60dc2cd976049f7b34f0801ffb2c15e987eb6f))
+* **taskfiles:** add deploy.yml — secret creation and grafana oauth tasks ([37d2ece](https://github.com/KevinDeBenedetti/k3s-lab/commit/37d2ece42aae3d17736dbff8df70b42b08f72519))
+* **taskfiles:** add provision.yml — Ansible provisioning tasks ([daa15d3](https://github.com/KevinDeBenedetti/k3s-lab/commit/daa15d3328e94634503bc2803036fa84f379f53f))
+* **taskfiles:** add ssh.yml — SSH access tasks ([fdbac45](https://github.com/KevinDeBenedetti/k3s-lab/commit/fdbac45cca8c9f2149c43728fc50b2181058ca13))
+* **taskfiles:** add status.yml — cluster status and health check tasks ([98cf48a](https://github.com/KevinDeBenedetti/k3s-lab/commit/98cf48a2afbe92396b05bd86fd7ae193637bf5f9))
+* **taskfiles:** add vault.yml — Vault + ESO tasks ([2a8b61c](https://github.com/KevinDeBenedetti/k3s-lab/commit/2a8b61c3e046d851657a581268b3867da30d67ab))
+* **taskfiles:** update argocd and vault taskfiles for improved admin commands ([fecdcff](https://github.com/KevinDeBenedetti/k3s-lab/commit/fecdcff5ffaacc14fc0c424a50ee2c72edf79d50))
+* update CI workflows and cleanup packages; refine vault configurations and documentation ([d095987](https://github.com/KevinDeBenedetti/k3s-lab/commit/d095987938853e2981dc425fa83478623c1c9bba))
+* **vault.mk:** add VAULT_CONFIGURE_SCRIPT / VAULT_SEED_SCRIPT override hooks ([6719158](https://github.com/KevinDeBenedetti/k3s-lab/commit/6719158df3736b0fce5109e6d66d51feac7c852c))
+
+
+### Bug Fixes
+
+* **gitleaks:** add global allowlist for historical commits with placeholder values ([b57496a](https://github.com/KevinDeBenedetti/k3s-lab/commit/b57496ad953e6946f37cbdfa4b825f085bedf9eb))
+
 ## [0.7.4](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.7.3...v0.7.4) (2026-04-23)
 
 
