@@ -12,7 +12,7 @@ For cluster-specific configuration, use a private `infra` repository that consum
 
 ## Features
 
-- **Helm Charts** (OCI) — platform-base, platform-monitoring, platform-security, platform-vault, platform-argocd
+- **Helm Charts** (OCI) — platform-base, platform-cert-manager, platform-external-secrets, platform-traefik, platform-monitoring, platform-security, platform-vault, platform-argocd
 - **Kustomize Bases** — reusable namespace, LimitRange, RBAC, ExternalSecret, and IngressRoute templates
 - **Ansible Roles** — common (VPS base), k3s_server, k3s_agent, wireguard
 - Lightweight Kubernetes via [k3s](https://k3s.io) with automated control-plane and agent bootstrap

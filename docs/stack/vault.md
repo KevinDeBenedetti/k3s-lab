@@ -26,12 +26,12 @@ This guide covers deploying [HashiCorp Vault](https://developer.hashicorp.com/va
 
 ## Secret path layout
 
-| Vault path | Kubernetes Secret | Namespace |
-|---|---|---|
-| `secret/argocd/oidc` | `argocd-secret` | `argocd` |
-| `secret/grafana/admin` | `grafana-admin-secret` | `monitoring` |
-| `secret/grafana/oauth` | `grafana-oauth-secret` | `monitoring` |
-| `secret/traefik/dashboard` | `traefik-dashboard-auth` | `ingress` |
+| Vault path                 | Kubernetes Secret        | Namespace    |
+| -------------------------- | ------------------------ | ------------ |
+| `secret/argocd/oidc`       | `argocd-secret`          | `argocd`     |
+| `secret/grafana/admin`     | `grafana-admin-secret`   | `monitoring` |
+| `secret/grafana/oauth`     | `grafana-oauth-secret`   | `monitoring` |
+| `secret/traefik/dashboard` | `traefik-dashboard-auth` | `ingress`    |
 
 ---
 
@@ -41,8 +41,6 @@ Add to `.env`:
 
 ```bash
 VAULT_DOMAIN=vault.example.com
-VAULT_CHART_VERSION=0.29.1   # optional — pin to avoid surprise upgrades
-ESO_CHART_VERSION=0.14.3     # optional
 ```
 
 Add DNS A record: `vault.example.com → SERVER_IP`
@@ -51,11 +49,17 @@ Add DNS A record: `vault.example.com → SERVER_IP`
 
 ## Step 1 — Deploy Vault
 
+Deploy the `platform-vault` OCI chart via ArgoCD or directly with Helm:
+
 ```bash
-make deploy-vault
+helm upgrade --install platform-vault \
+  oci://ghcr.io/kevindebenedetti/charts/platform-vault \
+  --version 0.7.4 \
+  --namespace vault --create-namespace \
+  --values platform/vault/values.yaml
 ```
 
-This installs the `hashicorp/vault` Helm chart into the `vault` namespace with:
+This installs Vault into the `vault` namespace with:
 - Single-replica Raft storage (5 Gi PVC on `local-path`)
 - UI enabled (ClusterIP, exposed via Traefik IngressRoute)
 - VPN-only IngressRoute + Let's Encrypt TLS cert
@@ -202,12 +206,12 @@ kubectl exec -it -n vault vault-0 -- env VAULT_SKIP_VERIFY=true vault operator u
 
 ## Makefile reference
 
-| Target | Description |
-|---|---|
-| `deploy-vault` | Install/upgrade Vault via Helm |
-| `deploy-eso` | Install/upgrade External Secrets Operator |
-| `vault-init` | Initialize, unseal, enable K8s auth, create policies |
-| `vault-unseal` | Unseal Vault after a node reboot |
-| `vault-configure` | Re-apply policies + roles (idempotent) |
-| `vault-seed` | Interactive: store all managed secrets into Vault |
-| `vault-status` | Show seal status + ESO sync status |
+| Target            | Description                                          |
+| ----------------- | ---------------------------------------------------- |
+| `deploy-vault`    | Install/upgrade Vault via Helm                       |
+| `deploy-eso`      | Install/upgrade External Secrets Operator            |
+| `vault-init`      | Initialize, unseal, enable K8s auth, create policies |
+| `vault-unseal`    | Unseal Vault after a node reboot                     |
+| `vault-configure` | Re-apply policies + roles (idempotent)               |
+| `vault-seed`      | Interactive: store all managed secrets into Vault    |
+| `vault-status`    | Show seal status + ESO sync status                   |

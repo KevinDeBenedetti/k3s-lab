@@ -33,7 +33,9 @@ jobs:
       shellcheck-severity: warning
       run-actionlint: true
       actionlint-paths: .github/workflows/
-      run-bats: false
+      run-bats: true
+      bats-tests-dir: tests/bats/
+      bats-submodules: false
       run-docker: false
       run-docs-link-check: true
 

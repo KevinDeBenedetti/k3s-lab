@@ -1,0 +1,46 @@
+# =============================================================================
+# cleanup-packages.yml — Purge old GHCR chart versions after each release
+#
+# Keeps the 5 most recent versions of each chart package.
+# Runs automatically after a GitHub Release is published, and can be
+# triggered manually from the Actions tab.
+# =============================================================================
+name: Cleanup GHCR packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: cleanup-packages-${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chart:
+          - charts/platform-argocd
+          - charts/platform-base
+          - charts/platform-cert-manager
+          - charts/platform-external-secrets
+          - charts/platform-monitoring
+          - charts/platform-security
+          - charts/platform-traefik
+          - charts/platform-vault
+
+    steps:
+      - name: Delete old versions of ${{ matrix.chart }}
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ matrix.chart }}
+          package-type: container
+          min-versions-to-keep: 5
+          ignore-versions: '^(latest|stable)$'
+          token: ${{ secrets.GITHUB_TOKEN }}

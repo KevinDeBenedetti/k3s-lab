@@ -3,8 +3,6 @@
 # HashiCorp Vault + External Secrets Operator
 # ──────────────────────────────────────────────────────────────────────────────
 
-VAULT_CHART_VERSION ?= 0.29.1
-ESO_CHART_VERSION   ?= 0.14.3
 VAULT_POD           ?= vault-0
 VAULT_NAMESPACE     ?= vault
 DASHBOARD_USER      ?= admin
