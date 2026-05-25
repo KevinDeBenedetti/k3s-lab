@@ -1,0 +1,45 @@
+# =============================================================================
+# taskfiles/ssh.yml — SSH access to cluster nodes
+#
+# Namespace: ssh
+# Usage (standalone):  task ssh:server
+# Usage (from infra):  includes: ssh: taskfile: ./vendor/k3s-lab/taskfiles/ssh.yml
+#
+# Required env (from .env or cluster.env):
+#   SERVER_IP    public IP of the server node
+#   SSH_USER     SSH username (default: debian)
+#   SSH_PORT     SSH port (default: 22)
+#   SSH_KEY      path to private key
+#
+# Optional env:
+#   AGENT_IP     public IP of the agent node
+# =============================================================================
+version: '3'
+
+vars:
+  SSH_SERVER_HOST: '{{.SSH_SERVER_HOST | default "$SERVER_IP"}}'
+
+tasks:
+  server:
+    desc: Open SSH shell on server node
+    preconditions:
+      - sh: test -n "$SERVER_IP"
+        msg: "SERVER_IP is not set — add it to .env"
+    cmds:
+      - ssh -i $SSH_KEY -p $SSH_PORT $SSH_USER@$SERVER_IP
+
+  agent:
+    desc: Open SSH shell on agent node
+    preconditions:
+      - sh: test -n "$AGENT_IP"
+        msg: "AGENT_IP is not set — add it to .env"
+    cmds:
+      - ssh -i $SSH_KEY -p $SSH_PORT $SSH_USER@$AGENT_IP
+
+  known-hosts-reset:
+    desc: Remove stale known_hosts entries (run after VPS reformat)
+    cmds:
+      - cmd: '[ -z "$SERVER_IP" ] || ssh-keygen -R "$SERVER_IP" 2>/dev/null; true'
+        ignore_error: true
+      - cmd: '[ -z "$AGENT_IP" ] || ssh-keygen -R "$AGENT_IP" 2>/dev/null; true'
+        ignore_error: true
