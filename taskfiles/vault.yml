@@ -1,0 +1,151 @@
+# =============================================================================
+# taskfiles/vault.yml — HashiCorp Vault + External Secrets Operator
+#
+# Namespace: vault
+# Usage (standalone):  task vault:status
+# Usage (from infra):  includes: vault: taskfile: ./vendor/k3s-lab/taskfiles/vault.yml
+#
+# Required env (from .env):
+#   KUBECONFIG_CONTEXT   kubectl context name
+#   VAULT_ROOT_TOKEN     for configure/seed tasks
+#   VAULT_UNSEAL_KEY_1   for unseal task
+#   VAULT_UNSEAL_KEY_2   for unseal task
+#
+# Vars (override via includes vars:):
+#   VAULT_POD            default: vault-0
+#   VAULT_NAMESPACE      default: vault
+# =============================================================================
+version: '3'
+
+vars:
+  VAULT_POD: '{{.VAULT_POD | default "vault-0"}}'
+  VAULT_NAMESPACE: '{{.VAULT_NAMESPACE | default "vault"}}'
+
+tasks:
+  init:
+    desc: Initialize Vault, unseal, enable K8s auth, create policies + ESO role
+    summary: |
+      Runs vault-init.sh which bootstraps a fresh Vault instance:
+        1. vault operator init
+        2. vault operator unseal (3 keys)
+        3. Enable kubernetes auth method
+        4. Create read-only policy for ESO
+        5. Configure OIDC auth method
+
+      Save the unseal keys and root token — they will not be shown again.
+    cmds:
+      - bash {{.TASKFILE_DIR}}/../scripts/vault-init.sh
+    env:
+      VAULT_POD: '{{.VAULT_POD}}'
+      VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
+      OIDC_CLIENT_ID: '{{.OIDC_CLIENT_ID | default ""}}'
+      OIDC_CLIENT_SECRET: '{{.OIDC_CLIENT_SECRET | default ""}}'
+      OIDC_ISSUER_URL: '{{.OIDC_ISSUER_URL | default ""}}'
+      VAULT_DOMAIN: '{{.VAULT_DOMAIN | default ""}}'
+      ADMIN_EMAIL: '{{.ADMIN_EMAIL | default ""}}'
+
+  unseal:
+    desc: Unseal Vault after node reboot (requires VAULT_UNSEAL_KEY_1 + _2 in .env)
+    preconditions:
+      - sh: test -n "$VAULT_UNSEAL_KEY_1"
+        msg: "VAULT_UNSEAL_KEY_1 is not set — add it to .env"
+      - sh: test -n "$VAULT_UNSEAL_KEY_2"
+        msg: "VAULT_UNSEAL_KEY_2 is not set — add it to .env"
+    cmds:
+      - kubectl --context $KUBECONFIG_CONTEXT exec -n {{.VAULT_NAMESPACE}} {{.VAULT_POD}} --
+          env VAULT_SKIP_VERIFY=true vault operator unseal $VAULT_UNSEAL_KEY_1
+          | grep -E "Sealed|Progress"
+      - kubectl --context $KUBECONFIG_CONTEXT exec -n {{.VAULT_NAMESPACE}} {{.VAULT_POD}} --
+          env VAULT_SKIP_VERIFY=true vault operator unseal $VAULT_UNSEAL_KEY_2
+          | grep -E "Sealed|Progress"
+
+  configure:
+    desc: (Re)create Vault policies, K8s auth, OIDC roles (idempotent)
+    preconditions:
+      - sh: test -n "$VAULT_ROOT_TOKEN"
+        msg: "VAULT_ROOT_TOKEN is not set — add it to .env"
+    cmds:
+      - bash {{.TASKFILE_DIR}}/../scripts/vault-configure.sh
+    env:
+      VAULT_POD: '{{.VAULT_POD}}'
+      VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
+      VAULT_ROOT_TOKEN: $VAULT_ROOT_TOKEN
+      OIDC_CLIENT_ID: '{{.OIDC_CLIENT_ID | default ""}}'
+      OIDC_CLIENT_SECRET: '{{.OIDC_CLIENT_SECRET | default ""}}'
+      OIDC_ISSUER_URL: '{{.OIDC_ISSUER_URL | default ""}}'
+      VAULT_DOMAIN: '{{.VAULT_DOMAIN | default ""}}'
+      ADMIN_EMAIL: '{{.ADMIN_EMAIL | default ""}}'
+
+  seed:
+    desc: Seed core secrets into Vault (OIDC, Grafana admin/oauth, Traefik dashboard)
+    summary: |
+      Reads from .env and seeds the following Vault KV paths:
+        secret/argocd/oidc         — OIDC_CLIENT_ID, OIDC_CLIENT_SECRET
+        secret/grafana/admin       — admin username + password
+        secret/grafana/oauth       — full Grafana Generic OAuth config
+        secret/traefik/dashboard   — htpasswd users string
+
+      All values must be set in .env before running this task.
+    preconditions:
+      - sh: test -n "$VAULT_ROOT_TOKEN"
+        msg: "VAULT_ROOT_TOKEN is not set — add it to .env"
+    cmds:
+      - bash {{.TASKFILE_DIR}}/../scripts/vault-seed.sh
+    env:
+      VAULT_POD: '{{.VAULT_POD}}'
+      VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
+      VAULT_ROOT_TOKEN: $VAULT_ROOT_TOKEN
+      OIDC_CLIENT_ID: '{{.OIDC_CLIENT_ID | default ""}}'
+      OIDC_CLIENT_SECRET: '{{.OIDC_CLIENT_SECRET | default ""}}'
+      OIDC_PROVIDER_NAME: '{{.OIDC_PROVIDER_NAME | default "OIDC"}}'
+      OIDC_ISSUER_URL: '{{.OIDC_ISSUER_URL | default ""}}'
+      OIDC_AUTH_URL: '{{.OIDC_AUTH_URL | default ""}}'
+      OIDC_TOKEN_URL: '{{.OIDC_TOKEN_URL | default ""}}'
+      OIDC_API_URL: '{{.OIDC_API_URL | default ""}}'
+      GRAFANA_PASSWORD: '{{.GRAFANA_PASSWORD | default ""}}'
+      DASHBOARD_USER: '{{.DASHBOARD_USER | default "admin"}}'
+      DASHBOARD_PASSWORD: '{{.DASHBOARD_PASSWORD | default ""}}'
+
+  seed-cloudflare:
+    desc: Seed Cloudflare API token into Vault for cert-manager DNS-01
+    preconditions:
+      - sh: test -n "$VAULT_ROOT_TOKEN"
+        msg: "VAULT_ROOT_TOKEN is not set — add it to .env"
+    cmds:
+      - bash {{.TASKFILE_DIR}}/../scripts/vault-seed-cloudflare.sh
+    env:
+      VAULT_POD: '{{.VAULT_POD}}'
+      VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
+      VAULT_ROOT_TOKEN: $VAULT_ROOT_TOKEN
+
+  status:
+    desc: Show Vault seal status, ESO sync status, and managed secrets
+    cmds:
+      - cmd: 'echo ""'
+        silent: true
+      - cmd: 'printf "\033[0;36m── Vault ──────────────────────────────────────────────────────\033[0m\n"'
+        silent: true
+      - cmd: >-
+          kubectl --context $KUBECONFIG_CONTEXT
+          exec -n {{.VAULT_NAMESPACE}} {{.VAULT_POD}} --
+          env VAULT_SKIP_VERIFY=true vault status 2>/dev/null
+          || echo "  ❌ Vault pod not reachable"
+        ignore_error: true
+      - cmd: 'echo ""'
+        silent: true
+      - cmd: 'printf "\033[0;36m── External Secrets ──────────────────────────────────────────\033[0m\n"'
+        silent: true
+      - cmd: >-
+          kubectl --context $KUBECONFIG_CONTEXT get externalsecrets -A
+          -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[0].status,REFRESH:.status.refreshTime'
+          2>/dev/null || echo "  ❌ ESO not installed"
+        ignore_error: true
+      - cmd: 'echo ""'
+        silent: true
+      - cmd: 'printf "\033[0;36m── ClusterSecretStore ────────────────────────────────────────\033[0m\n"'
+        silent: true
+      - cmd: >-
+          kubectl --context $KUBECONFIG_CONTEXT get clustersecretstore
+          -o custom-columns='NAME:.metadata.name,READY:.status.conditions[0].status'
+          2>/dev/null || echo "  (none)"
+        ignore_error: true
