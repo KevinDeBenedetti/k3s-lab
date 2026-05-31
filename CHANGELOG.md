@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.8.0...v0.9.0) (2026-05-31)
+
+
+### Features
+
+* **charts:** update chart versions and dependencies for platform-argocd, platform-external-secrets, platform-monitoring, platform-security, and platform-traefik ([8756683](https://github.com/KevinDeBenedetti/k3s-lab/commit/8756683a3aad18a08f66b95db67ead7eec47f67e))
+
 ## [0.8.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.7.4...v0.8.0) (2026-05-25)
 
 
