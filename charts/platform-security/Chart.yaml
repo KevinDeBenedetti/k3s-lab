@@ -1,11 +1,11 @@
 apiVersion: v2
 name: platform-security
 description: Runtime security — Falco, Tetragon, Trivy Operator, Kyverno
-version: 0.8.0
+version: 0.9.0
 type: application
 dependencies:
   - name: falco
-    version: 8.0.2
+    version: 9.0.0
     repository: https://falcosecurity.github.io/charts
     condition: falco.enabled
   - name: falcosidekick
@@ -13,7 +13,7 @@ dependencies:
     repository: https://falcosecurity.github.io/charts
     condition: falcosidekick.enabled
   - name: tetragon
-    version: 1.6.1
+    version: 1.7.0
     repository: https://helm.cilium.io
     condition: tetragon.enabled
   - name: trivy-operator
@@ -21,6 +21,6 @@ dependencies:
     repository: https://aquasecurity.github.io/helm-charts
     condition: trivy-operator.enabled
   - name: kyverno
-    version: 3.7.1
+    version: 3.8.1
     repository: https://kyverno.github.io/kyverno/
     condition: kyverno.enabled

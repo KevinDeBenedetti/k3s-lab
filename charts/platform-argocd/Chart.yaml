@@ -1,9 +1,9 @@
 apiVersion: v2
 name: platform-argocd
 description: GitOps — ArgoCD
-version: 0.8.0
+version: 0.9.0
 type: application
 dependencies:
   - name: argo-cd
-    version: 7.8.26
+    version: 9.5.17
     repository: https://argoproj.github.io/argo-helm
