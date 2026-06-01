@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.9.0...v0.9.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* refactor Makefiles to Taskfiles and Update Load Env Script ([e7d7783](https://github.com/KevinDeBenedetti/k3s-lab/commit/e7d77832b8490da69405813be1bfc498c6c1f7c0))
+
 ## [0.9.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.8.0...v0.9.0) (2026-05-31)
 
 
