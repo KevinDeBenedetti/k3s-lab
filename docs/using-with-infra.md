@@ -1,134 +1,135 @@
 # Using k3s-lab with a Private Infra Repo
 
-This guide explains how to use k3s-lab as a shared toolkit from a **private repository that holds only your personal configuration** — your IPs, domains, passwords, and custom app manifests.
+This guide explains how to consume k3s-lab as a shared toolkit from a **private
+`infra` repository that holds only your configuration** — your IPs, domains,
+secrets, chart overrides, and app manifests.
 
 ---
 
 ## Architecture overview
 
 ```
-k3s-lab (public)                  infra (private)
-──────────────────────────────    ──────────────────────────────────
-  ansible/roles/                    Makefile          ← thin wrapper
-  makefiles/                        .env              ← your secrets
-  charts/      (Helm charts)        terraform/        ← Hetzner VPS
-  lib/                              ansible/          ← inventory + group_vars
+k3s-lab (public, reusable)        infra (private, configuration)
+──────────────────────────────    ──────────────────────────────────────
+  ansible/roles/                    terraform/        ← Hetzner VPS
+  ansible/playbooks/                ansible/          ← inventory + group_vars
+  taskfiles/   (Task fragments)     clusters/         ← cluster.env (non-secret)
+  charts/      (Helm → OCI)         platform/         ← chart value overrides
   kubernetes/  (Kustomize bases)    apps/             ← your apps (GitOps)
-  tests/                            platform/         ← chart value overrides
-                                    argocd/           ← ApplicationSets
-                                    secrets/          ← ExternalSecrets
-                                    .mk-cache/        ← auto-fetched
+  lib/         (shell libs)         argocd/           ← projects + ApplicationSets
+  scripts/                          secrets/          ← ExternalSecrets
+  tests/                            .env              ← your secrets (gitignored)
+                                    vendor/k3s-lab/   ← git submodule (tag-pinned)
+                                    Taskfile.yml      ← thin wrapper
 ```
 
-**Rule:** Every file you edit lives in `infra/`. You never touch `k3s-lab/` for daily use.
+**Rule:** every file you edit lives in `infra/`. You only touch `k3s-lab/` to
+improve the toolkit itself.
 
-| Repo | What it holds | You edit? |
-|------|--------------|-----------|
-| `k3s-lab` | Ansible roles, scripts, makefiles, manifests, tests | Only to improve the toolkit |
-| `infra` | Terraform, Ansible inventory, `.env`, your app manifests, `Makefile` | Yes — always |
+| Repo      | What it holds                                                          | You edit?                   |
+| --------- | ---------------------------------------------------------------------- | --------------------------- |
+| `k3s-lab` | Ansible roles, Helm charts, Kustomize bases, taskfiles, libs, tests    | only to improve the toolkit |
+| `infra`   | Terraform, inventory, `.env`, app manifests, overrides, `Taskfile.yml` | yes — always                |
 
-k3s-lab makefiles are fetched **on-demand via curl** into `infra/.mk-cache/` the first time you run any `make` target. No clone, no submodule.
+k3s-lab is consumed two ways, each pinned:
+
+| Artifact                          | Mechanism                          | Pinning          |
+| --------------------------------- | ---------------------------------- | ---------------- |
+| Helm charts (platform components) | OCI pull in ArgoCD ApplicationSets | semver per chart |
+| Ansible roles, taskfiles, scripts | git submodule `vendor/k3s-lab`     | semver git tag   |
+
+> The submodule is reproducible (the pinned commit appears in `git log`), works
+> offline and in CI, and updates cleanly via a single command. There is **no**
+> runtime `curl` fetch and **no** `.mk-cache/`.
 
 ---
 
 ## 1 — Bootstrap your infra repo
 
-### 1.1 Create the repo
+### 1.1 Add k3s-lab as a submodule
 
 ```bash
-mkdir ~/dev/infra && cd ~/dev/infra
-git init
+cd ~/dev/infra
+git submodule add https://github.com/KevinDeBenedetti/k3s-lab vendor/k3s-lab
+git -C vendor/k3s-lab checkout v1.0.0      # pin to a released tag
+git add .gitmodules vendor/k3s-lab
+git commit -m "chore: vendor k3s-lab v1.0.0"
 ```
 
-### 1.2 Create the Makefile
+Clone with submodules later via:
 
-```makefile
-# infra/Makefile
-.DEFAULT_GOAL := help
-SHELL         := /bin/bash
+```bash
+git clone --recurse-submodules <your-infra-repo>
+# or, in an existing clone:
+git submodule update --init --recursive
+```
 
--include .env
-export
+### 1.2 Create `Taskfile.yml`
 
-# ── Your values ───────────────────────────────────────────────────────────────
-SSH_USER            ?= youruser
-SSH_PORT            ?= 22
-SSH_KEY             ?= $(HOME)/.ssh/id_ed25519
-SSH_KEY             := $(subst ~,$(HOME),$(SSH_KEY))
-INITIAL_USER        ?= root
-SERVER_IP           ?=
-AGENT_IP            ?=
-KUBECONFIG_CONTEXT  ?= k3s-infra
-K3S_VERSION         ?= v1.32.2+k3s1
+The infra `Taskfile.yml` is a thin wrapper that `includes:` the taskfiles from the
+vendored submodule and adds repo-specific targets (Terraform, bootstrap):
 
-# ── k3s-lab source ─────────────────────────────────────────────────────────────
-K3S_LAB     :=
-K3S_LAB_RAW := https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main
+```yaml
+version: '3'
 
-# ── Terminal colors ───────────────────────────────────────────────────────────
-GREEN  := \033[0;32m
-YELLOW := \033[1;33m
-CYAN   := \033[0;36m
-RED    := \033[0;31m
-RESET  := \033[0m
+dotenv:
+  - .env
+  - clusters/hetzner-prod/cluster.env
 
-# ── Shared makefiles (auto-fetched from k3s-lab) ──────────────────────────────
-MK_CACHE   := .mk-cache
-SHARED_MKS := 00-lib 10-help 40-kubeconfig 45-security 50-deploy \
-              51-external-dns 52-argocd 55-vault 60-status 70-ssh 80-dev 90-provision
+vars:
+  ANSIBLE_DIR: ansible
+  PLAYBOOK_DIR: '{{.ROOT_DIR}}/vendor/k3s-lab/ansible/playbooks'
+  CLUSTER_ENV: '{{.ROOT_DIR}}/.env'
 
-$(foreach f,$(SHARED_MKS),\
-  $(if $(wildcard $(MK_CACHE)/$(f).mk),,\
-    $(shell mkdir -p $(MK_CACHE) && \
-            curl -fsSL $(K3S_LAB_RAW)/makefiles/$(f).mk \
-                 -o $(MK_CACHE)/$(f).mk 2>/dev/null || true)))
+includes:
+  provision:
+    taskfile: ./vendor/k3s-lab/taskfiles/provision.yml
+    vars:
+      ANSIBLE_DIR: '{{.ANSIBLE_DIR}}'
+      PLAYBOOK_DIR: '{{.PLAYBOOK_DIR}}'
+      CLUSTER_ENV: '{{.CLUSTER_ENV}}'
+  kubeconfig:
+    taskfile: ./vendor/k3s-lab/taskfiles/kubeconfig.yml
+  vault:
+    taskfile: ./vendor/k3s-lab/taskfiles/vault.yml
+  argocd:
+    taskfile: ./vendor/k3s-lab/taskfiles/argocd.yml
+  deploy:
+    taskfile: ./vendor/k3s-lab/taskfiles/deploy.yml
+  ssh:
+    taskfile: ./vendor/k3s-lab/taskfiles/ssh.yml
+  status:
+    taskfile: ./vendor/k3s-lab/taskfiles/status.yml
 
--include $(patsubst %,$(MK_CACHE)/%.mk,$(SHARED_MKS))
-
-# ── Cache management ──────────────────────────────────────────────────────────
-
-.PHONY: mk-update mk-clean
-
-mk-update: ## Force re-fetch all shared makefiles from k3s-lab
-	@echo "$(YELLOW)→ Refreshing shared makefiles from k3s-lab...$(RESET)"
-	@rm -rf $(MK_CACHE) && mkdir -p $(MK_CACHE)
-	@$(foreach f,$(SHARED_MKS),\
-	  curl -fsSL $(K3S_LAB_RAW)/makefiles/$(f).mk -o $(MK_CACHE)/$(f).mk \
-	    && echo "  ✓ $(f).mk";)
-	@echo "$(GREEN)✅ Shared makefiles updated$(RESET)"
-
-mk-clean: ## Remove cached makefiles (re-fetched on next make invocation)
-	@rm -rf $(MK_CACHE)
-	@echo "$(GREEN)✅ .mk-cache cleared$(RESET)"
+tasks:
+  default:
+    desc: Show available tasks
+    silent: true
+    cmds: [task --list]
 ```
 
 ### 1.3 Create `.gitignore`
 
 ```gitignore
-# Secrets
+# Secrets — never committed
 .env
-
-# Auto-fetched toolkit makefiles — do not commit
-.mk-cache/
 ```
 
-### 1.4 Verify all targets are available
+### 1.4 Verify all tasks are available
 
 ```bash
-make help
+task --list
 ```
 
-You should see all 40+ targets from k3s-lab alongside your own `mk-update` / `mk-clean`.
+You should see every namespaced task (`provision:*`, `vault:*`, `argocd:*`,
+`deploy:*`, `ssh:*`, `status:*`, `kubeconfig:*`) alongside your own.
 
 ---
 
 ## 2 — Personalize your `.env`
 
-```bash
-cp /dev/null .env   # or copy from k3s-lab's .env.example
-```
-
-Edit `.env` with **your** values — this is the only file that changes between users:
+`.env` is the only file that changes between users. It is **gitignored** and never
+committed — keep an `.env.example` with placeholders instead.
 
 ```bash
 # VPS nodes
@@ -138,76 +139,72 @@ AGENT_IP=5.6.7.8
 # SSH
 SSH_USER=kevin
 SSH_KEY=~/.ssh/id_ed25519
-INITIAL_USER=root
 
-# k3s
-K3S_VERSION=v1.32.2+k3s1
-# K3S_NODE_TOKEN is auto-read from the server by Ansible
+# k3s + chart versions (pin to avoid surprise upgrades)
+K3S_VERSION=v1.32.13+k3s1
+TRAEFIK_CHART_VERSION=39.0.8
+CERT_MANAGER_CHART_VERSION=1.20.2
 
-# Helm chart versions (pin to avoid surprise upgrades)
-TRAEFIK_CHART_VERSION=34.4.0
-CERT_MANAGER_VERSION=v1.17.1
-KUBE_PROMETHEUS_VERSION=82.10.3
-LOKI_VERSION=6.35.1
-PROMTAIL_VERSION=6.17.1
-
-# Your domain + Let's Encrypt email
+# Domain + Let's Encrypt email
 DOMAIN=example.com
 EMAIL=you@example.com
-
-# Traefik dashboard
-DASHBOARD_DOMAIN=dashboard.example.com
-DASHBOARD_PASSWORD=your-secure-password
-
-# Grafana
-GRAFANA_DOMAIN=grafana.example.com
-GRAFANA_PASSWORD=your-secure-password
 
 # kubectl context name
 KUBECONFIG_CONTEXT=k3s-infra
 ```
 
-> ⚠️ `.env` is in `.gitignore`. It is **never committed**. Add `.env.example` with placeholder values instead.
-
-See the [Configuration reference](./configuration.md) for every variable.
+See the [Configuration reference](./configuration.md) for every variable and the
+precedence rules (`Task var > .env > cluster.env > default`).
 
 ---
 
-## 3 — Deploy the cluster
+## 3 — Provision the cluster
 
-Once `.env` is filled, the full deploy is identical to using k3s-lab directly. All targets are available from `infra/`:
+Once `.env` is filled, all tasks are available from `infra/`:
 
 ```bash
-# First time only — full provisioning
-make provision
+# Full provisioning (Ansible): common + k3s server + agents + kubeconfig
+task provision:inventory
+task provision:site
 ```
 
 Or step by step:
 
 ```bash
-make provision-server      # common + k3s server + wireguard (Ansible)
-make provision-agents      # join agent to cluster (Ansible)
-make kubeconfig            # merge ~/.kube/config
+task provision:server      # common + k3s server + wireguard
+task provision:agents      # join agent nodes
+task kubeconfig:fetch      # merge ~/.kube/config
 kubectl config use-context k3s-infra
-make nodes                 # verify nodes Ready
-
-make deploy-dashboard-secret
-make deploy                # Traefik + cert-manager + ClusterIssuers
-
-make deploy-grafana-secret
-make deploy-monitoring     # Prometheus + Grafana + Loki + Promtail
+task status:nodes          # verify nodes Ready
 ```
 
-See [Getting Started](./getting-started.md) for the full step-by-step walkthrough.
+See [Getting Started](./getting-started.md) for the full walkthrough.
 
 ---
 
-## 4 — Deploy your own apps
+## 4 — Deploy the platform & your apps
 
-### 4.1 Using ArgoCD ApplicationSets (recommended)
+The platform (Traefik, cert-manager, monitoring, security) is deployed
+declaratively via Helm charts + ArgoCD. Bootstrap ArgoCD once, then it reconciles
+everything from Git:
 
-Create your app manifests in the `apps/` directory of your infra repo.
-ArgoCD ApplicationSets auto-discover new directories and deploy them:
+```bash
+task argocd:deploy
+task argocd:add-repo
+task argocd:status
+```
+
+Create the secrets the charts consume:
+
+```bash
+task deploy:dashboard-secret
+task deploy:grafana-secret
+```
+
+### Deploy your own apps
+
+Create app manifests under `apps/` in your infra repo. The `apps` ApplicationSet
+auto-discovers new directories:
 
 ```
 infra/
@@ -215,138 +212,54 @@ infra/
     myapp/
       deployment.yaml
       service.yaml
-      ingress.yaml
+      ingress.yaml        ← Traefik IngressRoute
 ```
 
 Just `git push` — ArgoCD handles the rest. See [Deploying an App](./operations/deploy-app.md).
-
-### 4.2 Adding your own app manifests
-
-Create a directory in your **infra repo** for app-specific manifests. These are purely yours — they never go into k3s-lab.
-
-```
-infra/
-  apps/
-    myapp/
-      namespace.yaml
-      deployment.yaml
-      service.yaml
-      ingress.yaml        ← IngressRoute with ${DOMAIN}
-      certificate.yaml    ← cert-manager Certificate
-```
-
-**Example IngressRoute + Certificate:**
-
-```yaml
-# infra/apps/myapp/ingress.yaml
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: myapp-tls
-  namespace: apps
-spec:
-  secretName: myapp-tls
-  issuerRef:
-    name: letsencrypt-production
-    kind: ClusterIssuer
-  dnsNames:
-    - myapp.${DOMAIN}
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: myapp
-  namespace: apps
-spec:
-  entryPoints:
-    - websecure
-  routes:
-    - match: Host(`myapp.${DOMAIN}`)
-      kind: Rule
-      services:
-        - name: myapp
-          port: 80
-  tls:
-    secretName: myapp-tls
-```
-
-With ApplicationSets, these manifests are automatically deployed when pushed to git.
-
-### 4.3 Add a `make` target for your app (optional)
-
-> **Note:** With ArgoCD ApplicationSets, manual deploy targets are usually unnecessary.
-> Apps in `apps/` are auto-discovered and deployed. Use make targets only for
-> non-GitOps workflows or bootstrapping.
 
 ---
 
 ## 5 — Update the toolkit
 
-When k3s-lab ships improvements, update your cache:
+When k3s-lab ships improvements, bump the submodule pointer to a newer tag:
 
 ```bash
-make mk-update
+git -C vendor/k3s-lab fetch --tags
+git -C vendor/k3s-lab checkout v1.1.0
+git add vendor/k3s-lab
+git commit -m "chore: bump k3s-lab to v1.1.0"
 ```
 
-This re-fetches all shared makefiles from `k3s-lab@main`. Your `.env` and `apps/` manifests are **untouched**.
+Review the diff, let CI validate, and merge. Your `.env`, `apps/`, and `platform/`
+overrides are untouched. Renovate can open these bump PRs automatically.
 
-### Pin to a specific k3s-lab version
-
-To pin to a commit or branch instead of `main`, change `K3S_LAB_RAW` in your `infra/Makefile`:
-
-```makefile
-# Pin to a specific git ref
-K3S_LAB_RAW := https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v1.2.0
-
-# Or test against a development branch
-K3S_LAB_RAW := https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/my-feature-branch
-```
-
-Then run `make mk-clean && make mk-update` to re-fetch for the new ref.
-
-### What gets updated vs what stays yours
-
-| Updated by `make mk-update` | Never touched |
-|-----------------------------|---------------|
-| `.mk-cache/` — all shared makefiles | `Makefile` |
-| Scripts fetched at runtime via curl | `.env` |
-| k3s-lab's `kubernetes/` Kustomize bases | `apps/` — your apps |
-| k3s-lab's `charts/` defaults | `platform/` — your overrides |
+| Bumped by a submodule update                         | Never touched           |
+| ---------------------------------------------------- | ----------------------- |
+| `vendor/k3s-lab/` — taskfiles, roles, scripts, bases | `Taskfile.yml`          |
+| —                                                    | `.env`                  |
+| —                                                    | `apps/` — your apps     |
+| —                                                    | `platform/` — overrides |
 
 ---
 
 ## 6 — Update Helm chart versions
 
-Chart versions are pinned in `charts/*/Chart.yaml`. To upgrade:
+Platform charts are pulled via OCI and pinned in your ArgoCD ApplicationSets /
+`platform/*` values. To upgrade, bump the pinned `targetRevision` and push:
 
-1. Update the version in the chart dependency:
-   ```bash
-   # e.g. in charts/platform-monitoring/Chart.yaml
-   ```
+```bash
+git add -A && git commit -m "chore: bump chart versions" && git push
+```
 
-2. Let ArgoCD sync or re-deploy:
-   ```bash
-   git add -A && git commit -m "chore: bump chart versions" && git push
-   ```
-
-ArgoCD detects the change and syncs automatically.
+ArgoCD detects the change and syncs automatically. Renovate opens these PRs for you.
 
 ---
 
-## 7 — Override a k3s-lab target
+## 7 — Override a k3s-lab task
 
-If you need to customize a shared target (e.g. `deploy` has special requirements for your stack), add it directly in `infra/Makefile` **after** the `-include` block. Make uses the first definition of a target:
-
-```makefile
-# Override the shared deploy target with infra-specific steps
-deploy: ## Deploy base stack + myapp
-	@helm upgrade --install platform-base ./charts/platform-base -n kube-system
-	@kubectl apply -f apps/myapp/
-	@echo "$(GREEN)✅ Stack + myapp deployed$(RESET)"
-```
-
-> ⚠️ Override sparingly — the shared targets are maintained and improved in k3s-lab.
+If you need to customize a shared task, define a task with the same name **in your
+infra `Taskfile.yml`** — your local definition takes precedence over the included
+one. Override sparingly: shared tasks are maintained and improved in k3s-lab.
 
 ---
 
@@ -354,26 +267,29 @@ deploy: ## Deploy base stack + myapp
 
 ```bash
 # ── First time ────────────────────────────────────────────────────────────────
-git clone <your-infra-repo> && cd infra
-cp .env.example .env     # fill in your IPs, domain, passwords
-
-make help                # verify all targets loaded from k3s-lab
+git clone --recurse-submodules <your-infra-repo> && cd infra
+cp .env.example .env       # fill in your IPs, domain, passwords
+task --list                # verify all tasks loaded from the submodule
 
 # ── Provision cluster ─────────────────────────────────────────────────────────
-make provision           # one-shot: common → k3s → kubeconfig (via Ansible)
+task provision:inventory
+task provision:site        # common → k3s → agents → kubeconfig (Ansible)
+
+# ── Deploy platform (GitOps) ──────────────────────────────────────────────────
+task argocd:deploy
+task argocd:add-repo
+task deploy:dashboard-secret
+task deploy:grafana-secret
 
 # ── Day-to-day ────────────────────────────────────────────────────────────────
-make nodes               # check node status
-make status              # check all pod statuses
-make deploy-myapp        # deploy your custom app
-kubectl logs -n apps deploy/myapp --tail=50
+task status:nodes          # node status
+task status:all            # all pod statuses
+git add apps/myapp/ && git commit -m "feat: add myapp" && git push   # ArgoCD deploys
 
 # ── Maintain ─────────────────────────────────────────────────────────────────
-make mk-update           # pull latest makefiles from k3s-lab
-# edit .env to bump TRAEFIK_CHART_VERSION=35.0.0
-make deploy              # apply Helm upgrade
+git -C vendor/k3s-lab checkout v1.1.0 && git add vendor/k3s-lab   # bump toolkit
 
 # ── Debug remotely ────────────────────────────────────────────────────────────
-make ssh-server          # open SSH shell on server VPS
-make ssh-agent           # open SSH shell on agent VPS
+task ssh:server            # SSH shell on server VPS
+task ssh:agent             # SSH shell on agent VPS
 ```

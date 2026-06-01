@@ -22,7 +22,7 @@ For cluster-specific configuration, use a private `infra` repository that consum
 - Policy enforcement: Kyverno with Pod Security Standards and best practices
 - Secret management: HashiCorp Vault + External Secrets Operator
 - GitOps: ArgoCD
-- Makefile-driven workflow with includeable fragments
+- Task-driven workflow with includeable taskfiles
 - Static CI: ShellCheck, actionlint, kubeconform, Helm lint, resource limits check, Gitleaks
 - Local testing via Bats
 
@@ -51,7 +51,7 @@ k3s-lab/
 ├── kubernetes/                 # Kustomize bases
 │   ├── base/                   # Namespaces, LimitRange, RBAC
 │   └── components/             # Reusable ExternalSecret, IngressRoute templates
-├── makefiles/                  # Includeable Makefile fragments
+├── taskfiles/                  # Includeable Task fragments (provision, deploy, …)
 ├── scripts/                    # Deployment + validation scripts
 ├── lib/                        # Shared shell libs + default values
 ├── tests/                      # Bats tests

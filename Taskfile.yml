@@ -38,6 +38,10 @@ includes:
     taskfile: ./taskfiles/ssh.yml
   status:
     taskfile: ./taskfiles/status.yml
+  kubeconfig:
+    taskfile: ./taskfiles/kubeconfig.yml
+  dev:
+    taskfile: ./taskfiles/dev.yml
 
 tasks:
   default:

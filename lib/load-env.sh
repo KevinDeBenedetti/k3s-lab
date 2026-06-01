@@ -2,7 +2,7 @@
 # lib/load-env.sh — Load a .env file without overwriting already-set variables.
 # Source this file, then call: load_env [path/to/.env]
 #
-# This lets Makefile targets (or the environment) override .env values at call time.
+# This lets Task targets (or the environment) override .env values at call time.
 # Any variable already exported in the environment is left untouched.
 #
 # Usage:

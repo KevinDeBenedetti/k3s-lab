@@ -1,0 +1,42 @@
+# =============================================================================
+# taskfiles/dev.yml — Developer workflow (tests, lint, git hooks)
+#
+# Namespace: dev
+# Usage (standalone):  task dev:test
+# Requires: brew install bats-core prek   (test-watch also needs: brew install entr)
+# =============================================================================
+version: '3'
+
+tasks:
+  test:
+    desc: Run BATS unit tests (offline — no cluster needed)
+    dir: '{{.TASKFILE_DIR}}/..'
+    cmds:
+      - bats tests/bats/
+
+  test-watch:
+    desc: Re-run BATS tests on every file change (requires entr)
+    dir: '{{.TASKFILE_DIR}}/..'
+    preconditions:
+      - sh: command -v entr
+        msg: "entr not found — brew install entr"
+    cmds:
+      - find tests/bats -name '*.bats' -o -name '*.bash' | entr bats tests/bats/
+
+  lint:
+    desc: Run all linters (shellcheck + kubeconform + yaml) via prek
+    dir: '{{.TASKFILE_DIR}}/..'
+    cmds:
+      - prek run --all-files
+
+  lint-install:
+    desc: Install prek git hooks (run once after cloning)
+    dir: '{{.TASKFILE_DIR}}/..'
+    cmds:
+      - prek install
+
+  hooks-update:
+    desc: Update prek hook revisions to latest
+    dir: '{{.TASKFILE_DIR}}/..'
+    cmds:
+      - prek autoupdate

@@ -11,9 +11,6 @@ insert_final_newline = true
 [*.{sh,bash,bats}]
 indent_size = 2
 
-[Makefile,*.mk]
-indent_style = tab
-
 [*.md]
 trim_trailing_whitespace = false
 

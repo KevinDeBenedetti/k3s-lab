@@ -32,13 +32,13 @@ No manual DNS management. No waiting for DNS propagation before pushing.
 
 1. Cloudflare API token seeded into Vault:
    ```bash
-   make vault-seed-cloudflare        # seeds secret/cert-manager/cloudflare
-   make vault-apply-externalsecrets  # syncs cloudflare-api-token-secret to external-dns namespace
+     task vault:seed-cloudflare        # seeds secret/cert-manager/cloudflare
+     ArgoCD applies the ExternalSecret resources from Git to sync cloudflare-api-token-secret to external-dns namespace
    ```
 
 2. Deploy external-dns:
    ```bash
-   make deploy-external-dns
+     ArgoCD deploys external-dns from Git. No manual deploy command is needed.
    ```
 
 That's it. external-dns is now watching the cluster.
@@ -99,7 +99,7 @@ This means:
 
 To delete a DNS record, remove it from the Cloudflare dashboard.
 
-> To switch to `sync` policy (auto-delete), update `external-dns-values.yaml` and re-run `make deploy-external-dns`.
+> To switch to `sync` policy (auto-delete), update `external-dns-values.yaml` and commit/push your change — ArgoCD will sync automatically.
 
 ---
 
@@ -107,10 +107,10 @@ To delete a DNS record, remove it from the Cloudflare dashboard.
 
 ```bash
 # Check external-dns pod is running
-make external-dns-status
+kubectl get pods -n external-dns
 
 # Tail live logs to see record creation events
-make external-dns-logs
+kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns -f
 
 # Verify record in Cloudflare
 dig myapp.kevindb.dev +short
@@ -128,11 +128,11 @@ Expected log output:
 
 external-dns reads hostnames from three sources:
 
-| Source | How it discovers hostnames |
-|---|---|
+| Source          | How it discovers hostnames                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
 | `traefik-proxy` | Reads `Host()` rules from `IngressRoute` CRDs + `external-dns.alpha.kubernetes.io/hostname` annotation |
-| `ingress` | Reads standard Kubernetes `Ingress` resources |
-| `service` | Reads `LoadBalancer` services with hostname annotation |
+| `ingress`       | Reads standard Kubernetes `Ingress` resources                                                          |
+| `service`       | Reads `LoadBalancer` services with hostname annotation                                                 |
 
 ---
 
@@ -140,12 +140,12 @@ external-dns reads hostnames from three sources:
 
 Both external-dns and cert-manager use the same Cloudflare API token from Vault:
 
-| Component | Vault path | K8s Secret | Namespace | Purpose |
-|---|---|---|---|---|
-| cert-manager | `secret/cert-manager/cloudflare` | `cloudflare-api-token-secret` | `cert-manager` | DNS-01 ACME challenge |
+| Component    | Vault path                       | K8s Secret                    | Namespace      | Purpose                 |
+| ------------ | -------------------------------- | ----------------------------- | -------------- | ----------------------- |
+| cert-manager | `secret/cert-manager/cloudflare` | `cloudflare-api-token-secret` | `cert-manager` | DNS-01 ACME challenge   |
 | external-dns | `secret/cert-manager/cloudflare` | `cloudflare-api-token-secret` | `external-dns` | Create/update A records |
 
-Both are synced by ESO via `make vault-apply-externalsecrets`.
+Both are synced by ESO via ArgoCD applying the ExternalSecret resources from Git.
 
 ---
 

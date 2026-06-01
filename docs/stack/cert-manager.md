@@ -111,11 +111,11 @@ spec:
 
 ## Staging vs Production
 
-| | Staging | Production |
-|---|---|---|
-| Rate limits | None | [Strict](https://letsencrypt.org/docs/rate-limits/) |
-| Browser-trusted | ❌ | ✅ |
-| Use case | Testing pipeline | Real workloads |
+|                 | Staging          | Production                                          |
+| --------------- | ---------------- | --------------------------------------------------- |
+| Rate limits     | None             | [Strict](https://letsencrypt.org/docs/rate-limits/) |
+| Browser-trusted | ❌                | ✅                                                   |
+| Use case        | Testing pipeline | Real workloads                                      |
 
 **Always test with staging first.** Production is rate-limited to 5 duplicate certificates per week per domain.
 
@@ -214,8 +214,8 @@ Let's Encrypt → DNS lookup → validates TXT → issues certificate
 
 ```bash
 # In your infra repo
-make vault-seed-cloudflare        # seeds secret/cert-manager/cloudflare
-make vault-apply-externalsecrets  # syncs cloudflare-api-token-secret → cert-manager namespace
+task vault:seed-cloudflare        # seeds secret/cert-manager/cloudflare
+ArgoCD applies the ExternalSecret resources from Git to sync cloudflare-api-token-secret → cert-manager namespace
 ```
 
 3. The `ClusterIssuer` manifests already include a DNS-01 solver for `${DOMAIN}`:

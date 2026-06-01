@@ -194,7 +194,7 @@ kubectl --context k3s-infra get pods -n apps
 kubectl --context k3s-infra get certificate myapp-tls -n apps
 
 # Check external-dns logs
-make external-dns-logs
+kubectl logs -n external-dns -l app.kubernetes.io/name=external-dns -f
 ```
 
 Or open the ArgoCD UI: **https://argocd.kevindb.dev**

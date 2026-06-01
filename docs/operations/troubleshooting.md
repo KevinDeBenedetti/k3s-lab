@@ -34,9 +34,8 @@ Unable to connect to server: x509: certificate is valid for 127.0.0.1, not 1.2.3
 
 **Cause:** `--tls-san` was not set with the public IP during install.
 
-**Fix:** Re-run `make provision-server` with the correct server IP in the Ansible inventory.
+**Fix:** Re-run `task provision:server` with the correct server IP in the Ansible inventory.
 
----
 
 ### Agent can't join cluster
 
@@ -61,10 +60,9 @@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!
 
 **Fix:**
 ```bash
-make known-hosts-reset
+task ssh:known-hosts-reset
 ```
 
----
 
 ## Traefik
 
@@ -148,16 +146,15 @@ kubectl logs -n cert-manager deploy/cert-manager-webhook --tail=20
 
 ```
 grafana-admin-secret not found in monitoring namespace.
-Run first: make deploy-grafana-secret GRAFANA_PASSWORD=<your-password>
+Run first: task deploy:grafana-secret
 ```
 
 **Fix:**
 ```bash
-make deploy-grafana-secret
-make deploy-monitoring
+task deploy:grafana-secret
 ```
+Then let ArgoCD reconcile the monitoring stack (or trigger a sync).
 
----
 
 ### Prometheus not scraping Traefik
 
@@ -187,7 +184,7 @@ error: no context exists with the name: "k3s-lab"
 
 **Fix:**
 ```bash
-make kubeconfig
+task kubeconfig:fetch
 kubectl config use-context k3s-lab
 ```
 

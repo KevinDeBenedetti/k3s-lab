@@ -283,6 +283,5 @@ fi
 log_info "✅ Vault initialized and configured"
 echo ""
 echo "Next steps:"
-echo "  make vault-seed                     # store secrets into Vault"
-echo "  make deploy-eso                     # install External Secrets Operator"
-echo "  make vault-apply-externalsecrets    # apply ClusterSecretStore + ExternalSecrets"
+echo "  task vault:seed                     # store secrets into Vault"
+echo "  (ArgoCD deploys External Secrets Operator and applies the ClusterSecretStore + ExternalSecrets from Git)"

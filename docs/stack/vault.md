@@ -16,11 +16,12 @@ This guide covers deploying [HashiCorp Vault](https://developer.hashicorp.com/va
 [Kubernetes Secrets]  — consumed natively by pods / Helm charts
 ```
 
+
 **Storage:** Vault uses Raft integrated storage backed by a `local-path` PVC — no external Consul or etcd required.
 
 **Auth:** ESO authenticates to Vault via the Kubernetes auth method. ESO's own ServiceAccount token is exchanged for a scoped Vault token at sync time.
 
-**UI access:** Vault UI is behind the WireGuard `vpn-only` middleware. Connect with `make wg-up` before opening the browser.
+**UI access:** Vault UI is behind the WireGuard `vpn-only` middleware. Bring up your WireGuard VPN connection before opening the browser.
 
 ---
 
@@ -71,7 +72,7 @@ This installs Vault into the `vault` namespace with:
 ## Step 2 — Initialize Vault
 
 ```bash
-make vault-init
+task vault:init
 ```
 
 This script:
@@ -110,7 +111,7 @@ VAULT_UNSEAL_KEY_2=def456...
 ## Step 3 — Seed secrets into Vault
 
 ```bash
-VAULT_ROOT_TOKEN=hvs.XXXXX make vault-seed
+VAULT_ROOT_TOKEN=hvs.XXXXX task vault:seed
 ```
 
 The interactive prompt walks you through storing each secret:
@@ -125,7 +126,7 @@ The interactive prompt walks you through storing each secret:
 ## Step 4 — Deploy External Secrets Operator
 
 ```bash
-make deploy-eso
+ArgoCD deploys External Secrets Operator from Git. No manual deploy command is needed.
 ```
 
 Installs the `external-secrets/external-secrets` Helm chart into the `external-secrets` namespace.
@@ -143,7 +144,7 @@ kubectl apply -f secrets/
 ESO immediately begins syncing. Check status:
 
 ```bash
-make vault-status
+task vault:status
 ```
 
 ---
@@ -153,7 +154,7 @@ make vault-status
 Vault becomes sealed when the pod restarts. Unseal with:
 
 ```bash
-make vault-unseal   # requires VAULT_UNSEAL_KEY_1 + VAULT_UNSEAL_KEY_2 in .env
+task vault:unseal   # requires VAULT_UNSEAL_KEY_1 + VAULT_UNSEAL_KEY_2 in .env
 ```
 
 Or interactively:
@@ -204,14 +205,4 @@ kubectl exec -it -n vault vault-0 -- env VAULT_SKIP_VERIFY=true vault operator u
 
 ---
 
-## Makefile reference
-
-| Target            | Description                                          |
-| ----------------- | ---------------------------------------------------- |
-| `deploy-vault`    | Install/upgrade Vault via Helm                       |
-| `deploy-eso`      | Install/upgrade External Secrets Operator            |
-| `vault-init`      | Initialize, unseal, enable K8s auth, create policies |
-| `vault-unseal`    | Unseal Vault after a node reboot                     |
-| `vault-configure` | Re-apply policies + roles (idempotent)               |
-| `vault-seed`      | Interactive: store all managed secrets into Vault    |
-| `vault-status`    | Show seal status + ESO sync status                   |
+## Taskfile reference

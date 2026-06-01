@@ -7,13 +7,13 @@ It watches your `infra` repo and automatically applies any changes to Kubernetes
 
 ## What ArgoCD does here
 
-| Responsibility | Detail |
-|---|---|
-| Continuous delivery | Syncs cluster state to Git on every push |
-| Self-healing | Reverts manual `kubectl` changes automatically |
-| Pruning | Removes cluster resources deleted from Git |
-| Web UI | Visual overview of all apps and their sync status |
-| Webhook receiver | Instant sync triggered by GitHub push events |
+| Responsibility      | Detail                                            |
+| ------------------- | ------------------------------------------------- |
+| Continuous delivery | Syncs cluster state to Git on every push          |
+| Self-healing        | Reverts manual `kubectl` changes automatically    |
+| Pruning             | Removes cluster resources deleted from Git        |
+| Web UI              | Visual overview of all apps and their sync status |
+| Webhook receiver    | Instant sync triggered by GitHub push events      |
 
 ---
 
@@ -42,7 +42,7 @@ Kubernetes (apps, monitoring, … namespaces)
 ArgoCD is deployed via Helm from `infra/`:
 
 ```bash
-make deploy-argocd
+task argocd:deploy
 ```
 
 This installs `argo/argo-cd` chart at the version pinned in `ARGOCD_VERSION`
@@ -51,21 +51,21 @@ This installs `argo/argo-cd` chart at the version pinned in `ARGOCD_VERSION`
 
 ### Key configuration choices
 
-| Setting | Value | Why |
-|---|---|---|
-| `server.insecure: true` | enabled | Traefik terminates TLS; ArgoCD runs plain HTTP behind it |
-| `dex.enabled: false` | disabled | Single-user setup; no SSO needed |
-| `redis` in-cluster | enabled | Required for app state cache |
+| Setting                 | Value    | Why                                                      |
+| ----------------------- | -------- | -------------------------------------------------------- |
+| `server.insecure: true` | enabled  | Traefik terminates TLS; ArgoCD runs plain HTTP behind it |
+| `dex.enabled: false`    | disabled | Single-user setup; no SSO needed                         |
+| `redis` in-cluster      | enabled  | Required for app state cache                             |
 
 ---
 
 ## Access
 
-| Method | URL / Command |
-|---|---|
-| Web UI | `https://<ARGOCD_DOMAIN>` |
+| Method           | URL / Command                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| Web UI           | `https://<ARGOCD_DOMAIN>`                                                                              |
 | Initial password | `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' \| base64 -d` |
-| CLI login | `argocd login <ARGOCD_DOMAIN> --username admin` |
+| CLI login        | `argocd login <ARGOCD_DOMAIN> --username admin`                                                        |
 
 > Change the default password after first login.
 
@@ -77,7 +77,7 @@ ArgoCD accesses your private `infra` repo via an SSH deploy key stored as a
 Kubernetes Secret:
 
 ```bash
-make argocd-add-repo GITHUB_DEPLOY_KEY=~/.ssh/argocd_deploy_key
+task argocd:add-repo GITHUB_DEPLOY_KEY=~/.ssh/argocd_deploy_key
 ```
 
 This creates (or updates) the `argocd-infra-repo` secret in the `argocd`
@@ -156,12 +156,12 @@ spec:
 
 For instant sync (instead of polling every 3 minutes), configure a webhook:
 
-| Field | Value |
-|---|---|
-| URL | `https://<ARGOCD_DOMAIN>/api/webhook` |
-| Content type | `application/json` |
-| Events | **Just the push event** |
-| Secret | *(leave empty)* |
+| Field        | Value                                 |
+| ------------ | ------------------------------------- |
+| URL          | `https://<ARGOCD_DOMAIN>/api/webhook` |
+| Content type | `application/json`                    |
+| Events       | **Just the push event**               |
+| Secret       | *(leave empty)*                       |
 
 **`https://github.com/KevinDeBenedetti/infra/settings/hooks`**
 

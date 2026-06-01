@@ -8,13 +8,13 @@ k3s ships with Traefik by default, but this repo **disables the built-in Traefik
 
 ## What Traefik does here
 
-| Responsibility | Detail |
-|---|---|
+| Responsibility     | Detail                                             |
+| ------------------ | -------------------------------------------------- |
 | Ingress controller | Routes traffic to services via `IngressRoute` CRDs |
-| TLS termination | Handles HTTPS using certificates from cert-manager |
-| Dashboard | Secured admin UI at `DASHBOARD_DOMAIN` |
-| Metrics | Exposes Prometheus metrics on port `9100` |
-| Access logs | JSON-formatted access logs |
+| TLS termination    | Handles HTTPS using certificates from cert-manager |
+| Dashboard          | Secured admin UI at `DASHBOARD_DOMAIN`             |
+| Metrics            | Exposes Prometheus metrics on port `9100`          |
+| Access logs        | JSON-formatted access logs                         |
 
 ---
 
@@ -37,11 +37,11 @@ helm upgrade --install traefik traefik/traefik \
 
 ### EntryPoints
 
-| EntryPoint | Port | Exposed | Purpose |
-|---|---|---|---|
-| `web` | 8000 | 80 | HTTP traffic |
-| `websecure` | 8443 | 443 | HTTPS + TLS |
-| `metrics` | 9100 | No | Internal metrics endpoint |
+| EntryPoint  | Port | Exposed | Purpose                   |
+| ----------- | ---- | ------- | ------------------------- |
+| `web`       | 8000 | 80      | HTTP traffic              |
+| `websecure` | 8443 | 443     | HTTPS + TLS               |
+| `metrics`   | 9100 | No      | Internal metrics endpoint |
 
 > **No global HTTP→HTTPS redirect.** A global redirect on the `web` entrypoint would intercept cert-manager's HTTP-01 ACME challenge before the solver can respond, breaking TLS issuance. Use a per-route `redirectScheme` middleware instead.
 
@@ -80,7 +80,7 @@ The Traefik dashboard is exposed via a secured `IngressRoute` at `DASHBOARD_DOMA
 ### Create the BasicAuth secret (run once)
 
 ```bash
-make deploy-dashboard-secret
+task deploy:dashboard-secret
 ```
 
 This runs:

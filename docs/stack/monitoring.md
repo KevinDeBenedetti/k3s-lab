@@ -4,10 +4,10 @@ The observability stack provides dashboards and centralized logging for the enti
 
 ## Stack components
 
-| Component | Role | Helm chart |
-|---|---|---|
-| [Grafana](https://grafana.com/grafana/) | Visualization dashboards | `grafana/grafana` |
-| [Loki](https://grafana.com/oss/loki/) | Centralized log storage | `grafana/loki` |
+| Component                                                            | Role                      | Helm chart         |
+| -------------------------------------------------------------------- | ------------------------- | ------------------ |
+| [Grafana](https://grafana.com/grafana/)                              | Visualization dashboards  | `grafana/grafana`  |
+| [Loki](https://grafana.com/oss/loki/)                                | Centralized log storage   | `grafana/loki`     |
 | [Promtail](https://grafana.com/docs/loki/latest/send-data/promtail/) | Log collector (DaemonSet) | `grafana/promtail` |
 
 ---
@@ -38,11 +38,11 @@ The observability stack provides dashboards and centralized logging for the enti
 
 Before deploying monitoring:
 
-1. Base stack deployed (`make deploy`)
+1. Commit and push your changes — ArgoCD syncs the platform automatically.
 2. Grafana admin secret created:
 
 ```bash
-make deploy-grafana-secret
+task deploy:grafana-secret
 ```
 
 This creates a `grafana-admin-secret` in the `monitoring` namespace with:
@@ -54,7 +54,7 @@ This creates a `grafana-admin-secret` in the `monitoring` namespace with:
 ## Deploy
 
 ```bash
-make deploy-monitoring
+ArgoCD reconciles the monitoring stack from Git. No manual deploy command is needed.
 ```
 
 This deploys the monitoring stack via the `platform-monitoring` Helm chart (managed by ArgoCD).
@@ -162,16 +162,16 @@ Configuration (`charts/platform-monitoring/values.yaml` under the `promtail:` ke
 
 ## Grafana dashboards
 
-| Dashboard | Source | What it shows |
-|---|---|---|
+| Dashboard     | Source                        | What it shows                     |
+| ------------- | ----------------------------- | --------------------------------- |
 | Logs — Errors | `grafana-logs-dashboard.yaml` | Error-focused log explorer (Loki) |
 
 ### Import additional dashboards
 
 Grafana has a large community dashboard library. Import by ID from **Dashboards → Import**:
 
-| ID | Name |
-|---|---|
+| ID      | Name             |
+| ------- | ---------------- |
 | `13713` | Loki log summary |
 
 ---

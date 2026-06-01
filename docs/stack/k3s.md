@@ -4,13 +4,13 @@
 
 ## Why k3s
 
-| Feature | Value |
-|---|---|
-| Single binary | No Docker daemon required |
-| Built-in containerd | Reduced resource footprint |
-| ARM + x86 support | Works on any VPS |
-| Certified Kubernetes | 100% API compatible |
-| Automatic TLS | Internal cluster PKI included |
+| Feature              | Value                         |
+| -------------------- | ----------------------------- |
+| Single binary        | No Docker daemon required     |
+| Built-in containerd  | Reduced resource footprint    |
+| ARM + x86 support    | Works on any VPS              |
+| Certified Kubernetes | 100% API compatible           |
+| Automatic TLS        | Internal cluster PKI included |
 
 ---
 
@@ -38,14 +38,14 @@
 
 ## Prerequisites
 
-| Requirement | Notes |
-|---|---|
-| Ubuntu 22.04+ / Debian 12+ | Both nodes |
-| 2 vCPU / 2 GB RAM (server) | 1 GB minimum for agent |
-| Public IP on each VPS | Required for TLS SAN + UFW rules |
-| SSH access as root or sudo user | Bootstrap uses `INITIAL_USER=root` |
-| Port `6443` open on server | k3s API server |
-| Ports `80`, `443` open on server | HTTP + HTTPS traffic |
+| Requirement                      | Notes                              |
+| -------------------------------- | ---------------------------------- |
+| Ubuntu 22.04+ / Debian 12+       | Both nodes                         |
+| 2 vCPU / 2 GB RAM (server)       | 1 GB minimum for agent             |
+| Public IP on each VPS            | Required for TLS SAN + UFW rules   |
+| SSH access as root or sudo user  | Bootstrap uses `INITIAL_USER=root` |
+| Port `6443` open on server       | k3s API server                     |
+| Ports `80`, `443` open on server | HTTP + HTTPS traffic               |
 
 ---
 
@@ -96,22 +96,22 @@ kernel.panic_on_oops                = 1
 
 ### Server node
 
-| Port | Protocol | Purpose |
-|---|---|---|
-| `80` | TCP | HTTP (Traefik + ACME HTTP-01 challenge) |
-| `443` | TCP | HTTPS (Traefik TLS termination) |
-| `6443` | TCP | Kubernetes API server |
-| `10.42.0.0/16` | any | k3s pod CIDR (Flannel) |
-| `10.43.0.0/16` | any | k3s service CIDR |
-| `8472` from AGENT_IP | UDP | Flannel VXLAN tunnel |
-| `10250` from AGENT_IP | TCP | kubelet API |
+| Port                  | Protocol | Purpose                                 |
+| --------------------- | -------- | --------------------------------------- |
+| `80`                  | TCP      | HTTP (Traefik + ACME HTTP-01 challenge) |
+| `443`                 | TCP      | HTTPS (Traefik TLS termination)         |
+| `6443`                | TCP      | Kubernetes API server                   |
+| `10.42.0.0/16`        | any      | k3s pod CIDR (Flannel)                  |
+| `10.43.0.0/16`        | any      | k3s service CIDR                        |
+| `8472` from AGENT_IP  | UDP      | Flannel VXLAN tunnel                    |
+| `10250` from AGENT_IP | TCP      | kubelet API                             |
 
 ### Agent node
 
-| Port | Protocol | Purpose |
-|---|---|---|
-| `8472` from SERVER_IP | UDP | Flannel VXLAN tunnel |
-| `10250` from SERVER_IP | TCP | kubelet API |
+| Port                   | Protocol | Purpose              |
+| ---------------------- | -------- | -------------------- |
+| `8472` from SERVER_IP  | UDP      | Flannel VXLAN tunnel |
+| `10250` from SERVER_IP | TCP      | kubelet API          |
 
 ---
 
@@ -120,7 +120,7 @@ kernel.panic_on_oops                = 1
 ### 1. Bootstrap server
 
 ```bash
-make provision-server
+task provision:server
 ```
 
 This runs the Ansible `k3s-server.yml` playbook which:
@@ -134,7 +134,7 @@ This runs the Ansible `k3s-server.yml` playbook which:
 ### 2. Bootstrap agent
 
 ```bash
-make provision-agents
+task provision:agents
 ```
 
 This runs the Ansible `k3s-agent.yml` playbook which:
@@ -145,7 +145,7 @@ This runs the Ansible `k3s-agent.yml` playbook which:
 ### 3. Fetch kubeconfig
 
 ```bash
-make kubeconfig
+task kubeconfig:fetch
 ```
 
 Fetches `/etc/rancher/k3s/k3s.yaml` from the server, replaces `127.0.0.1` with the public IP, and merges it into `~/.kube/config` under the context name `KUBECONFIG_CONTEXT`.
@@ -155,7 +155,7 @@ Fetches `/etc/rancher/k3s/k3s.yaml` from the server, replaces `127.0.0.1` with t
 ## Uninstall
 
 ```bash
-make provision-reset       # Uninstall k3s from all nodes (DESTRUCTIVE)
+task provision:reset       # Uninstall k3s from all nodes (DESTRUCTIVE)
 ```
 
 The Ansible `reset.yml` playbook:
