@@ -1,0 +1,79 @@
+# =============================================================================
+# platform-deployment — Umbrella chart values
+#
+# This chart aggregates all platform-* subcharts. Each subchart can be
+# enabled/disabled independently, and you can override values for each.
+#
+# Usage:
+#   helm install platform-deployment oci://ghcr.io/kevindebenedetti/charts/platform-deployment \
+#     --version 1.0.0 \
+#     -f cluster-values.yaml
+#
+# See platform-argocd/values.yaml, platform-monitoring/values.yaml, etc.
+# for available options.
+# =============================================================================
+
+# Enable/disable individual subcharts (default: true for all)
+platform-argocd:
+  enabled: true
+
+platform-monitoring:
+  enabled: true
+
+platform-external-secrets:
+  enabled: true
+
+platform-vault:
+  enabled: true
+
+platform-cert-manager:
+  enabled: true
+
+platform-traefik:
+  enabled: true
+
+platform-security:
+  enabled: true
+
+# =============================================================================
+# Per-subchart configuration (pass through to dependencies)
+#
+# Everything under these keys is passed directly to the corresponding subchart.
+# Example:
+#
+#   platform-argocd:
+#     enabled: true
+#     argo-cd:
+#       global:
+#         domain: argocd.example.com
+#
+# See:
+#   - k3s-lab/charts/platform-argocd/values.yaml
+#   - k3s-lab/charts/platform-monitoring/values.yaml
+#   - etc.
+# =============================================================================
+
+# platform-argocd:
+#   # Override values here; will be merged with cluster-specific values
+#   argo-cd:
+#     global:
+#       domain: argocd.example.com
+
+# platform-monitoring:
+#   # Override values here
+#   grafana:
+#     adminPassword: "example"
+
+# platform-vault:
+#   # Override values here
+#   vault:
+#     server:
+#       replicas: 1
+
+# platform-traefik:
+#   # Override values here
+#   traefik:
+#     deployment:
+#       replicas: 1
+
+# ... and so on for other subcharts

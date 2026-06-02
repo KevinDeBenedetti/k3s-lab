@@ -4,12 +4,12 @@ This guide explains how to use the reusable Kustomize components from k3s-lab to
 
 ## Components Available
 
-| Component | Purpose | Files Provided |
-|-----------|---------|-----------------|
-| `app-base` | Standard pod security, labels, Service, ServiceAccount | `kustomization.yaml`, `deployment-patch.yaml`, `service.yaml`, `serviceaccount.yaml` |
-| `traefik-ingress` | IngressRoute + Middleware templates | `ingressroute.yaml`, `middleware.yaml` |
-| `network-policies` | Default-deny + allow from ingress controller + DNS | `network-deny-all.yaml`, `network-allow-ingress.yaml`, `network-allow-dns.yaml` |
-| `vault-auth` | ServiceAccount + RBAC for Vault authentication | `serviceaccount-vault.yaml`, `role.yaml`, `rolebinding.yaml` |
+| Component          | Purpose                                                | Files Provided                                                                       |
+| ------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `app-base`         | Standard pod security, labels, Service, ServiceAccount | `kustomization.yaml`, `deployment-patch.yaml`, `service.yaml`, `serviceaccount.yaml` |
+| `traefik-ingress`  | IngressRoute + Middleware templates                    | `ingressroute.yaml`, `middleware.yaml`                                               |
+| `network-policies` | Default-deny + allow from ingress controller + DNS     | `network-deny-all.yaml`, `network-allow-ingress.yaml`, `network-allow-dns.yaml`      |
+| `vault-auth`       | ServiceAccount + RBAC for Vault authentication         | `serviceaccount-vault.yaml`, `role.yaml`, `rolebinding.yaml`                         |
 
 ## Quick Start: Create a New App
 
@@ -269,14 +269,14 @@ patchesStrategicMerge:
 
 ## Benefits
 
-| Feature | Before | After |
-|---------|--------|-------|
-| Security context duplicated | Every app | Defined once in `app-base` |
-| Service template | Every app | Provided by `app-base` |
-| IngressRoute template | Every app | Provided by `traefik-ingress` |
-| NetworkPolicy | Every app | Provided by `network-policies` |
-| Updating security policy | Edit 8 apps | Edit 1 component |
-| Onboarding new app | Copy-paste 100s of lines | Reference 4 components |
+| Feature                     | Before                   | After                          |
+| --------------------------- | ------------------------ | ------------------------------ |
+| Security context duplicated | Every app                | Defined once in `app-base`     |
+| Service template            | Every app                | Provided by `app-base`         |
+| IngressRoute template       | Every app                | Provided by `traefik-ingress`  |
+| NetworkPolicy               | Every app                | Provided by `network-policies` |
+| Updating security policy    | Edit 8 apps              | Edit 1 component               |
+| Onboarding new app          | Copy-paste 100s of lines | Reference 4 components         |
 
 ## Troubleshooting
 

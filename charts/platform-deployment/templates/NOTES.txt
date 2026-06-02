@@ -1,0 +1,38 @@
+1. Platform deployment started — Check status:
+
+  kubectl get applications -n argocd
+  kubectl get helmreleases -n platform-system
+  kubectl get pods --all-namespaces | grep platform
+
+2. Verify subcharts are deployed:
+
+  kubectl get deployment -n argocd       # ArgoCD
+  kubectl get deployment -n monitoring   # Grafana, Prometheus
+  kubectl get pod -n vault               # Vault
+  kubectl get deployment -n kube-system  # Traefik (usually here or traefik namespace)
+
+3. Access ArgoCD UI:
+
+  kubectl port-forward -n argocd svc/argo-cd-argocd-server 8080:443
+  # Then: https://localhost:8080
+
+4. Check Grafana:
+
+  kubectl get secret -n monitoring grafana-admin-password -o jsonpath='{.data.GF_SECURITY_ADMIN_PASSWORD}' | base64 -d
+  kubectl port-forward -n monitoring svc/grafana 3000:80
+
+5. Check Vault:
+
+  kubectl get pod -n vault
+  kubectl port-forward -n vault svc/vault 8200:8200
+
+6. To update:
+
+  helm dependency update charts/platform-deployment
+  helm upgrade platform-deployment charts/platform-deployment -f values.yaml
+
+7. For more info:
+
+  helm show values oci://ghcr.io/kevindebenedetti/charts/platform-deployment --version 1.0.0
+  helm show values oci://ghcr.io/kevindebenedetti/charts/platform-argocd --version 0.9.2
+  ... and so on for other subcharts

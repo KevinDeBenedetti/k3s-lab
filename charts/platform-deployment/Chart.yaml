@@ -1,0 +1,76 @@
+apiVersion: v2
+name: platform-deployment
+description: |
+  Platform deployment — Umbrella chart combining all k3s-lab platform components
+
+  This chart aggregates all platform-* subcharts into a single Helm release,
+  making it easy to deploy the entire platform stack via ArgoCD with a single
+  ApplicationSet.
+
+  Subcharts (dependencies):
+  - platform-argocd (GitOps)
+  - platform-monitoring (Grafana + Prometheus + Loki)
+  - platform-external-secrets (Vault integration)
+  - platform-vault (Secret management)
+  - platform-cert-manager (TLS/ACME)
+  - platform-traefik (Ingress controller)
+  - platform-security (Pod security + network policies)
+
+  Each subchart can be enabled/disabled independently via values.
+
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+# All platform-* charts are OCI charts in ghcr.io
+dependencies:
+  - name: platform-argocd
+    version: "0.9.2"
+    repository: "oci://ghcr.io/kevindebenedetti/charts"
+    condition: platform-argocd.enabled
+
+  - name: platform-monitoring
+    version: "0.9.1"
+    repository: "oci://ghcr.io/kevindebenedetti/charts"
+    condition: platform-monitoring.enabled
+
+  - name: platform-external-secrets
+    version: "0.9.1"
+    repository: "oci://ghcr.io/kevindebenedetti/charts"
+    condition: platform-external-secrets.enabled
+
+  - name: platform-vault
+    version: "0.9.1"
+    repository: "oci://ghcr.io/kevindebenedetti/charts"
+    condition: platform-vault.enabled
+
+  - name: platform-cert-manager
+    version: "0.8.0"
+    repository: "oci://ghcr.io/kevindebenedetti/charts"
+    condition: platform-cert-manager.enabled
+
+  - name: platform-traefik
+    version: "0.8.0"
+    repository: "oci://ghcr.io/kevindebenedetti/charts"
+    condition: platform-traefik.enabled
+
+  - name: platform-security
+    version: "0.8.0"
+    repository: "oci://ghcr.io/kevindebenedetti/charts"
+    condition: platform-security.enabled
+
+maintainers:
+  - name: Kevin De Benedetti
+    email: kevin@example.com
+
+keywords:
+  - kubernetes
+  - k3s
+  - platform
+  - gitops
+  - helm
+  - umbrella
+
+home: https://github.com/KevinDeBenedetti/k3s-lab
+sources:
+  - https://github.com/KevinDeBenedetti/k3s-lab
