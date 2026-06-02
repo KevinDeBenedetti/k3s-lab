@@ -22,12 +22,13 @@ for values_file in charts/*/values.yaml; do
   echo "── $chart_name ──"
 
   # Skip charts that only define non-workload resources (namespaces, RBAC, etc.)
-  # These charts have no pods and thus no resource limits to set.
+  # Also skip umbrella charts (which delegate resource limits to subcharts)
   if ! grep -q 'resources:' "$values_file"; then
-    # Check if this chart has any workload dependencies (sub-charts with pods)
-    if [ -f "$(dirname "$values_file")/Chart.yaml" ] && \
-       ! grep -q 'dependencies:' "$(dirname "$values_file")/Chart.yaml"; then
-      echo -e "  ${YELLOW}⏭  Skipped (no workload resources)${RESET}"
+    chart_dir="$(dirname "$values_file")"
+    # Check if this is an umbrella chart (has dependencies) OR has no workloads
+    if [ -f "$chart_dir/Chart.yaml" ] && \
+       { grep -q 'dependencies:' "$chart_dir/Chart.yaml" || ! grep -q 'kind:' "$chart_dir/Chart.yaml"; }; then
+      echo -e "  ${YELLOW}⏭  Skipped (umbrella or no workload resources)${RESET}"
       continue
     fi
     echo -e "  ${RED}❌ No resource definitions found${RESET}"
