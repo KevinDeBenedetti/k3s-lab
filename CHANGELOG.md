@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.9.1...v0.10.0) (2026-06-02)
+
+
+### Features
+
+* **helm:** Add platform-deployment umbrella chart (v0.1.0) ([26271c0](https://github.com/KevinDeBenedetti/k3s-lab/commit/26271c007ae335b4777bb461a66692c46c4d63e8))
+* **kubernetes:** add Kustomize components for app modularity ([e3d5c04](https://github.com/KevinDeBenedetti/k3s-lab/commit/e3d5c04267a99981d18554371fa10f173fa3e30f))
+
+
+### Bug Fixes
+
+* **ci:** Fix GitHub Actions validation for platform-deployment chart ([f3d6960](https://github.com/KevinDeBenedetti/k3s-lab/commit/f3d6960e63cbfe8df5b647cc77af9542d0526301))
+* **platform-argocd:** bump to 0.9.2 — increase controller memory default to 2Gi (OOMKill prevention) ([5909fcf](https://github.com/KevinDeBenedetti/k3s-lab/commit/5909fcf2e7de931f6a20432300fc323a45492aa4))
+
 ## [0.9.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.9.0...v0.9.1) (2026-06-01)
 
 
