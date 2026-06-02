@@ -1,30 +1,28 @@
-# =============================================================================
-# Example: Refactoring homepage to use Kustomize Components
-#
-# This shows the BEFORE and AFTER of using components to reduce duplication.
-#
-# BEFORE: homepage had:
-#   - deployment.yaml (with full security context boilerplate)
-#   - service.yaml (standard template)
-#   - ingress.yaml (Traefik IngressRoute)
-#   - middleware.yaml (middleware chain)
-#   - configmap.yaml (app config)
-#   - serviceaccount.yaml (service account)
-#   - clusterrole.yaml (RBAC)
-#   - kustomization.yaml (listing all resources)
-#
-# AFTER: homepage uses components:
-#   - kustomization.yaml (references components)
-#   - deployment.yaml (ONLY app-specific spec)
-#   - configmap.yaml (app config)
-#   - ingress-patch.yaml (domain override)
-#   - deployment-patch.yaml (resources + security override)
-#
-# =============================================================================
+# Example — Refactoring `homepage` to use Kustomize Components
 
-# ── BEFORE: homepage/kustomization.yaml ────────────────────────────────────
+This guide walks through the **before** and **after** of adopting reusable
+[Kustomize components](./kustomize-components.md) to remove duplicated YAML
+boilerplate from an application's manifests, using the `homepage` app as a
+worked example.
 
-# OLD (lots of boilerplate):
+## Overview
+
+|            | Files                                                                                                                                                   | Approx. lines              | Security context           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | -------------------------- |
+| **Before** | `deployment.yaml`, `service.yaml`, `ingress.yaml`, `middleware.yaml`, `configmap.yaml`, `serviceaccount.yaml`, `clusterrole.yaml`, `kustomization.yaml` | ~350                       | Repeated in every app      |
+| **After**  | `kustomization.yaml`, `deployment.yaml`, `configmap.yaml`, `ingress-patch.yaml`, `deployment-patch.yaml`                                                | ~100 (+ shared components) | Defined once in `app-base` |
+
+**Before**, `homepage` carried a full set of manifests with all the security
+context, service account, networking and RBAC boilerplate inlined.
+
+**After**, `homepage` references shared components and only keeps the
+app-specific spec plus a couple of small patches.
+
+## `kustomization.yaml`
+
+### Before — lots of boilerplate
+
+```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: homepage
@@ -41,12 +39,11 @@ commonLabels:
   app.kubernetes.io/name: homepage
 commonAnnotations:
   description: "Dashboard UI"
+```
 
----
+### After — clean, components provide the boilerplate
 
-# ── AFTER: homepage/kustomization.yaml ─────────────────────────────────────
-
-# NEW (clean, components provide boilerplate):
+```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: homepage
@@ -63,23 +60,31 @@ resources:
   - configmap.yaml
 
 # Customize component templates for this app
-patchesStrategicMerge:
-  - ingress-patch.yaml
-  - deployment-patch.yaml
+patches:
+  - path: ingress-patch.yaml
+  - path: deployment-patch.yaml
 
-# Standard labels (app-base provides managed-by label)
+# Standard labels (app-base provides the managed-by label)
 commonLabels:
   app.kubernetes.io/name: homepage
+```
 
----
+> [!NOTE]
+> `patchesStrategicMerge` was deprecated in Kustomize v5.0.0. Use the `patches`
+> field with `path:` instead — strategic merge semantics still apply, so
+> existing patch files keep working. Run `kustomize edit fix` to migrate
+> automatically.
 
-# ── homepage/deployment.yaml (BEFORE - FULL BOILERPLATE) ───────────────────
+## `deployment.yaml`
 
+### Before — full boilerplate
+
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: homepage
-  namespace: apps  # OLD: namespace here
+  namespace: apps # OLD: namespace set here
   labels:
     app.kubernetes.io/name: homepage
 spec:
@@ -103,7 +108,7 @@ spec:
         - name: homepage
           image: "ghcr.io/gethomepage/homepage:v1.12.3@sha256:abc123..."
           imagePullPolicy: IfNotPresent
-          securityContext:                 # ← BOILERPLATE
+          securityContext: # ← boilerplate
             allowPrivilegeEscalation: false
             capabilities:
               drop:
@@ -122,12 +127,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          volumeMounts:           # ← BOILERPLATE (tmp/var-run)
+          volumeMounts: # ← boilerplate (tmp/var-run)
             - name: tmp
               mountPath: /tmp
             - name: var-run
               mountPath: /var/run
-          resources:             # ← Often identical
+          resources: # ← often identical across apps
             requests:
               cpu: "10m"
               memory: "32Mi"
@@ -139,16 +144,19 @@ spec:
           emptyDir: {}
         - name: var-run
           emptyDir: {}
+```
 
----
+### After — clean
 
-# ── homepage/deployment.yaml (AFTER - CLEAN) ───────────────────────────────
+Comments mark what is now provided by a component or a patch instead of being
+declared inline.
 
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: homepage
-  # namespace: ← Provided by kustomization.yaml
+  # namespace: ← provided by kustomization.yaml
 spec:
   revisionHistoryLimit: 3
   replicas: 1
@@ -162,17 +170,17 @@ spec:
       labels:
         app.kubernetes.io/name: homepage
     spec:
-      # serviceAccountName: ← Patched by kustomization.yaml
-      # automountServiceAccountToken: ← Provided by app-base
-      # dnsPolicy: ← Provided by app-base
-      # enableServiceLinks: ← Provided by app-base
-      # securityContext: ← Provided by app-base component
-      # volumes: ← Patched by deployment-patch.yaml
+      # serviceAccountName: ← patched by deployment-patch.yaml
+      # automountServiceAccountToken: ← provided by app-base
+      # dnsPolicy: ← provided by app-base
+      # enableServiceLinks: ← provided by app-base
+      # securityContext: ← provided by app-base component
+      # volumes: ← patched by deployment-patch.yaml
       containers:
         - name: homepage
           image: "ghcr.io/gethomepage/homepage:v1.12.3@sha256:abc123..."
-          # imagePullPolicy: ← Provided by app-base
-          # securityContext: ← Provided by app-base
+          # imagePullPolicy: ← provided by app-base
+          # securityContext: ← provided by app-base
           ports:
             - name: http
               containerPort: 8080
@@ -181,31 +189,31 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          # volumeMounts: ← Patched by deployment-patch.yaml
-          # resources: ← Patched by deployment-patch.yaml
+          # volumeMounts: ← patched by deployment-patch.yaml
+          # resources: ← patched by deployment-patch.yaml
+```
 
----
+## `ingress-patch.yaml` — customize the domain
 
-# ── homepage/ingress-patch.yaml (CUSTOMIZE DOMAIN) ────────────────────────
+Patch the `IngressRoute` provided by the `traefik-ingress` component.
 
-# Patch the IngressRoute from traefik-ingress component
+```yaml
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: app-https
 spec:
   routes:
-    - match: "Host(`homepage.kevindb.dev`)"  # ← Override domain
+    - match: "Host(`homepage.kevindb.dev`)" # ← override domain
       kind: Rule
       services:
-        - name: homepage  # ← Match service name
+        - name: homepage # ← match service name
           port: 80
+```
 
----
+## `deployment-patch.yaml` — override resources and volumes
 
-# ── homepage/deployment-patch.yaml (OVERRIDE RESOURCES + VOLUMES) ──────────
-
-# Patch to override resources and add volumes
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -235,34 +243,35 @@ spec:
           emptyDir: {}
         - name: var-run
           emptyDir: {}
+```
 
----
+## Files that disappear
 
-# ── Files that DISAPPEAR (provided by components) ────────────────────────
+These files are no longer needed because the components provide them:
 
-# These are no longer needed because:
+| File                  | Status  | Provided by                                  |
+| --------------------- | ------- | -------------------------------------------- |
+| `service.yaml`        | Deleted | `app-base`                                   |
+| `ingress.yaml`        | Deleted | `traefik-ingress` (use `ingress-patch.yaml`) |
+| `middleware.yaml`     | Deleted | `traefik-ingress`                            |
+| `serviceaccount.yaml` | Deleted | `app-base`                                   |
+| `clusterrole.yaml`    | Deleted | `network-policies` or base                   |
+| `configmap.yaml`      | Kept    | App-specific                                 |
 
-# service.yaml → DELETED (provided by app-base)
-# ingress.yaml → DELETED (provided by traefik-ingress; use ingress-patch.yaml)
-# middleware.yaml → DELETED (provided by traefik-ingress)
-# serviceaccount.yaml → DELETED (provided by app-base)
-# clusterrole.yaml → DELETED (provided by network-policies or base)
-# configmap.yaml → KEPT (app-specific)
+## Benefits summary
 
----
+**Before**
 
-# ── BENEFITS SUMMARY ───────────────────────────────────────────────────────
+- 8 files (`deployment`, `service`, `ingress`, `middleware`, `configmap`, `clusterrole`, `serviceaccount`, `kustomization`).
+- ~350 lines of YAML.
+- Boilerplate security context in every app.
+- Updating the security policy means editing 8+ apps.
 
-# BEFORE:
-# - 8 files (deployment, service, ingress, middleware, configmap, clusterrole, serviceaccount, kustomization)
-# - ~350 lines of YAML
-# - Boilerplate security context in EVERY app
-# - Updating security policy = edit 8+ apps
+**After**
 
-# AFTER:
-# - 4 files (deployment, configmap, kustomization, 2 patches)
-# - ~100 lines of YAML (+ 300 lines in components, reused by ALL apps)
-# - Security context defined ONCE in app-base
-# - Updating security policy = edit 1 file (app-base component)
-# - 70% less duplicated YAML per app
-# - 100% easier to onboard new apps
+- 4 files (`deployment`, `configmap`, `kustomization`, plus 2 patches).
+- ~100 lines of YAML (+ ~300 lines in components, reused by all apps).
+- Security context defined once in `app-base`.
+- Updating the security policy means editing 1 file (the `app-base` component).
+- ~70% less duplicated YAML per app.
+- Much easier to onboard new apps.
