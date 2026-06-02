@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.10.0...v0.11.0) (2026-06-02)
+
+
+### Features
+
+* Add vault-seeder Helm chart with job configurations and validation scripts ([7dc5d8e](https://github.com/KevinDeBenedetti/k3s-lab/commit/7dc5d8e1e8d76763db6a21c88508eefda686c3b7))
+
 ## [0.10.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.9.1...v0.10.0) (2026-06-02)
 
 
