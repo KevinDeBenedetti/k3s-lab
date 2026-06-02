@@ -1,0 +1,28 @@
+# Allow ingress from Traefik IngressController (usually in kube-system or traefik namespace)
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-ingress-controller
+  labels:
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}  # Applies to all pods in this namespace
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from Traefik (typically in kube-system or traefik namespace)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - namespaceSelector:
+            matchLabels:
+              name: traefik
+      ports:
+        - protocol: TCP
+          port: 8080      # Common app HTTP port
+        - protocol: TCP
+          port: 80        # HTTP fallback
+        - protocol: TCP
+          port: 443       # HTTPS

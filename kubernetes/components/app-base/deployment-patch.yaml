@@ -1,0 +1,47 @@
+# Patch applied to all Deployments — enforces security best practices
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: __APP_NAME__  # Placeholder; will be replaced per-app
+spec:
+  template:
+    metadata:
+      labels:
+        version: "1.0"  # Will be overridden per-app if needed
+    spec:
+      automountServiceAccountToken: true
+      dnsPolicy: ClusterFirst
+      enableServiceLinks: true
+      # serviceAccountName: will be set per-app via name
+      containers:
+        - name: app  # Placeholder; will be replaced
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            # runAsUser: will be set per-app (e.g., 1000)
+            # runAsGroup: will be set per-app (e.g., 1000)
+            seccompProfile:
+              type: RuntimeDefault
+          # volumeMounts:
+          #   - name: tmp
+          #     mountPath: /tmp
+          #   - name: var-run
+          #     mountPath: /var/run
+          # resources:
+          #   requests:
+          #     cpu: "10m"
+          #     memory: "32Mi"
+          #   limits:
+          #     cpu: "500m"
+          #     memory: "256Mi"
+      # volumes:
+      #   - name: tmp
+      #     emptyDir: {}
+      #   - name: var-run
+      #     emptyDir: {}

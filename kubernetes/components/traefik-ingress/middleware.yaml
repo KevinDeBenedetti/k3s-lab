@@ -1,0 +1,27 @@
+# Traefik Middleware template — security headers + auth
+
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: app-middleware
+spec:
+  chain:
+    middlewares:
+      - name: security-headers
+      # - name: oidc-forward-auth  # Optional: uncomment for OIDC
+      # - name: rate-limit         # Optional: for API rate limiting
+
+---
+# Common security headers middleware (shared, should exist cluster-wide)
+# This is a reference; the actual middleware should be in platform/traefik/
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+spec:
+  headers:
+    sslRedirect: true
+    sslHost: "app.example.com"  # Override in app
+    referrerPolicy: "strict-origin-when-cross-origin"
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"

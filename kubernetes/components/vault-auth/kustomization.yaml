@@ -1,0 +1,25 @@
+# =============================================================================
+# vault-auth Component — Vault AppRole ServiceAccount + RBAC
+#
+# Provides:
+# - ServiceAccount configured for Vault auth
+# - ServiceAccount token (used by ExternalSecret to authenticate to Vault)
+# - Role/RoleBinding for apps that need read access
+#
+# Usage in app kustomization.yaml:
+#   components:
+#     - ../../../../vendor/k3s-lab/kubernetes/components/vault-auth
+#   resources:
+#     - deployment.yaml
+#
+# The ServiceAccount is bound to a Role that allows reading secrets
+# (simplified; actual Vault auth is via ExternalSecret, not kubectl secrets)
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - serviceaccount-vault.yaml
+  - role.yaml
+  - rolebinding.yaml

@@ -1,0 +1,34 @@
+# =============================================================================
+# app-base Component — Reusable base for all apps
+#
+# Provides:
+# - Standard labels (app.kubernetes.io/*, managed-by)
+# - Service & ServiceAccount templates
+# - Namespace label selector
+#
+# NOTE: patchesStrategicMerge are applied at the APP level, not here.
+# This component provides the base templates only.
+#
+# Usage in app kustomization.yaml:
+#   components:
+#     - ../../../../vendor/k3s-lab/kubernetes/components/app-base
+#   resources:
+#     - deployment.yaml      # your app-specific deployment
+#   patchesStrategicMerge:
+#     - deployment-patch.yaml     # override resources, volumes, etc.
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Resources used by this component (templates)
+resources:
+  - service.yaml
+  - serviceaccount.yaml
+
+# Labels applied to ALL objects (including Deployments, Services, etc.)
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: "kustomize"
+    # app.kubernetes.io/name will be set per-app
+    # app.kubernetes.io/version will be set per-app

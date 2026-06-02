@@ -1,0 +1,27 @@
+# Role for Vault-authenticated apps
+# (minimal; actual secret reading is done by ExternalSecret via Vault auth)
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-auth
+  labels:
+    app.kubernetes.io/component: vault-auth
+rules:
+  # Allow reading ExternalSecrets (for debugging)
+  - apiGroups:
+      - external-secrets.io
+    resources:
+      - externalsecrets
+    verbs:
+      - get
+      - list
+      - watch
+  # Allow reading the Secrets that ExternalSecret creates
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list

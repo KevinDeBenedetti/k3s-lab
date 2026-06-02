@@ -1,0 +1,25 @@
+# Traefik IngressRoute template — customize with patchesJson6902 or patchesStrategicMerge
+
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: app-https
+  labels:
+    app.kubernetes.io/component: ingress
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: "Host(`app.example.com`)"  # Override in app
+      kind: Rule
+      services:
+        - name: app  # Will match service name
+          port: 80
+      middlewares:
+        - name: app-middleware
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: "app.example.com"  # Override in app
+        sans:
+          - "*.example.com"

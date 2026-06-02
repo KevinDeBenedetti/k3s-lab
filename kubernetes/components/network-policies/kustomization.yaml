@@ -1,0 +1,23 @@
+# =============================================================================
+# network-policies Component — Default-deny + Allow ingress
+#
+# Provides:
+# - Default deny all traffic (ingress + egress)
+# - Allow ingress from Traefik (ingress controller)
+# - Allow DNS egress to kube-system
+#
+# Usage in app kustomization.yaml:
+#   components:
+#     - ../../../../vendor/k3s-lab/kubernetes/components/network-policies
+#
+# This is a DRY way to apply consistent network policy across all apps
+# without duplicating the same rules in each app namespace.
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - network-deny-all.yaml
+  - network-allow-ingress.yaml
+  - network-allow-dns.yaml

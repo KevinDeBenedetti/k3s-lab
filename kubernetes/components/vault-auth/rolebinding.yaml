@@ -1,0 +1,15 @@
+# Bind the vault-auth ServiceAccount to its Role
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-auth
+  labels:
+    app.kubernetes.io/component: vault-auth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vault-auth
+subjects:
+  - kind: ServiceAccount
+    name: vault-auth

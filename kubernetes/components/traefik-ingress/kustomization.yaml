@@ -1,0 +1,24 @@
+# =============================================================================
+# traefik-ingress Component — Reusable Traefik IngressRoute + Middleware
+#
+# Provides:
+# - IngressRoute template (TLS, path-based routing)
+# - Middleware template (auth chains, security headers)
+#
+# Usage in app kustomization.yaml:
+#   components:
+#     - ../../../../vendor/k3s-lab/kubernetes/components/traefik-ingress
+#   resources:
+#     - deployment.yaml
+#   patchesStrategicMerge:
+#     - ingress-patch.yaml    # customize domain, paths, middleware
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ingressroute.yaml
+  - middleware.yaml
+
+# namePrefix can be set by consumer to customize routes

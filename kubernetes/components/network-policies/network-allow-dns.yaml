@@ -1,0 +1,29 @@
+# Allow DNS egress to kube-system for name resolution
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  labels:
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}  # Applies to all pods in this namespace
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS to kube-system
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53        # DNS UDP
+        - protocol: TCP
+          port: 53        # DNS TCP
+    # Allow external HTTPS (for external API calls if needed)
+    - to:
+        - namespaceSelector: {}  # Any namespace
+      ports:
+        - protocol: TCP
+          port: 443

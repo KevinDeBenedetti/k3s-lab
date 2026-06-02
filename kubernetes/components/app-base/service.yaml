@@ -1,0 +1,17 @@
+# Service template — to be customized per-app with kustomize namePrefix/nameSuffix
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  labels:
+    app.kubernetes.io/component: service
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+  selector:
+    app.kubernetes.io/name: app  # Will be overridden per-app
