@@ -1,0 +1,142 @@
+{{- if .Values.jobCore.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.jobCore.name }}-script
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "platform-vault-seeder.labels" . | nindent 4 }}
+    app: {{ .Values.jobCore.name }}
+data:
+  vault-configure.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # =============================================================================
+    # vault-configure.sh — (Re)create Vault policies and Kubernetes roles
+    # Runs as Job in cluster
+    # =============================================================================
+
+    export VAULT_TOKEN="${VAULT_ROOT_TOKEN}"
+    export VAULT_SKIP_VERIFY=true
+    export KUBECONFIG_CONTEXT="{{ .Values.global.kubeContext }}"
+    export VAULT_NAMESPACE="{{ .Values.global.vaultNamespace }}"
+    export VAULT_POD="{{ .Values.global.vaultPod }}"
+    export ESO_NAMESPACE="external-secrets"
+    export ESO_SA="external-secrets"
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+    vault_exec() {
+      kubectl --context "${KUBECONFIG_CONTEXT}" exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
+        -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
+    }
+
+    vault_exec_stdin() {
+      kubectl --context "${KUBECONFIG_CONTEXT}" exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
+        -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
+    }
+
+    log() { echo "[vault-seeder-core] $*"; }
+    log_step() { echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo "→ $*"; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; }
+
+    # ── 1. ESO read policy + Kubernetes role ──────────────────────────────────
+    log_step "Creating ESO read policy + Kubernetes role..."
+
+    vault_exec_stdin policy write eso-read - <<'POLICY'
+    path "secret/data/*" {
+      capabilities = ["read", "list"]
+    }
+    path "secret/metadata/*" {
+      capabilities = ["read", "list"]
+    }
+    POLICY
+
+    vault_exec write auth/kubernetes/role/eso \
+      bound_service_account_names="${ESO_SA}" \
+      bound_service_account_namespaces="${ESO_NAMESPACE}" \
+      policies="eso-read" \
+      ttl=1h
+
+    log "✅ ESO policy and role configured"
+
+    # ── 2. OIDC auth (conditional) ────────────────────────────────────────────
+    {{- if .Values.secrets.oidcClientId }}
+    if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_ISSUER_URL:-}" && -n "${VAULT_DOMAIN:-}" ]]; then
+      log_step "Configuring OIDC auth method..."
+
+      if vault_exec auth list -format=json 2>/dev/null \
+        | python3 -c "import sys,json; sys.exit(0 if 'oidc/' in json.load(sys.stdin) else 1)" 2>/dev/null; then
+        log "ℹ️  OIDC auth already enabled — updating config"
+      else
+        vault_exec auth enable oidc || true
+      fi
+
+      vault_exec write auth/oidc/config \
+        oidc_discovery_url="${OIDC_ISSUER_URL}" \
+        oidc_client_id="${OIDC_CLIENT_ID}" \
+        oidc_client_secret="${OIDC_CLIENT_SECRET:-}" \
+        default_role="default"
+
+      log "✅ OIDC auth configured"
+
+      # ── 3. vault-admin policy + OIDC role ─────────────────────────────────
+      log_step "Creating vault-admin policy + OIDC role..."
+
+      vault_exec_stdin policy write vault-admin - <<'POLICY'
+      path "secret/*" {
+        capabilities = ["create", "read", "update", "delete", "list"]
+      }
+      path "secret/data/*" {
+        capabilities = ["create", "read", "update", "delete", "list"]
+      }
+      path "secret/metadata/*" {
+        capabilities = ["read", "list", "delete"]
+      }
+      path "sys/health" {
+        capabilities = ["read", "sudo"]
+      }
+      path "sys/seal-status" {
+        capabilities = ["read"]
+      }
+      path "sys/policies/*" {
+        capabilities = ["read", "list"]
+      }
+      path "auth/*" {
+        capabilities = ["read", "list"]
+      }
+      POLICY
+
+      ADMIN_EMAIL="${ADMIN_EMAIL:-}"
+      _oidc_policies="default,vault-admin"
+
+      if [[ -n "${ADMIN_EMAIL}" ]]; then
+        vault_exec write auth/oidc/role/default \
+          user_claim="email" \
+          allowed_redirect_uris="https://${VAULT_DOMAIN}/ui/vault/auth/oidc/oidc/callback" \
+          allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+          policies="${_oidc_policies}" \
+          oidc_scopes="openid,email,profile" \
+          bound_claims="{\"email\":\"${ADMIN_EMAIL}\"}" \
+          ttl=12h
+      else
+        vault_exec write auth/oidc/role/default \
+          user_claim="email" \
+          allowed_redirect_uris="https://${VAULT_DOMAIN}/ui/vault/auth/oidc/oidc/callback" \
+          allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+          policies="${_oidc_policies}" \
+          oidc_scopes="openid,email,profile" \
+          ttl=12h
+      fi
+
+      log "✅ OIDC role configured — login at https://${VAULT_DOMAIN}"
+    else
+      log "ℹ️  Skipping OIDC auth (OIDC_CLIENT_ID or OIDC_ISSUER_URL not set)"
+    fi
+    {{- else }}
+    log "ℹ️  OIDC disabled (OIDC_CLIENT_ID not set in values)"
+    {{- end }}
+
+    log ""
+    log "✅ Vault configuration complete"
+
+{{- end }}

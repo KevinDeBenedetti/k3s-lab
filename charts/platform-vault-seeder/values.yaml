@@ -1,0 +1,105 @@
+# Default values for platform-vault-seeder
+# This is a YAML-formatted file for Helm values
+
+enabled: true
+
+# Global settings
+global:
+  kubeContext: k3s-infra
+  vaultNamespace: vault
+  vaultPod: vault-0
+
+# Job 1: Core (vault-configure logic)
+jobCore:
+  enabled: true
+  name: vault-seeder-core
+  restartPolicy: OnFailure
+
+  # Image for running kubectl + bash (must have curl/jq if needed)
+  image:
+    repository: bitnami/kubectl
+    tag: "1.32"
+    pullPolicy: IfNotPresent
+
+  # Resource requests/limits
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  # Node affinity (run on control plane for Vault access)
+  nodeSelector: {}
+
+  # Time to live for completed Job
+  ttlSecondsAfterFinished: 3600
+
+# Job 2: Apps (vault-seed-apps logic)
+jobApps:
+  enabled: true
+  name: vault-seeder-apps
+  restartPolicy: OnFailure
+
+  image:
+    repository: bitnami/kubectl
+    tag: "1.32"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  nodeSelector: {}
+
+  # Apps job depends on core job completing
+  # Implemented via initContainer checking core job status
+  ttlSecondsAfterFinished: 3600
+
+# Secrets (from .env, passed to jobs via envFrom)
+secrets:
+  # --- Vault ---
+  vaultRootToken: ""  # REQUIRED - set via helm values or secrets.yaml
+
+  # --- OIDC (for argocd + grafana oauth) ---
+  oidcClientId: ""
+  oidcClientSecret: ""
+  oidcProviderName: "Infomaniak"
+  oidcDiscoveryUrl: "https://login.infomaniak.com"  # Vault discovers .well-known/openid-configuration
+  oidcAuthUrl: "https://login.infomaniak.com/authorize"
+  oidcTokenUrl: "https://login.infomaniak.com/token"
+  oidcApiUrl: "https://login.infomaniak.com/userinfo"
+
+  # --- ArgoCD ---
+  argocdServerSecretKey: ""
+  homepageArgocdToken: ""
+
+  # --- Grafana ---
+  grafanaPassword: ""
+
+  # --- GHCR (for private images) ---
+  ghcrPat: ""
+  githubUser: "KevinDeBenedetti"
+
+  # --- Reactive Resume ---
+  rrAuthSecret: ""
+  rrDbPassword: ""
+  rrBrowserlessToken: ""
+  rrS3AccessKeyId: ""
+  rrS3SecretAccessKey: ""
+
+  # --- Vault domain (for OIDC redirect) ---
+  vaultDomain: "vault.kevindb.dev"
+
+  # --- Admin email (for OIDC role binding) ---
+  adminEmail: ""
+
+# Namespace (created if doesn't exist)
+namespace:
+  name: vault-seeder
+  create: true

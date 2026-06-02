@@ -1,0 +1,202 @@
+{{- if .Values.jobApps.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.jobApps.name }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "platform-vault-seeder.labels" . | nindent 4 }}
+    app: {{ .Values.jobApps.name }}
+  {{- if .Values.jobCore.enabled }}
+  # Job 2 depends on Job 1 completing (created via ownerReference or annotation)
+  annotations:
+    depends-on: "{{ .Values.jobCore.name }}"
+  {{- end }}
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: {{ .Values.jobApps.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform-vault-seeder.selectorLabels" . | nindent 8 }}
+        app: {{ .Values.jobApps.name }}
+    spec:
+      serviceAccountName: vault-seeder
+      restartPolicy: {{ .Values.jobApps.restartPolicy }}
+      {{- with .Values.jobApps.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- if .Values.jobCore.enabled }}
+      # Wait for core job to complete before starting apps job
+      initContainers:
+      - name: wait-for-core-job
+        image: "{{ .Values.jobApps.image.repository }}:{{ .Values.jobApps.image.tag }}"
+        imagePullPolicy: {{ .Values.jobApps.image.pullPolicy }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          echo "Waiting for {{ .Values.jobCore.name }} to complete..."
+          for i in {1..300}; do
+            if kubectl get job -n {{ .Values.namespace.name }} {{ .Values.jobCore.name }} \
+               -o jsonpath='{.status.succeeded}' 2>/dev/null | grep -q "1"; then
+              echo "✅ {{ .Values.jobCore.name }} completed successfully"
+              exit 0
+            fi
+            if kubectl get job -n {{ .Values.namespace.name }} {{ .Values.jobCore.name }} \
+               -o jsonpath='{.status.failed}' 2>/dev/null | grep -q "1"; then
+              echo "❌ {{ .Values.jobCore.name }} failed!"
+              exit 1
+            fi
+            echo "  ... waiting (${i}/300)"
+            sleep 2
+          done
+          echo "❌ Timeout waiting for {{ .Values.jobCore.name }}"
+          exit 1
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+            - ALL
+      {{- end }}
+
+      containers:
+      - name: seeder
+        image: "{{ .Values.jobApps.image.repository }}:{{ .Values.jobApps.image.tag }}"
+        imagePullPolicy: {{ .Values.jobApps.image.pullPolicy }}
+
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          chmod +x /scripts/vault-seed-apps.sh
+          exec /scripts/vault-seed-apps.sh
+
+        env:
+        - name: VAULT_ROOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: vault-root-token
+        - name: OIDC_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: oidc-client-id
+              optional: true
+        - name: OIDC_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: oidc-client-secret
+              optional: true
+        - name: OIDC_PROVIDER_NAME
+          value: "{{ .Values.secrets.oidcProviderName }}"
+        - name: OIDC_AUTH_URL
+          value: "{{ .Values.secrets.oidcAuthUrl }}"
+        - name: OIDC_TOKEN_URL
+          value: "{{ .Values.secrets.oidcTokenUrl }}"
+        - name: OIDC_API_URL
+          value: "{{ .Values.secrets.oidcApiUrl }}"
+        - name: ARGOCD_SERVER_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: argocd-server-secret-key
+              optional: true
+        - name: HOMEPAGE_ARGOCD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: homepage-argocd-token
+              optional: true
+        - name: GRAFANA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: grafana-password
+              optional: true
+        - name: GHCR_PAT
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: ghcr-pat
+              optional: true
+        - name: GITHUB_USER
+          value: "{{ .Values.secrets.githubUser }}"
+        - name: RR_AUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: rr-auth-secret
+              optional: true
+        - name: RR_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: rr-db-password
+              optional: true
+        - name: RR_BROWSERLESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: rr-browserless-token
+              optional: true
+        - name: RR_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: rr-database-url
+              optional: true
+        - name: RR_PRINTER_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: rr-printer-endpoint
+              optional: true
+        - name: RR_S3_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: rr-s3-access-key-id
+              optional: true
+        - name: RR_S3_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: rr-s3-secret-access-key
+              optional: true
+
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+
+        {{- with .Values.jobApps.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+            - ALL
+
+      volumes:
+      - name: scripts
+        configMap:
+          name: {{ .Values.jobApps.name }}-script
+          defaultMode: 0755
+{{- end }}

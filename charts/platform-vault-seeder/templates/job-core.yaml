@@ -1,0 +1,96 @@
+{{- if .Values.jobCore.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.jobCore.name }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "platform-vault-seeder.labels" . | nindent 4 }}
+    app: {{ .Values.jobCore.name }}
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: {{ .Values.jobCore.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform-vault-seeder.selectorLabels" . | nindent 8 }}
+        app: {{ .Values.jobCore.name }}
+    spec:
+      serviceAccountName: vault-seeder
+      restartPolicy: {{ .Values.jobCore.restartPolicy }}
+      {{- with .Values.jobCore.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+      - name: seeder
+        image: "{{ .Values.jobCore.image.repository }}:{{ .Values.jobCore.image.tag }}"
+        imagePullPolicy: {{ .Values.jobCore.image.pullPolicy }}
+
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          chmod +x /scripts/vault-configure.sh
+          exec /scripts/vault-configure.sh
+
+        env:
+        - name: VAULT_ROOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: vault-root-token
+        - name: OIDC_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: oidc-client-id
+              optional: true
+        - name: OIDC_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: vault-seeder-secrets
+              key: oidc-client-secret
+              optional: true
+        - name: OIDC_ISSUER_URL
+          value: "{{ .Values.secrets.oidcDiscoveryUrl }}"
+        - name: OIDC_PROVIDER_NAME
+          value: "{{ .Values.secrets.oidcProviderName }}"
+        - name: OIDC_AUTH_URL
+          value: "{{ .Values.secrets.oidcAuthUrl }}"
+        - name: OIDC_TOKEN_URL
+          value: "{{ .Values.secrets.oidcTokenUrl }}"
+        - name: OIDC_API_URL
+          value: "{{ .Values.secrets.oidcApiUrl }}"
+        - name: VAULT_DOMAIN
+          value: "{{ .Values.secrets.vaultDomain }}"
+        - name: ADMIN_EMAIL
+          value: "{{ .Values.secrets.adminEmail }}"
+
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+
+        {{- with .Values.jobCore.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534  # nobody
+          capabilities:
+            drop:
+            - ALL
+
+      volumes:
+      - name: scripts
+        configMap:
+          name: {{ .Values.jobCore.name }}-script
+          defaultMode: 0755
+{{- end }}

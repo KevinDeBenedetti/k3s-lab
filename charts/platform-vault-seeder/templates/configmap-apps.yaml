@@ -1,0 +1,144 @@
+{{- if .Values.jobApps.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.jobApps.name }}-script
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "platform-vault-seeder.labels" . | nindent 4 }}
+    app: {{ .Values.jobApps.name }}
+data:
+  vault-seed-apps.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # =============================================================================
+    # vault-seed-apps.sh — Seed application secrets into Vault
+    # Runs as Job in cluster
+    # =============================================================================
+
+    export VAULT_TOKEN="${VAULT_ROOT_TOKEN}"
+    export VAULT_SKIP_VERIFY=true
+    export KUBECONFIG_CONTEXT="{{ .Values.global.kubeContext }}"
+    export VAULT_NAMESPACE="{{ .Values.global.vaultNamespace }}"
+    export VAULT_POD="{{ .Values.global.vaultPod }}"
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+    vault_exec() {
+      kubectl --context "${KUBECONFIG_CONTEXT}" exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
+        -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
+    }
+
+    log() { echo "[vault-seeder-apps] $*"; }
+    log_step() { echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo "→ $*"; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; }
+
+    _seeded=0
+    _skipped=0
+
+    _seed() {
+      local path="$1"; shift
+      vault_exec kv put "${path}" "$@"
+      log "  ✓ ${path}"
+      (( _seeded++ )) || true
+    }
+
+    _skip() {
+      log "  - skipped ${1} (${2} not set)"
+      (( _skipped++ )) || true
+    }
+
+    log_step "Seeding application secrets into Vault..."
+
+    # ── secret/argocd/oidc ───────────────────────────────────────────────────
+    {{- if .Values.secrets.oidcClientId }}
+    if [[ -n "${OIDC_CLIENT_ID:-}" ]]; then
+      _seed "secret/argocd/oidc" \
+        clientID="${OIDC_CLIENT_ID}" \
+        clientSecret="${OIDC_CLIENT_SECRET:-}" \
+        "server.secretkey=${ARGOCD_SERVER_SECRET_KEY}" \
+        "accounts.homepage.tokens=${HOMEPAGE_ARGOCD_TOKEN:-}"
+    else
+      _skip "secret/argocd/oidc" "OIDC_CLIENT_ID"
+    fi
+    {{- else }}
+    log "  - skipped secret/argocd/oidc (OIDC_CLIENT_ID not set)"
+    {{- end }}
+
+    # ── secret/grafana/admin ─────────────────────────────────────────────────
+    {{- if .Values.secrets.grafanaPassword }}
+    if [[ -n "${GRAFANA_PASSWORD:-}" ]]; then
+      _seed "secret/grafana/admin" \
+        username="admin" \
+        password="${GRAFANA_PASSWORD}"
+    else
+      _skip "secret/grafana/admin" "GRAFANA_PASSWORD"
+    fi
+    {{- else }}
+    log "  - skipped secret/grafana/admin (GRAFANA_PASSWORD not set)"
+    {{- end }}
+
+    # ── secret/grafana/oauth ─────────────────────────────────────────────────
+    {{- if .Values.secrets.oidcClientId }}
+    if [[ -n "${OIDC_CLIENT_ID:-}" ]]; then
+      _seed "secret/grafana/oauth" \
+        GF_AUTH_GENERIC_OAUTH_ENABLED="true" \
+        GF_AUTH_GENERIC_OAUTH_NAME="${OIDC_PROVIDER_NAME:-Infomaniak}" \
+        GF_AUTH_GENERIC_OAUTH_CLIENT_ID="${OIDC_CLIENT_ID}" \
+        GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="${OIDC_CLIENT_SECRET:-}" \
+        GF_AUTH_GENERIC_OAUTH_SCOPES="openid email profile" \
+        GF_AUTH_GENERIC_OAUTH_AUTH_URL="${OIDC_AUTH_URL:-https://login.infomaniak.com/authorize}" \
+        GF_AUTH_GENERIC_OAUTH_TOKEN_URL="${OIDC_TOKEN_URL:-https://login.infomaniak.com/token}" \
+        GF_AUTH_GENERIC_OAUTH_API_URL="${OIDC_API_URL:-https://login.infomaniak.com/userinfo}" \
+        GF_AUTH_GENERIC_OAUTH_REDIRECT_URI="https://grafana.kevindb.dev/login/generic_oauth" \
+        GF_AUTH_GENERIC_OAUTH_USE_PKCE="true" \
+        GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN="true" \
+        GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN="true" \
+        GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP="true" \
+        GF_AUTH_DISABLE_LOGIN_FORM="true"
+    else
+      _skip "secret/grafana/oauth" "OIDC_CLIENT_ID"
+    fi
+    {{- else }}
+    log "  - skipped secret/grafana/oauth (OIDC_CLIENT_ID not set)"
+    {{- end }}
+
+    # ── secret/ghcr/pull ─────────────────────────────────────────────────────
+    {{- if .Values.secrets.ghcrPat }}
+    if [[ -n "${GHCR_PAT:-}" ]]; then
+      _seed "secret/ghcr/pull" \
+        username="${GITHUB_USER:-KevinDeBenedetti}" \
+        password="${GHCR_PAT}"
+    else
+      _skip "secret/ghcr/pull" "GHCR_PAT"
+    fi
+    {{- else }}
+    log "  - skipped secret/ghcr/pull (GHCR_PAT not set)"
+    {{- end }}
+
+    # ── secret/reactive-resume/prod ──────────────────────────────────────────
+    {{- if .Values.secrets.rrAuthSecret }}
+    if [[ -n "${RR_AUTH_SECRET:-}" ]]; then
+      local_db_pw="${RR_DB_PASSWORD:-}"
+      local_bt="${RR_BROWSERLESS_TOKEN:-}"
+      local_db_url="${RR_DATABASE_URL:-postgresql://reactive_resume:${local_db_pw}@postgres:5432/reactive_resume}"
+      local_printer="${RR_PRINTER_ENDPOINT:-ws://browserless:3000?token=${local_bt}}"
+      _seed "secret/reactive-resume/prod" \
+        AUTH_SECRET="${RR_AUTH_SECRET}" \
+        DB_PASSWORD="${local_db_pw}" \
+        BROWSERLESS_TOKEN="${local_bt}" \
+        DATABASE_URL="${local_db_url}" \
+        PRINTER_ENDPOINT="${local_printer}" \
+        S3_ACCESS_KEY_ID="${RR_S3_ACCESS_KEY_ID:-}" \
+        S3_SECRET_ACCESS_KEY="${RR_S3_SECRET_ACCESS_KEY:-}"
+    else
+      _skip "secret/reactive-resume/prod" "RR_AUTH_SECRET"
+    fi
+    {{- else }}
+    log "  - skipped secret/reactive-resume/prod (RR_AUTH_SECRET not set)"
+    {{- end }}
+
+    log ""
+    log "✅ Done — ${_seeded} path(s) seeded, ${_skipped} skipped"
+    log "→ ESO syncs within 15 min, or force: kubectl annotate externalsecret --all -A force-sync=\$(date +%s) --overwrite"
+
+{{- end }}

@@ -1,0 +1,72 @@
+{{ include "platform-vault-seeder.chart" . }} v{{ .Chart.AppVersion }} deployed successfully! 🚀
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 Deployment Status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Namespace: {{ .Values.namespace.name }}
+
+Jobs deployed:
+{{- if .Values.jobCore.enabled }}
+  • {{ .Values.jobCore.name }} (runs first)
+{{- else }}
+  • {{ .Values.jobCore.name }} (DISABLED)
+{{- end }}
+{{- if .Values.jobApps.enabled }}
+  • {{ .Values.jobApps.name }} (runs after core job completes)
+{{- else }}
+  • {{ .Values.jobApps.name }} (DISABLED)
+{{- end }}
+
+Secrets:
+  • vault-seeder-secrets (mounted into Jobs)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Verification
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Watch the core job:
+  kubectl -n {{ .Values.namespace.name }} logs -f job/{{ .Values.jobCore.name }}
+
+Watch the apps job:
+  kubectl -n {{ .Values.namespace.name }} logs -f job/{{ .Values.jobApps.name }}
+
+Check job status:
+  kubectl -n {{ .Values.namespace.name }} get jobs -w
+
+Verify Vault was configured (after core job succeeds):
+  kubectl exec -n vault vault-0 -- vault policy list
+  kubectl exec -n vault vault-0 -- vault auth list
+  kubectl exec -n vault vault-0 -- env VAULT_TOKEN=$VAULT_ROOT_TOKEN vault kv get secret/argocd/oidc
+
+Verify app secrets were seeded (after apps job succeeds):
+  kubectl exec -n vault vault-0 -- env VAULT_TOKEN=$VAULT_ROOT_TOKEN vault kv get secret/argocd/oidc
+  kubectl exec -n vault vault-0 -- env VAULT_TOKEN=$VAULT_ROOT_TOKEN vault kv get secret/grafana/admin
+
+Force ESO to sync secrets immediately:
+  kubectl annotate externalsecret --all -A force-sync=$(date +%s) --overwrite
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔄 Cleanup
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Completed jobs are automatically deleted after {{ .Values.jobCore.ttlSecondsAfterFinished }} seconds.
+
+Manual cleanup:
+  kubectl delete job -n {{ .Values.namespace.name }} {{ .Values.jobCore.name }} {{ .Values.jobApps.name }}
+  kubectl delete ns {{ .Values.namespace.name }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📖 Next Steps
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Wait for both Jobs to complete (green ✅ status)
+2. Verify Vault configuration and secrets are seeded
+3. Force ExternalSecret syncs to pull secrets into cluster
+4. Check that K8s Secrets are now populated
+5. Remove these Job deployments once validated
+6. Update your bootstrap automation to use this chart
+
+Next in Étape 4: Integration with ArgoCD Application + full bootstrap sequence.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
