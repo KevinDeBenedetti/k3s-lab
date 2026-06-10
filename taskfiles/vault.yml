@@ -70,7 +70,9 @@ tasks:
     env:
       VAULT_POD: '{{.VAULT_POD}}'
       VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
-      VAULT_ROOT_TOKEN: $VAULT_ROOT_TOKEN
+      # NOTE: Task does not expand `$VAR` in env: values — use {{.VAR}} templates
+      # (resolved from Task vars, then the environment/dotenv).
+      VAULT_ROOT_TOKEN: '{{.VAULT_ROOT_TOKEN}}'
       OIDC_CLIENT_ID: '{{.OIDC_CLIENT_ID | default ""}}'
       OIDC_CLIENT_SECRET: '{{.OIDC_CLIENT_SECRET | default ""}}'
       OIDC_ISSUER_URL: '{{.OIDC_ISSUER_URL | default ""}}'
@@ -95,7 +97,7 @@ tasks:
     env:
       VAULT_POD: '{{.VAULT_POD}}'
       VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
-      VAULT_ROOT_TOKEN: $VAULT_ROOT_TOKEN
+      VAULT_ROOT_TOKEN: '{{.VAULT_ROOT_TOKEN}}'
       OIDC_CLIENT_ID: '{{.OIDC_CLIENT_ID | default ""}}'
       OIDC_CLIENT_SECRET: '{{.OIDC_CLIENT_SECRET | default ""}}'
       OIDC_PROVIDER_NAME: '{{.OIDC_PROVIDER_NAME | default "OIDC"}}'
@@ -117,7 +119,7 @@ tasks:
     env:
       VAULT_POD: '{{.VAULT_POD}}'
       VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
-      VAULT_ROOT_TOKEN: $VAULT_ROOT_TOKEN
+      VAULT_ROOT_TOKEN: '{{.VAULT_ROOT_TOKEN}}'
 
   status:
     desc: Show Vault seal status, ESO sync status, and managed secrets

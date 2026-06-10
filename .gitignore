@@ -5,6 +5,8 @@
 # Kubeconfig files fetched from the cluster
 kubeconfig
 kubeconfig-*
+kubeconfig.yaml
+kubeconfig*.yaml
 *.yaml.bak
 
 # TLS / private keys

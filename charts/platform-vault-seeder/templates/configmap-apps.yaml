@@ -19,13 +19,14 @@ data:
 
     export VAULT_TOKEN="${VAULT_ROOT_TOKEN}"
     export VAULT_SKIP_VERIFY=true
-    export KUBECONFIG_CONTEXT="{{ .Values.global.kubeContext }}"
     export VAULT_NAMESPACE="{{ .Values.global.vaultNamespace }}"
     export VAULT_POD="{{ .Values.global.vaultPod }}"
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+    # NOTE: no --context here — kubectl runs with the in-cluster service
+    # account config, which has no kubeconfig contexts.
     vault_exec() {
-      kubectl --context "${KUBECONFIG_CONTEXT}" exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
+      kubectl exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
         -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
     }
 
@@ -55,7 +56,7 @@ data:
       _seed "secret/argocd/oidc" \
         clientID="${OIDC_CLIENT_ID}" \
         clientSecret="${OIDC_CLIENT_SECRET:-}" \
-        "server.secretkey=${ARGOCD_SERVER_SECRET_KEY}" \
+        "server.secretkey=${ARGOCD_SERVER_SECRET_KEY:-}" \
         "accounts.homepage.tokens=${HOMEPAGE_ARGOCD_TOKEN:-}"
     else
       _skip "secret/argocd/oidc" "OIDC_CLIENT_ID"

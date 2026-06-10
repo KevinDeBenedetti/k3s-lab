@@ -47,19 +47,3 @@ Selector labels
 app.kubernetes.io/name: {{ include "platform-vault-seeder.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
-
-{{/*
-Vault CLI helper — returns command to execute vault CLI via kubectl exec
-Usage: {{ include "platform-vault-seeder.vaultExec" . }}
-*/}}
-{{- define "platform-vault-seeder.vaultExec" -}}
-kubectl --context {{ .Values.global.kubeContext }} exec -n {{ .Values.global.vaultNamespace }} {{ .Values.global.vaultPod }} -- env VAULT_TOKEN="${VAULT_ROOT_TOKEN}" VAULT_SKIP_VERIFY=true vault
-{{- end }}
-
-{{/*
-Vault CLI helper for stdin input (policies, etc.)
-Usage: {{ include "platform-vault-seeder.vaultExecStdin" . }}
-*/}}
-{{- define "platform-vault-seeder.vaultExecStdin" -}}
-kubectl --context {{ .Values.global.kubeContext }} exec -i -n {{ .Values.global.vaultNamespace }} {{ .Values.global.vaultPod }} -- env VAULT_TOKEN="${VAULT_ROOT_TOKEN}" VAULT_SKIP_VERIFY=true vault
-{{- end }}

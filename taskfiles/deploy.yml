@@ -64,7 +64,8 @@ tasks:
     cmds:
       - bash {{.TASKFILE_DIR}}/../scripts/deploy-grafana-oauth.sh
     env:
-      GRAFANA_DOMAIN: $GRAFANA_DOMAIN
+      # NOTE: Task does not expand `$VAR` in env: values — use {{.VAR}} templates
+      GRAFANA_DOMAIN: '{{.GRAFANA_DOMAIN}}'
 
   uninstall:
     desc: "[DESTRUCTIVE] Tear down all deployed workloads"

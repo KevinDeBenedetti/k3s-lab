@@ -18,4 +18,7 @@ build_ssh_opts() {
   SSH_OPTS=(-p "${port}" -o "StrictHostKeyChecking=${strict}")
   [[ "${timeout}" -gt 0 ]] && SSH_OPTS+=(-o "ConnectTimeout=${timeout}")
   [[ -n "${SSH_KEY:-}" ]]  && SSH_OPTS+=(-i "${SSH_KEY}")
+  # Always return 0 — the optional flags above must not leak a non-zero
+  # status to callers running under `set -e`.
+  return 0
 }

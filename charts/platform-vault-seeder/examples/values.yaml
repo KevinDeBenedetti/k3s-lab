@@ -27,8 +27,8 @@ jobApps:
   enabled: true
 
 # ── Global Kubernetes/Vault Settings ───────────────────────────────────────
+# (no kubeContext — the jobs use the in-cluster service account config)
 global:
-  kubeContext: k3s-infra
   vaultNamespace: vault
   vaultPod: vault-0
 

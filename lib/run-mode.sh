@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # lib/run-mode.sh — Dual-mode execution preamble for k3s-lab scripts.
 #
 # Source this file at the very top of any script (after set -euo pipefail):

@@ -77,7 +77,7 @@ spec:
         - -c
         - |
           set -euo pipefail
-          chmod +x /scripts/vault-seed-apps.sh
+          # configMap volume is read-only; defaultMode 0755 already makes it executable
           exec /scripts/vault-seed-apps.sh
 
         env:

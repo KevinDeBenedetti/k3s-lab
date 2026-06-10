@@ -19,20 +19,21 @@ data:
 
     export VAULT_TOKEN="${VAULT_ROOT_TOKEN}"
     export VAULT_SKIP_VERIFY=true
-    export KUBECONFIG_CONTEXT="{{ .Values.global.kubeContext }}"
     export VAULT_NAMESPACE="{{ .Values.global.vaultNamespace }}"
     export VAULT_POD="{{ .Values.global.vaultPod }}"
     export ESO_NAMESPACE="external-secrets"
     export ESO_SA="external-secrets"
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+    # NOTE: no --context here — kubectl runs with the in-cluster service
+    # account config, which has no kubeconfig contexts.
     vault_exec() {
-      kubectl --context "${KUBECONFIG_CONTEXT}" exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
+      kubectl exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
         -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
     }
 
     vault_exec_stdin() {
-      kubectl --context "${KUBECONFIG_CONTEXT}" exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
+      kubectl exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
         -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
     }
 
@@ -64,8 +65,8 @@ data:
     if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_ISSUER_URL:-}" && -n "${VAULT_DOMAIN:-}" ]]; then
       log_step "Configuring OIDC auth method..."
 
-      if vault_exec auth list -format=json 2>/dev/null \
-        | python3 -c "import sys,json; sys.exit(0 if 'oidc/' in json.load(sys.stdin) else 1)" 2>/dev/null; then
+      # grep instead of python3 — the kubectl image has no python
+      if vault_exec auth list -format=json 2>/dev/null | grep -q '"oidc/"'; then
         log "ℹ️  OIDC auth already enabled — updating config"
       else
         vault_exec auth enable oidc || true
@@ -82,29 +83,31 @@ data:
       # ── 3. vault-admin policy + OIDC role ─────────────────────────────────
       log_step "Creating vault-admin policy + OIDC role..."
 
-      vault_exec_stdin policy write vault-admin - <<'POLICY'
-      path "secret/*" {
-        capabilities = ["create", "read", "update", "delete", "list"]
-      }
-      path "secret/data/*" {
-        capabilities = ["create", "read", "update", "delete", "list"]
-      }
-      path "secret/metadata/*" {
-        capabilities = ["read", "list", "delete"]
-      }
-      path "sys/health" {
-        capabilities = ["read", "sudo"]
-      }
-      path "sys/seal-status" {
-        capabilities = ["read"]
-      }
-      path "sys/policies/*" {
-        capabilities = ["read", "list"]
-      }
-      path "auth/*" {
-        capabilities = ["read", "list"]
-      }
-      POLICY
+      # Heredoc delimiter must sit at column 0 — keep this block unindented
+      # even though it is inside the if.
+    vault_exec_stdin policy write vault-admin - <<'POLICY'
+    path "secret/*" {
+      capabilities = ["create", "read", "update", "delete", "list"]
+    }
+    path "secret/data/*" {
+      capabilities = ["create", "read", "update", "delete", "list"]
+    }
+    path "secret/metadata/*" {
+      capabilities = ["read", "list", "delete"]
+    }
+    path "sys/health" {
+      capabilities = ["read", "sudo"]
+    }
+    path "sys/seal-status" {
+      capabilities = ["read"]
+    }
+    path "sys/policies/*" {
+      capabilities = ["read", "list"]
+    }
+    path "auth/*" {
+      capabilities = ["read", "list"]
+    }
+    POLICY
 
       ADMIN_EMAIL="${ADMIN_EMAIL:-}"
       _oidc_policies="default,vault-admin"
