@@ -25,9 +25,12 @@ data:
     # ── Helpers ───────────────────────────────────────────────────────────────
     # NOTE: no --context here — kubectl runs with the in-cluster service
     # account config, which has no kubeconfig contexts.
+    # The token travels on stdin (first line), never as a process argument
+    # (argv is visible in the exec API request and in `ps` inside the pod).
     vault_exec() {
-      kubectl exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-        -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
+      printf '%s\n' "${VAULT_TOKEN}" | \
+        kubectl exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" -- \
+        sh -c 'IFS= read -r VAULT_TOKEN; export VAULT_TOKEN VAULT_SKIP_VERIFY=true; exec vault "$@"' vault-cli "$@"
     }
 
     log() { echo "[vault-seeder-apps] $*"; }

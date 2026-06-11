@@ -13,7 +13,9 @@
 #   3. Loads .env (fallback — vars from Make take precedence)
 # ──────────────────────────────────────────────────────────────────────────────
 
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
+# Remote fetches default to the released tag, not the moving main branch
+# (supply-chain pinning — kept current by release-please).
+K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.11.0}" # x-release-please-version
 
 # Detect caller context — [1] is the script that sourced us
 _run_src="${BASH_SOURCE[1]:-}"

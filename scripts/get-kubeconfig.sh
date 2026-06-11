@@ -8,11 +8,11 @@ set -euo pipefail
 
 SERVER_IP="${1:?'Usage: ./scripts/get-kubeconfig.sh <SERVER_IP> [SSH_USER] [CONTEXT_NAME]'}"
 SSH_USER="${2:-${SSH_USER:-kevin}}"
-CONTEXT_NAME="${3:-${KUBECONFIG_CONTEXT:-k3s-infra}}"
+CONTEXT_NAME="${3:-${KUBECONFIG_CONTEXT:-k3s-lab}}"
 SSH_KEY="${SSH_KEY:-}"
 SSH_PORT="${SSH_PORT:-22}"
 
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}"
+K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.11.0}" # x-release-please-version
 
 # get-kubeconfig uses positional args before sourcing — keep manual preamble
 # since script-init.sh would try to load .env (not needed here).
@@ -32,7 +32,10 @@ TARGET="${HOME}/.kube/config"
 mkdir -p "${HOME}/.kube"
 chmod 700 "${HOME}/.kube"
 
-build_ssh_opts "${SSH_PORT}" "no"
+# accept-new: trusts the host key on first contact but refuses a CHANGED key —
+# this fetch carries cluster-admin credentials, never disable checking outright.
+# After a VPS rebuild, clear the old key first: task ssh:known-hosts-reset
+build_ssh_opts "${SSH_PORT}" "accept-new"
 
 log_info "Fetching kubeconfig from ${SSH_USER}@${SERVER_IP} (port ${SSH_PORT})..."
 

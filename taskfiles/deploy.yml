@@ -31,9 +31,10 @@ tasks:
         msg: "htpasswd not found — brew install httpd"
     cmds:
       - |
+        # htpasswd -i reads the password from stdin — keeps it out of `ps` (unlike -b)
         kubectl --context $KUBECONFIG_CONTEXT \
           create secret generic traefik-dashboard-auth \
-          --from-literal=users="$(htpasswd -nb '{{.DASHBOARD_USER}}' "$DASHBOARD_PASSWORD")" \
+          --from-literal=users="$(printf '%s\n' "$DASHBOARD_PASSWORD" | htpasswd -ni '{{.DASHBOARD_USER}}')" \
           -n ingress \
           --dry-run=client -o yaml \
         | kubectl --context $KUBECONFIG_CONTEXT apply -f -

@@ -35,48 +35,34 @@ global:
 # ── Secrets (from .env / environment) ──────────────────────────────────────
 #
 # IMPORTANT: These are sensitive. DO NOT commit to Git.
-# Pass via:
-#   1. helm --set (CLI)
-#   2. Separate secrets.yaml file (gitignored)
-#   3. ExternalSecret pulling from Vault/sealed-secrets
+# NOTE: plain Helm does NOT expand `{{ env "VAR" }}` inside values files
+# (that is a helmfile feature). Pass real values via:
+#   1. helm --set secrets.vaultRootToken="$VAULT_ROOT_TOKEN" (CLI, from env)
+#   2. A separate gitignored secrets.yaml file (see below)
+#   3. An ExternalSecret / sealed-secret rendered before install
 #
+# Non-secret values can stay in this file:
 secrets:
-  # ── Vault (REQUIRED) ────────────────────────────────────────────────────
-  vaultRootToken: "{{ env \"VAULT_ROOT_TOKEN\" }}"  # From bootstrap
-
-  # ── OIDC (for argocd + grafana oauth) ───────────────────────────────────
-  # Set to empty string to skip OIDC configuration
-  oidcClientId: "{{ env \"OIDC_CLIENT_ID\" }}"  # e.g., "my-keycloak-client"
-  oidcClientSecret: "{{ env \"OIDC_CLIENT_SECRET\" }}"
-  oidcProviderName: "Infomaniak"  # Display name  oidcDiscoveryUrl: "https://login.infomaniak.com"  # Vault discovers .well-known/openid-configuration  oidcAuthUrl: "https://login.infomaniak.com/authorize"
+  # ── OIDC endpoints (non-secret) ─────────────────────────────────────────
+  oidcProviderName: "Infomaniak"  # Display name
+  oidcDiscoveryUrl: "https://login.infomaniak.com"  # Vault discovers .well-known/openid-configuration
+  oidcAuthUrl: "https://login.infomaniak.com/authorize"
   oidcTokenUrl: "https://login.infomaniak.com/token"
   oidcApiUrl: "https://login.infomaniak.com/userinfo"
   vaultDomain: "vault.kevindb.dev"  # For OIDC redirect URIs
-  adminEmail: "{{ env \"ADMIN_EMAIL\" }}"  # e.g., "admin@example.com"
-
-  # ── ArgoCD ──────────────────────────────────────────────────────────────
-  # argocd/oidc ExternalSecret
-  argocdServerSecretKey: "{{ env \"ARGOCD_SERVER_SECRET_KEY\" }}"  # Random string
-  homepageArgocdToken: "{{ env \"HOMEPAGE_ARGOCD_TOKEN\" }}"  # Optional
-
-  # ── Grafana ─────────────────────────────────────────────────────────────
-  # grafana/admin + grafana/oauth ExternalSecrets
-  grafanaPassword: "{{ env \"GRAFANA_PASSWORD\" }}"
-
-  # ── GHCR (GitHub Container Registry) ────────────────────────────────────
-  # ghcr/pull ExternalSecret (for private image pulls)
-  ghcrPat: "{{ env \"GHCR_PAT\" }}"  # GitHub PAT with read:packages
+  adminEmail: "admin@example.com"   # REQUIRED for OIDC — bound_claims restricts vault-admin to this account
   githubUser: "KevinDeBenedetti"
 
-  # ── Reactive Resume ─────────────────────────────────────────────────────
-  # reactive-resume/prod ExternalSecret
-  rrAuthSecret: "{{ env \"RR_AUTH_SECRET\" }}"  # Random string for session auth
-  rrDbPassword: "{{ env \"RR_DB_PASSWORD\" }}"
-  rrBrowserlessToken: "{{ env \"RR_BROWSERLESS_TOKEN\" }}"
-  rrDatabaseUrl: "{{ env \"RR_DATABASE_URL\" }}"  # e.g., "postgresql://user:pw@host/db"
-  rrPrinterEndpoint: "{{ env \"RR_PRINTER_ENDPOINT\" }}"  # e.g., "ws://browserless:3000?token=..."
-  rrS3AccessKeyId: "{{ env \"RR_S3_ACCESS_KEY_ID\" }}"
-  rrS3SecretAccessKey: "{{ env \"RR_S3_SECRET_ACCESS_KEY\" }}"
+  # ── Secret values — set via --set or a gitignored file, NOT here ────────
+  # vaultRootToken          (REQUIRED — from vault:init bootstrap)
+  # oidcClientId            (empty = skip OIDC configuration)
+  # oidcClientSecret
+  # argocdServerSecretKey   (random string)
+  # homepageArgocdToken     (optional)
+  # grafanaPassword
+  # ghcrPat                 (GitHub PAT with read:packages)
+  # rrAuthSecret, rrDbPassword, rrBrowserlessToken,
+  # rrDatabaseUrl, rrPrinterEndpoint, rrS3AccessKeyId, rrS3SecretAccessKey
 
 # ── Installation via Helm CLI ───────────────────────────────────────────────
 #
@@ -117,7 +103,7 @@ secrets:
 #     source:
 #       repoURL: "oci://ghcr.io/kevindebenedetti/charts"
 #       chart: platform-vault-seeder
-#       targetRevision: "0.1.0"
+#       targetRevision: "0.1.3"
 #       helm:
 #         releaseName: vault-seeder
 #         valuesObject:

@@ -27,14 +27,18 @@ data:
     # ── Helpers ───────────────────────────────────────────────────────────────
     # NOTE: no --context here — kubectl runs with the in-cluster service
     # account config, which has no kubeconfig contexts.
+    # The token travels on stdin (first line), never as a process argument
+    # (argv is visible in the exec API request and in `ps` inside the pod).
     vault_exec() {
-      kubectl exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-        -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
+      printf '%s\n' "${VAULT_TOKEN}" | \
+        kubectl exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" -- \
+        sh -c 'IFS= read -r VAULT_TOKEN; export VAULT_TOKEN VAULT_SKIP_VERIFY=true; exec vault "$@"' vault-cli "$@"
     }
 
     vault_exec_stdin() {
-      kubectl exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-        -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY=true vault "$@"
+      { printf '%s\n' "${VAULT_TOKEN}"; cat; } | \
+        kubectl exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" -- \
+        sh -c 'IFS= read -r VAULT_TOKEN; export VAULT_TOKEN VAULT_SKIP_VERIFY=true; exec vault "$@"' vault-cli "$@"
     }
 
     log() { echo "[vault-seeder-core] $*"; }
@@ -61,8 +65,10 @@ data:
     log "✅ ESO policy and role configured"
 
     # ── 2. OIDC auth (conditional) ────────────────────────────────────────────
+    # ADMIN_EMAIL is mandatory: without it the role would have no bound_claims
+    # and ANY account at the OIDC provider would get vault-admin.
     {{- if .Values.secrets.oidcClientId }}
-    if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_ISSUER_URL:-}" && -n "${VAULT_DOMAIN:-}" ]]; then
+    if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_ISSUER_URL:-}" && -n "${VAULT_DOMAIN:-}" && -n "${ADMIN_EMAIL:-}" ]]; then
       log_step "Configuring OIDC auth method..."
 
       # grep instead of python3 — the kubectl image has no python
@@ -109,31 +115,19 @@ data:
     }
     POLICY
 
-      ADMIN_EMAIL="${ADMIN_EMAIL:-}"
-      _oidc_policies="default,vault-admin"
-
-      if [[ -n "${ADMIN_EMAIL}" ]]; then
-        vault_exec write auth/oidc/role/default \
-          user_claim="email" \
-          allowed_redirect_uris="https://${VAULT_DOMAIN}/ui/vault/auth/oidc/oidc/callback" \
-          allowed_redirect_uris="http://localhost:8250/oidc/callback" \
-          policies="${_oidc_policies}" \
-          oidc_scopes="openid,email,profile" \
-          bound_claims="{\"email\":\"${ADMIN_EMAIL}\"}" \
-          ttl=12h
-      else
-        vault_exec write auth/oidc/role/default \
-          user_claim="email" \
-          allowed_redirect_uris="https://${VAULT_DOMAIN}/ui/vault/auth/oidc/oidc/callback" \
-          allowed_redirect_uris="http://localhost:8250/oidc/callback" \
-          policies="${_oidc_policies}" \
-          oidc_scopes="openid,email,profile" \
-          ttl=12h
-      fi
+      # bound_claims is always set (ADMIN_EMAIL is required by the gate above)
+      vault_exec write auth/oidc/role/default \
+        user_claim="email" \
+        allowed_redirect_uris="https://${VAULT_DOMAIN}/ui/vault/auth/oidc/oidc/callback" \
+        allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+        policies="default,vault-admin" \
+        oidc_scopes="openid,email,profile" \
+        bound_claims="{\"email\":\"${ADMIN_EMAIL}\"}" \
+        ttl=12h
 
       log "✅ OIDC role configured — login at https://${VAULT_DOMAIN}"
     else
-      log "ℹ️  Skipping OIDC auth (OIDC_CLIENT_ID or OIDC_ISSUER_URL not set)"
+      log "ℹ️  Skipping OIDC auth (requires OIDC_CLIENT_ID, OIDC_ISSUER_URL, VAULT_DOMAIN and ADMIN_EMAIL)"
     fi
     {{- else }}
     log "ℹ️  OIDC disabled (OIDC_CLIENT_ID not set in values)"

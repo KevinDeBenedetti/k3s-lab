@@ -14,7 +14,16 @@
         { "type": "yaml", "path": "charts/platform-cert-manager/Chart.yaml", "jsonpath": "$.version" },
         { "type": "yaml", "path": "charts/platform-external-secrets/Chart.yaml", "jsonpath": "$.version" },
         { "type": "yaml", "path": "charts/platform-traefik/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "charts/platform-vault/Chart.yaml", "jsonpath": "$.version" }
+        { "type": "yaml", "path": "charts/platform-vault/Chart.yaml", "jsonpath": "$.version" },
+        { "type": "generic", "path": "lib/script-init.sh" },
+        { "type": "generic", "path": "lib/run-mode.sh" },
+        { "type": "generic", "path": "scripts/vault-init.sh" },
+        { "type": "generic", "path": "scripts/vault-configure.sh" },
+        { "type": "generic", "path": "scripts/vault-seed-cloudflare.sh" },
+        { "type": "generic", "path": "scripts/uninstall.sh" },
+        { "type": "generic", "path": "scripts/generate-inventory.sh" },
+        { "type": "generic", "path": "scripts/deploy-grafana-oauth.sh" },
+        { "type": "generic", "path": "scripts/get-kubeconfig.sh" }
       ]
     }
   },

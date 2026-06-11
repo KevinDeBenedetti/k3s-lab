@@ -86,9 +86,13 @@ jobs:
         run: ./scripts/check-resource-limits.sh
 
   # ─── Docs dispatch (push to main only) ───────────────────────────────────
+  # cd-docs.yml now authenticates via GitHub App (client-id + APP_PRIVATE_KEY);
+  # passing an undeclared secret (the old PAT_TOKEN) startup-fails the whole run.
   docs:
     needs: [shell-ci, kubernetes, security, helm-lint, resource-limits]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     uses: KevinDeBenedetti/github-workflows/.github/workflows/cd-docs.yml@main
+    with:
+      client-id: ${{ vars.DOCS_APP_CLIENT_ID }}
     secrets:
-      PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+      APP_PRIVATE_KEY: ${{ secrets.DOCS_APP_PRIVATE_KEY }}

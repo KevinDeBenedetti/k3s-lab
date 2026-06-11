@@ -3,6 +3,11 @@
 
 k3s_version: "v1.32.13+k3s1"
 
+# Optional integrity pin for the get.k3s.io installer script (runs as root).
+# Set to e.g. "sha256:abc123..." to verify the download; empty = no check.
+# Compute with: curl -fsSL https://get.k3s.io | shasum -a 256
+k3s_installer_checksum: ""
+
 # Server URL to join (set from k3s_server group)
 k3s_server_url: ""
 

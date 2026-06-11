@@ -24,20 +24,26 @@ VAULT_SKIP_VERIFY="${VAULT_SKIP_VERIFY:-true}"
 # kubectl shorthand
 K="${K:-kubectl --context "${KUBECONFIG_CONTEXT}"}"
 
+# The token travels on stdin (first line), never as a process argument:
+# argv is visible in local `ps`, in the kubectl exec API request, and in
+# `ps` inside the pod — stdin is none of those.
+# A tiny in-pod sh wrapper reads the token line, exports it, then execs vault;
+# everything after that first line remains available as vault's own stdin.
+
 # vault_exec <vault-args...>
-# Run a vault CLI command inside the Vault pod (no stdin).
+# Run a vault CLI command inside the Vault pod (no stdin for vault itself).
 vault_exec() {
   # shellcheck disable=SC2086
-  $K exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-    -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY="${VAULT_SKIP_VERIFY}" vault "$@"
+  printf '%s\n' "${VAULT_TOKEN}" | $K exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" -- \
+    sh -c "IFS= read -r VAULT_TOKEN; export VAULT_TOKEN VAULT_SKIP_VERIFY=${VAULT_SKIP_VERIFY}; exec vault \"\$@\"" vault-cli "$@"
 }
 
 # vault_exec_stdin <vault-args...>
 # Run a vault CLI command inside the Vault pod (with stdin for heredocs).
 vault_exec_stdin() {
   # shellcheck disable=SC2086
-  $K exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-    -- env VAULT_TOKEN="${VAULT_TOKEN}" VAULT_SKIP_VERIFY="${VAULT_SKIP_VERIFY}" vault "$@"
+  { printf '%s\n' "${VAULT_TOKEN}"; cat; } | $K exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" -- \
+    sh -c "IFS= read -r VAULT_TOKEN; export VAULT_TOKEN VAULT_SKIP_VERIFY=${VAULT_SKIP_VERIFY}; exec vault \"\$@\"" vault-cli "$@"
 }
 
 # vault_kv_put <path> <key=value...>

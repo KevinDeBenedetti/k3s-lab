@@ -29,11 +29,13 @@ jobs:
           - charts/platform-argocd
           - charts/platform-base
           - charts/platform-cert-manager
+          - charts/platform-deployment
           - charts/platform-external-secrets
           - charts/platform-monitoring
           - charts/platform-security
           - charts/platform-traefik
           - charts/platform-vault
+          - charts/platform-vault-seeder
 
     steps:
       - name: Delete old versions of ${{ matrix.chart }}

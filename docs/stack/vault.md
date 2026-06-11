@@ -177,7 +177,7 @@ kubectl exec -it -n vault vault-0 -- env VAULT_SKIP_VERIFY=true vault operator u
 
 2. Create an ExternalSecret manifest:
    ```yaml
-   apiVersion: external-secrets.io/v1beta1
+   apiVersion: external-secrets.io/v1
    kind: ExternalSecret
    metadata:
      name: myapp-secret

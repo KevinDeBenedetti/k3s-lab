@@ -66,6 +66,13 @@ log_warn() {
   echo -e "${YELLOW}⚠️ $1${RESET}"
 }
 
+# vault_exec <vault-args...> — run vault CLI in the Vault pod.
+# The token travels on stdin (first line), never as a process argument.
+vault_exec() {
+  printf '%s\n' "${VAULT_TOKEN}" | kubectl exec -i -n "$NAMESPACE_VAULT" "$VAULT_POD" -- \
+    sh -c 'IFS= read -r VAULT_TOKEN; export VAULT_TOKEN VAULT_SKIP_VERIFY=true; exec vault "$@"' vault-cli "$@"
+}
+
 wait_for_condition() {
   local description="$1"
   local condition_cmd="$2"
@@ -101,7 +108,8 @@ log_header "Étape 4.5: vault-seeder E2E Testing"
 log_header "Phase 1: Pre-flight Checks"
 
 log_step "Check kubectl access"
-if kubectl version --short > /dev/null 2>&1; then
+# NOTE: no --short — the flag was removed in kubectl 1.28
+if kubectl version > /dev/null 2>&1; then
   log_ok "kubectl is accessible"
 else
   log_fail "kubectl is not accessible"
@@ -135,7 +143,7 @@ else
 fi
 
 log_step "Check cluster version"
-CLUSTER_VERSION=$(kubectl version --short 2>/dev/null | grep "Server" | awk '{print $3}')
+CLUSTER_VERSION=$(kubectl version -o json 2>/dev/null | jq -r '.serverVersion.gitVersion' || echo "unknown")
 log_ok "Cluster version: $CLUSTER_VERSION"
 
 # =============================================================================
@@ -153,7 +161,7 @@ else
   log_info "Create it with:"
   echo "    kubectl apply -f secrets/vault-seeder-secrets.yaml"
   echo ""
-  read -p "Press Enter to continue (assuming secret will be created)..."
+  read -r -p "Press Enter to continue (assuming secret will be created)..."
 fi
 
 log_step "Verify secret has required keys"
@@ -218,12 +226,12 @@ fi
 log_header "Phase 5: Monitor Job 1 ($JOB_CORE_NAME)"
 
 log_step "Wait for Job 1 to start"
-wait_for_condition "Job $JOB_CORE_NAME exists" \
+# NOTE: under `set -e` a bare wait_for_condition failure would abort the
+# script, so each call must be part of an if — `$?` checks were dead code.
+if ! wait_for_condition "Job $JOB_CORE_NAME exists" \
   "kubectl get job -n $NAMESPACE_SEEDER $JOB_CORE_NAME" \
   30 \
-  2
-
-if [ $? -ne 0 ]; then
+  2; then
   log_fail "Job 1 did not start within 30 seconds"
   kubectl get pods -n "$NAMESPACE_SEEDER"
   exit 1
@@ -234,12 +242,10 @@ POD_NAME=$(kubectl get pod -n "$NAMESPACE_SEEDER" -l app="$JOB_CORE_NAME" -o jso
 log_info "Pod: $POD_NAME"
 
 log_step "Wait for Job 1 pod to start"
-wait_for_condition "Job 1 pod is running" \
+if wait_for_condition "Job 1 pod is running" \
   "kubectl get pod -n $NAMESPACE_SEEDER $POD_NAME -o jsonpath='{.status.phase}' | grep -q Running" \
   60 \
-  3
-
-if [ $? -eq 0 ]; then
+  3; then
   log_ok "Job 1 pod is running"
 else
   log_warn "Job 1 pod not in Running state yet. Checking logs..."
@@ -251,12 +257,10 @@ timeout 120 kubectl logs -n "$NAMESPACE_SEEDER" -f "$POD_NAME" 2>/dev/null || tr
 echo ""
 
 log_step "Wait for Job 1 to complete"
-wait_for_condition "Job $JOB_CORE_NAME completes" \
+if wait_for_condition "Job $JOB_CORE_NAME completes" \
   "kubectl get job -n $NAMESPACE_SEEDER $JOB_CORE_NAME -o jsonpath='{.status.succeeded}' | grep -q 1" \
   "$TIMEOUT_CORE_JOB" \
-  5
-
-if [ $? -eq 0 ]; then
+  5; then
   log_ok "Job 1 completed successfully"
   JOB1_STATUS="SUCCESS"
 else
@@ -281,12 +285,10 @@ kubectl describe job -n "$NAMESPACE_SEEDER" "$JOB_CORE_NAME" | grep -E "^Status:
 log_header "Phase 6: Monitor Job 2 ($JOB_APPS_NAME)"
 
 log_step "Wait for Job 2 to exist"
-wait_for_condition "Job $JOB_APPS_NAME exists" \
+if ! wait_for_condition "Job $JOB_APPS_NAME exists" \
   "kubectl get job -n $NAMESPACE_SEEDER $JOB_APPS_NAME" \
   60 \
-  3
-
-if [ $? -ne 0 ]; then
+  3; then
   log_fail "Job 2 did not appear within 60 seconds"
   log_info "Job 1 may have failed or timed out"
   exit 1
@@ -307,12 +309,10 @@ else
 fi
 
 log_step "Wait for Job 2 main container to start"
-wait_for_condition "Job 2 pod is running" \
+if wait_for_condition "Job 2 pod is running" \
   "kubectl get pod -n $NAMESPACE_SEEDER $POD_NAME_2 -o jsonpath='{.status.phase}' | grep -q Running" \
   120 \
-  5
-
-if [ $? -eq 0 ]; then
+  5; then
   log_ok "Job 2 main container is running"
 else
   log_warn "Job 2 main container not running yet"
@@ -324,12 +324,10 @@ timeout 240 kubectl logs -n "$NAMESPACE_SEEDER" -f "$POD_NAME_2" -c seeder 2>/de
 echo ""
 
 log_step "Wait for Job 2 to complete"
-wait_for_condition "Job $JOB_APPS_NAME completes" \
+if wait_for_condition "Job $JOB_APPS_NAME completes" \
   "kubectl get job -n $NAMESPACE_SEEDER $JOB_APPS_NAME -o jsonpath='{.status.succeeded}' | grep -q 1" \
   "$TIMEOUT_APPS_JOB" \
-  5
-
-if [ $? -eq 0 ]; then
+  5; then
   log_ok "Job 2 completed successfully"
   JOB2_STATUS="SUCCESS"
 else
@@ -362,9 +360,7 @@ fi
 log_ok "Vault root token retrieved"
 
 log_step "List all seeded secrets in Vault"
-SECRETS_LIST=$(kubectl exec -n "$NAMESPACE_VAULT" "$VAULT_POD" -- \
-  env VAULT_TOKEN="$VAULT_TOKEN" VAULT_SKIP_VERIFY=true \
-  vault kv list secret/ 2>/dev/null || echo "ERROR")
+SECRETS_LIST=$(vault_exec kv list secret/ 2>/dev/null || echo "ERROR")
 
 if [[ "$SECRETS_LIST" == "ERROR" ]]; then
   log_fail "Could not list secrets from Vault"
@@ -384,9 +380,7 @@ SECRETS_TO_CHECK=(
 
 for secret_path in "${SECRETS_TO_CHECK[@]}"; do
   log_step "Check $secret_path exists in Vault"
-  if kubectl exec -n "$NAMESPACE_VAULT" "$VAULT_POD" -- \
-    env VAULT_TOKEN="$VAULT_TOKEN" VAULT_SKIP_VERIFY=true \
-    vault kv get "$secret_path" > /dev/null 2>&1; then
+  if vault_exec kv get "$secret_path" > /dev/null 2>&1; then
     log_ok "$secret_path exists"
   else
     log_warn "$secret_path does not exist (may not have been seeded if optional)"
@@ -400,27 +394,21 @@ done
 log_header "Phase 8: Verify Vault Configuration"
 
 log_step "Check ESO Kubernetes auth role exists"
-if kubectl exec -n "$NAMESPACE_VAULT" "$VAULT_POD" -- \
-  env VAULT_TOKEN="$VAULT_TOKEN" VAULT_SKIP_VERIFY=true \
-  vault read auth/kubernetes/role/eso > /dev/null 2>&1; then
+if vault_exec read auth/kubernetes/role/eso > /dev/null 2>&1; then
   log_ok "ESO Kubernetes auth role found"
 else
   log_fail "ESO Kubernetes auth role not found"
 fi
 
 log_step "Check eso-read policy exists"
-if kubectl exec -n "$NAMESPACE_VAULT" "$VAULT_POD" -- \
-  env VAULT_TOKEN="$VAULT_TOKEN" VAULT_SKIP_VERIFY=true \
-  vault policy read eso-read > /dev/null 2>&1; then
+if vault_exec policy read eso-read > /dev/null 2>&1; then
   log_ok "eso-read policy found"
 else
   log_fail "eso-read policy not found"
 fi
 
 log_step "Check OIDC auth method (if configured)"
-OIDC_ENABLED=$(kubectl exec -n "$NAMESPACE_VAULT" "$VAULT_POD" -- \
-  env VAULT_TOKEN="$VAULT_TOKEN" VAULT_SKIP_VERIFY=true \
-  vault auth list -format=json 2>/dev/null | jq 'has("oidc/")' || echo "false")
+OIDC_ENABLED=$(vault_exec auth list -format=json 2>/dev/null | jq 'has("oidc/")' || echo "false")
 
 if [[ "$OIDC_ENABLED" == "true" ]]; then
   log_ok "OIDC auth method is enabled"
@@ -436,12 +424,10 @@ log_header "Phase 9: Verify K8s Secrets (via ExternalSecret)"
 
 log_step "Wait for ExternalSecrets to sync"
 log_info "Waiting up to 2 minutes for ESO to pull secrets from Vault..."
-wait_for_condition "K8s secrets are synced" \
+if wait_for_condition "K8s secrets are synced" \
   "kubectl get secret -n argocd argocd-secret > /dev/null 2>&1 || kubectl get secret -n monitoring grafana-oauth-secret > /dev/null 2>&1" \
   120 \
-  10
-
-if [ $? -eq 0 ]; then
+  10; then
   log_ok "K8s secrets found (ESO sync completed)"
 else
   log_warn "Expected K8s secrets not found yet"

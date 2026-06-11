@@ -8,7 +8,8 @@ set -euo pipefail
 #
 # Optional:
 #   KUBECONFIG_CONTEXT   Kubectl context (default: k3s-lab)
-#   HELM_RELEASES        Space-separated "release namespace" pairs to uninstall
+#   HELM_RELEASES        Newline-separated "release namespace" pairs to uninstall
+#                        (one pair per line — pairs contain a space themselves)
 #   NAMESPACES           Space-separated list of namespaces to delete
 # =============================================================================
 
@@ -18,7 +19,7 @@ if [[ -n "${_src}" && "${_src}" != /dev/fd/* && -f "${_src}" ]]; then
   source "$(cd "$(dirname "${_src}")" && pwd)/../lib/script-init.sh"
 else
   # shellcheck source=/dev/null
-  source <(curl -fsSL "${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}/lib/script-init.sh")
+  source <(curl -fsSL "${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.11.0}/lib/script-init.sh") # x-release-please-version
 fi
 unset _src
 

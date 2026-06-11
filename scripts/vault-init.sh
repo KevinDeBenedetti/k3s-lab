@@ -22,7 +22,7 @@ if [[ -n "${_src}" && "${_src}" != /dev/fd/* && -f "${_src}" ]]; then
   source "$(cd "$(dirname "${_src}")" && pwd)/../lib/script-init.sh"
 else
   # shellcheck source=/dev/null
-  source <(curl -fsSL "${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/main}/lib/script-init.sh")
+  source <(curl -fsSL "${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.11.0}/lib/script-init.sh") # x-release-please-version
 fi
 unset _src
 
@@ -31,22 +31,33 @@ if ! command -v python3 &> /dev/null; then
   exit 1
 fi
 
-KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-infra}"
+KUBECONFIG_CONTEXT="${KUBECONFIG_CONTEXT:-k3s-lab}"
 VAULT_NAMESPACE="${VAULT_NAMESPACE:-vault}"
 VAULT_POD="${VAULT_POD:-vault-0}"
 ESO_NAMESPACE="${ESO_NAMESPACE:-external-secrets}"
 ESO_SA="${ESO_SA:-external-secrets}"
 
 # ── Helpers: run vault CLI inside the Vault pod ───────────────────────────────
-# vault_exec: for commands that do NOT need stdin (status, unseal, auth list…)
+# The token (and unseal keys) travel on stdin, never as process arguments:
+# argv is visible in local `ps`, in the kubectl exec API request, and inside
+# the pod — stdin is none of those.
+# vault_exec: for commands that do NOT need stdin (status, auth list…)
 # vault_exec_stdin: for commands that read from stdin (policy write via heredoc)
 vault_exec() {
-  kubectl --context "${KUBECONFIG_CONTEXT}" exec -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-    -- env VAULT_TOKEN="${VAULT_TOKEN:-}" VAULT_SKIP_VERIFY=true vault "$@"
+  printf '%s\n' "${VAULT_TOKEN:-}" | \
+    kubectl --context "${KUBECONFIG_CONTEXT}" exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" -- \
+    sh -c 'IFS= read -r VAULT_TOKEN; export VAULT_TOKEN VAULT_SKIP_VERIFY=true; exec vault "$@"' vault-cli "$@"
 }
 vault_exec_stdin() {
-  kubectl --context "${KUBECONFIG_CONTEXT}" exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" \
-    -- env VAULT_TOKEN="${VAULT_TOKEN:-}" VAULT_SKIP_VERIFY=true vault "$@"
+  { printf '%s\n' "${VAULT_TOKEN:-}"; cat; } | \
+    kubectl --context "${KUBECONFIG_CONTEXT}" exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" -- \
+    sh -c 'IFS= read -r VAULT_TOKEN; export VAULT_TOKEN VAULT_SKIP_VERIFY=true; exec vault "$@"' vault-cli "$@"
+}
+# vault_unseal <key> — unseal key via stdin (argv only inside the Vault container)
+vault_unseal() {
+  printf '%s\n' "$1" | \
+    kubectl --context "${KUBECONFIG_CONTEXT}" exec -i -n "${VAULT_NAMESPACE}" "${VAULT_POD}" -- \
+    sh -c 'IFS= read -r k; export VAULT_SKIP_VERIFY=true; exec vault operator unseal "$k"'
 }
 
 # _json_field <json> <python-expression>
@@ -66,7 +77,9 @@ _parse_status() {
 }
 
 # ── Compute total steps (5 base + 2 if OIDC is configured) ───────────────────
-if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_CLIENT_SECRET:-}" ]]; then
+# ADMIN_EMAIL is mandatory for OIDC: without it the role would have no
+# bound_claims and ANY account at the provider would get vault-admin.
+if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_CLIENT_SECRET:-}" && -n "${OIDC_ISSUER_URL:-}" && -n "${ADMIN_EMAIL:-}" ]]; then
   TOTAL_STEPS=7
 else
   TOTAL_STEPS=5
@@ -102,8 +115,8 @@ if [[ "${INITIALIZED}" == "yes" ]]; then
     if [[ -z "${VAULT_UNSEAL_KEY_2:-}" ]]; then
       read -r -s -p "  Unseal Key 2: " VAULT_UNSEAL_KEY_2 < /dev/tty; echo ""
     fi
-    vault_exec operator unseal "${VAULT_UNSEAL_KEY_1}"
-    vault_exec operator unseal "${VAULT_UNSEAL_KEY_2}"
+    vault_unseal "${VAULT_UNSEAL_KEY_1}"
+    vault_unseal "${VAULT_UNSEAL_KEY_2}"
     log_info "Vault unsealed"
   else
     log_info "Vault is already unsealed"
@@ -140,8 +153,8 @@ print('Root Token:  ', d['root_token'])
 
   # ── Unseal ──────────────────────────────────────────────────────────────
   log_step "[2/${TOTAL_STEPS}] Unsealing Vault..."
-  vault_exec operator unseal "${UNSEAL_KEY_1}"
-  vault_exec operator unseal "${UNSEAL_KEY_2}"
+  vault_unseal "${UNSEAL_KEY_1}"
+  vault_unseal "${UNSEAL_KEY_2}"
   log_info "Vault unsealed successfully"
 fi
 
@@ -210,11 +223,10 @@ vault_exec write auth/kubernetes/role/eso \
   ttl=1h
 
 # ── 6. Enable OIDC auth (optional — requires OIDC_CLIENT_ID) ────────────────
-if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_CLIENT_SECRET:-}" ]]; then
+if [[ -n "${OIDC_CLIENT_ID:-}" && -n "${OIDC_CLIENT_SECRET:-}" && -n "${OIDC_ISSUER_URL:-}" && -n "${ADMIN_EMAIL:-}" ]]; then
   log_step "[6/${TOTAL_STEPS}] Configuring OIDC auth method..."
 
   VAULT_DOMAIN="${VAULT_DOMAIN:-}"
-  ADMIN_EMAIL="${ADMIN_EMAIL:-}"
 
   if [[ -z "${VAULT_DOMAIN}" ]]; then
     log_warn "VAULT_DOMAIN not set — skipping OIDC (needed for callback URL)"
@@ -259,25 +271,21 @@ path "auth/*" {
 }
 POLICY
 
-    _oidc_policies="default,vault-admin"
-    _bound_claims=()
-    if [[ -n "${ADMIN_EMAIL}" ]]; then
-      _bound_claims=("bound_claims={\"email\":\"${ADMIN_EMAIL}\"}")
-    fi
-
+    # bound_claims is always set (ADMIN_EMAIL is required by the gate above):
+    # without it any account at the OIDC provider would get vault-admin.
     vault_exec write auth/oidc/role/default \
       user_claim="email" \
       allowed_redirect_uris="https://${VAULT_DOMAIN}/ui/vault/auth/oidc/oidc/callback" \
       allowed_redirect_uris="http://localhost:8250/oidc/callback" \
-      policies="${_oidc_policies}" \
+      policies="default,vault-admin" \
       oidc_scopes="openid,email,profile" \
-      ttl=12h \
-      "${_bound_claims[@]}"
+      bound_claims="{\"email\":\"${ADMIN_EMAIL}\"}" \
+      ttl=12h
 
     log_info "OIDC configured — login at https://${VAULT_DOMAIN}"
   fi
 else
-  log_info "Skipping OIDC auth (OIDC_CLIENT_ID not set)"
+  log_info "Skipping OIDC auth (requires OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_ISSUER_URL and ADMIN_EMAIL)"
 fi
 
 log_info "✅ Vault initialized and configured"

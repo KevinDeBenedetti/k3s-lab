@@ -52,12 +52,16 @@ tasks:
         msg: "VAULT_UNSEAL_KEY_1 is not set — add it to .env"
       - sh: test -n "$VAULT_UNSEAL_KEY_2"
         msg: "VAULT_UNSEAL_KEY_2 is not set — add it to .env"
+    # Keys travel on stdin, not argv — argv is visible in `ps` and in the
+    # kubectl exec API request (printf is a shell builtin, no extra process).
     cmds:
-      - kubectl --context $KUBECONFIG_CONTEXT exec -n {{.VAULT_NAMESPACE}} {{.VAULT_POD}} --
-          env VAULT_SKIP_VERIFY=true vault operator unseal $VAULT_UNSEAL_KEY_1
+      - printf '%s\n' "$VAULT_UNSEAL_KEY_1"
+          | kubectl --context $KUBECONFIG_CONTEXT exec -i -n {{.VAULT_NAMESPACE}} {{.VAULT_POD}} --
+          sh -c 'IFS= read -r k; export VAULT_SKIP_VERIFY=true; exec vault operator unseal "$k"'
           | grep -E "Sealed|Progress"
-      - kubectl --context $KUBECONFIG_CONTEXT exec -n {{.VAULT_NAMESPACE}} {{.VAULT_POD}} --
-          env VAULT_SKIP_VERIFY=true vault operator unseal $VAULT_UNSEAL_KEY_2
+      - printf '%s\n' "$VAULT_UNSEAL_KEY_2"
+          | kubectl --context $KUBECONFIG_CONTEXT exec -i -n {{.VAULT_NAMESPACE}} {{.VAULT_POD}} --
+          sh -c 'IFS= read -r k; export VAULT_SKIP_VERIFY=true; exec vault operator unseal "$k"'
           | grep -E "Sealed|Progress"
 
   configure:

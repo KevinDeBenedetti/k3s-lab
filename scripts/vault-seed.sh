@@ -26,10 +26,14 @@ source "${SCRIPT_DIR}/lib/common.sh" 2>/dev/null || true
 KUBECTL="${KUBECTL:-kubectl}"
 K="${KUBECTL} --context ${KUBECONFIG_CONTEXT:-k3s-lab}"
 
+# The token travels on stdin (first line), never as a process argument:
+# argv is visible in local `ps`, in the kubectl exec API request, and inside
+# the pod — stdin is none of those.
 vault_exec() {
-  ${K} exec -n "${VAULT_NAMESPACE:-vault}" "${VAULT_POD:-vault-0}" -- \
-    env VAULT_TOKEN="${VAULT_ROOT_TOKEN}" VAULT_SKIP_VERIFY=true \
-    vault "$@"
+  # shellcheck disable=SC2086
+  printf '%s\n' "${VAULT_ROOT_TOKEN}" | \
+    ${K} exec -i -n "${VAULT_NAMESPACE:-vault}" "${VAULT_POD:-vault-0}" -- \
+    sh -c 'IFS= read -r VAULT_TOKEN; export VAULT_TOKEN VAULT_SKIP_VERIFY=true; exec vault "$@"' vault-cli "$@"
 }
 
 echo "→ Seeding Vault secrets..."
@@ -87,7 +91,8 @@ if [[ -n "${DASHBOARD_PASSWORD:-}" ]]; then
   if ! command -v htpasswd >/dev/null 2>&1; then
     echo "  ❌ htpasswd not found — brew install httpd (skipping traefik/dashboard)"
   else
-    DASHBOARD_USERS="$(htpasswd -nb "${DASHBOARD_USER:-admin}" "${DASHBOARD_PASSWORD}")"
+    # -i reads the password from stdin — keeps it out of `ps` (unlike -b)
+    DASHBOARD_USERS="$(printf '%s\n' "${DASHBOARD_PASSWORD}" | htpasswd -ni "${DASHBOARD_USER:-admin}")"
     vault_exec kv put secret/traefik/dashboard \
       users="${DASHBOARD_USERS}"
     echo "  ✓ traefik/dashboard"

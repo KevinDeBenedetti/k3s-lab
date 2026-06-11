@@ -36,6 +36,18 @@ vault:
       initialDelaySeconds: 60
     ingress:
       enabled: false
+    # The listener below reads its cert from /vault/userconfig/vault-tls —
+    # mount the `vault-tls` secret there or Vault cannot start.
+    # The secret must exist in the vault namespace (e.g. a cert-manager
+    # Certificate, or created manually) before the pod is scheduled.
+    volumes:
+      - name: vault-tls
+        secret:
+          secretName: vault-tls
+    volumeMounts:
+      - name: vault-tls
+        mountPath: /vault/userconfig/vault-tls
+        readOnly: true
     standalone:
       enabled: true
       config: |
