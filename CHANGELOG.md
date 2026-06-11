@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.11.0...v0.11.1) (2026-06-11)
+
+
+### Bug Fixes
+
+* security ([2822852](https://github.com/KevinDeBenedetti/k3s-lab/commit/2822852eeb1a8738f11d6819deeccc76966471ea))
+* security & improvements ([cb7d1be](https://github.com/KevinDeBenedetti/k3s-lab/commit/cb7d1be76670aa19c5414aa092f539bef5db9e57))
+
 ## [0.11.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.10.0...v0.11.0) (2026-06-02)
 
 
