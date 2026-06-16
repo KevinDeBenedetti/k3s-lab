@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.11.1...v0.11.2) (2026-06-16)
+
+
+### Bug Fixes
+
+* update wireguard ([81a9788](https://github.com/KevinDeBenedetti/k3s-lab/commit/81a97881935f677df07ad5575b54d7616e65b25c))
+
 ## [0.11.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.11.0...v0.11.1) (2026-06-11)
 
 
