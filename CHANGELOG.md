@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.11.2...v0.12.0) (2026-06-29)
+
+
+### Features
+
+* **ansible:** add dynamic MOTD for server overview on SSH login ([f9381ca](https://github.com/KevinDeBenedetti/k3s-lab/commit/f9381ca174800861fca65bbdeded2e19fabb51f3))
+
 ## [0.11.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.11.1...v0.11.2) (2026-06-16)
 
 
