@@ -98,14 +98,6 @@ spec:
               name: vault-seeder-secrets
               key: oidc-client-secret
               optional: true
-        - name: OIDC_PROVIDER_NAME
-          value: "{{ .Values.secrets.oidcProviderName }}"
-        - name: OIDC_AUTH_URL
-          value: "{{ .Values.secrets.oidcAuthUrl }}"
-        - name: OIDC_TOKEN_URL
-          value: "{{ .Values.secrets.oidcTokenUrl }}"
-        - name: OIDC_API_URL
-          value: "{{ .Values.secrets.oidcApiUrl }}"
         - name: ARGOCD_SERVER_SECRET_KEY
           valueFrom:
             secretKeyRef:

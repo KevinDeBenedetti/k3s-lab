@@ -66,6 +66,7 @@
     state: directory
     mode: "0700"
   when: k3s_tls_sans | length > 0
+  tags: [api-access]
 
 - name: Configure extra API server TLS SANs
   ansible.builtin.copy:
@@ -79,6 +80,7 @@
     mode: "0600"
   when: k3s_tls_sans | length > 0
   notify: Restart k3s
+  tags: [api-access]
 
 - name: Open firewall ports for agents
   community.general.ufw:
@@ -100,6 +102,7 @@
     from_ip: "{{ item }}"
   loop: "{{ k3s_api_extra_allow_from }}"
   notify: Reload UFW
+  tags: [api-access]
 
 - name: Open ingress ports (HTTP/HTTPS) with rate limiting
   community.general.ufw:
