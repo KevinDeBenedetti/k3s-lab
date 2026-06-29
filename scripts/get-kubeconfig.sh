@@ -12,7 +12,7 @@ CONTEXT_NAME="${3:-${KUBECONFIG_CONTEXT:-k3s-lab}}"
 SSH_KEY="${SSH_KEY:-}"
 SSH_PORT="${SSH_PORT:-22}"
 
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.12.0}" # x-release-please-version
+K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v1.2.0}" # x-release-please-version
 
 # get-kubeconfig uses positional args before sourcing — keep manual preamble
 # since script-init.sh would try to load .env (not needed here).

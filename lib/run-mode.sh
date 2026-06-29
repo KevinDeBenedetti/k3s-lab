@@ -28,7 +28,7 @@
 
 # Remote fetches default to the released tag, not the moving main branch
 # (supply-chain pinning — kept current by release-please).
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.12.0}" # x-release-please-version
+K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v1.2.0}" # x-release-please-version
 
 # Detect execution context.
 _run_src="${BASH_SOURCE[1]:-}"   # [1] = the script that sourced us

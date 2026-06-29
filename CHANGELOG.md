@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.12.0...v1.2.0) (2026-06-29)
+
+
+### Miscellaneous Chores
+
+* release 1.2.0 ([686d7c9](https://github.com/KevinDeBenedetti/k3s-lab/commit/686d7c9b9afe3ae18559eb094f477f169b453cac))
+
 ## [0.12.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.11.2...v0.12.0) (2026-06-29)
 
 
