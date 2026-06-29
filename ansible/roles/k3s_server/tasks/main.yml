@@ -60,6 +60,26 @@
     k3s_node_token: "{{ k3s_node_token_raw.content | b64decode | trim }}"
   no_log: true
 
+- name: Ensure k3s config.yaml.d directory exists
+  ansible.builtin.file:
+    path: /etc/rancher/k3s/config.yaml.d
+    state: directory
+    mode: "0700"
+  when: k3s_tls_sans | length > 0
+
+- name: Configure extra API server TLS SANs
+  ansible.builtin.copy:
+    dest: /etc/rancher/k3s/config.yaml.d/10-tls-san.yaml
+    content: |
+      # Managed by Ansible (k3s_server role) — extra apiserver cert SANs.
+      tls-san:
+      {% for san in k3s_tls_sans %}
+        - {{ san }}
+      {% endfor %}
+    mode: "0600"
+  when: k3s_tls_sans | length > 0
+  notify: Restart k3s
+
 - name: Open firewall ports for agents
   community.general.ufw:
     rule: allow
@@ -70,6 +90,15 @@
     - { port: "6443", proto: tcp }
     - { port: "8472", proto: udp }
     - { port: "10250", proto: tcp }
+  notify: Reload UFW
+
+- name: Open API port (6443) for extra allowed CIDRs
+  community.general.ufw:
+    rule: allow
+    port: "6443"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ k3s_api_extra_allow_from }}"
   notify: Reload UFW
 
 - name: Open ingress ports (HTTP/HTTPS) with rate limiting

@@ -66,6 +66,7 @@
 
 - name: Configure login MOTD (server overview on SSH login)
   when: common_motd_enabled
+  tags: [motd]
   block:
     - name: Ensure update-motd.d directory exists
       ansible.builtin.file:

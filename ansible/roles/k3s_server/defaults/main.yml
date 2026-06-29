@@ -43,6 +43,17 @@ k3s_extra_server_args: >-
 # Firewall: ports to open for agent communication
 k3s_ufw_allow_from: "10.0.0.0/16"
 
+# Extra CIDRs (besides k3s_ufw_allow_from) allowed to reach the API server on
+# 6443. Use for VPN clients so kubectl works from a laptop over the tunnel,
+# e.g. ["10.8.0.0/24"] for the WireGuard subnet. Empty = no extra access.
+k3s_api_extra_allow_from: []
+
+# Extra Subject Alternative Names added to the API server serving cert via a
+# /etc/rancher/k3s/config.yaml.d drop-in. Applied by restarting k3s (no
+# reinstall needed). Required when kubectl reaches the API on an address k3s
+# does not auto-detect, e.g. the WireGuard tunnel IP ["10.8.0.1"]. Empty = none.
+k3s_tls_sans: []
+
 # =============================================================================
 # kine-vacuum — periodic SQLite VACUUM of the kine datastore
 # =============================================================================

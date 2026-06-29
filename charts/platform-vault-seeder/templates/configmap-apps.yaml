@@ -82,23 +82,19 @@ data:
     {{- end }}
 
     # ── secret/grafana/oauth ─────────────────────────────────────────────────
+    # Seed ONLY the two secret values. Grafana auto-maps these env vars to
+    # auth.generic_oauth.client_id / client_secret.
+    #
+    # All NON-secret OIDC config (enabled, name, scopes, urls, pkce, auto_login,
+    # allow_sign_up, disable_login_form, …) must live in grafana.ini at the
+    # consumer, NOT here: Grafana lets env OVERRIDE grafana.ini, so seeding those
+    # keys as env is a footgun — e.g. a stale GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true
+    # would silently defeat an `allow_sign_up: false` lockdown in grafana.ini.
     {{- if .Values.secrets.oidcClientId }}
     if [[ -n "${OIDC_CLIENT_ID:-}" ]]; then
       _seed "secret/grafana/oauth" \
-        GF_AUTH_GENERIC_OAUTH_ENABLED="true" \
-        GF_AUTH_GENERIC_OAUTH_NAME="${OIDC_PROVIDER_NAME:-Infomaniak}" \
         GF_AUTH_GENERIC_OAUTH_CLIENT_ID="${OIDC_CLIENT_ID}" \
-        GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="${OIDC_CLIENT_SECRET:-}" \
-        GF_AUTH_GENERIC_OAUTH_SCOPES="openid email profile" \
-        GF_AUTH_GENERIC_OAUTH_AUTH_URL="${OIDC_AUTH_URL:-https://login.infomaniak.com/authorize}" \
-        GF_AUTH_GENERIC_OAUTH_TOKEN_URL="${OIDC_TOKEN_URL:-https://login.infomaniak.com/token}" \
-        GF_AUTH_GENERIC_OAUTH_API_URL="${OIDC_API_URL:-https://login.infomaniak.com/userinfo}" \
-        GF_AUTH_GENERIC_OAUTH_REDIRECT_URI="https://grafana.kevindb.dev/login/generic_oauth" \
-        GF_AUTH_GENERIC_OAUTH_USE_PKCE="true" \
-        GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN="true" \
-        GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN="true" \
-        GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP="true" \
-        GF_AUTH_DISABLE_LOGIN_FORM="true"
+        GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="${OIDC_CLIENT_SECRET:-}"
     else
       _skip "secret/grafana/oauth" "OIDC_CLIENT_ID"
     fi
