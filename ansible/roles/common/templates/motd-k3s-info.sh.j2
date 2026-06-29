@@ -1,0 +1,63 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Dynamic MOTD shown on every SSH login (deployed by the k3s-lab `common` role).
+# HARD RULE: this must never fail or hang a login — every external call is
+# guarded (timeout / 2>/dev/null) and degrades gracefully. No `set -e`.
+
+b=$'\033[1m'; dim=$'\033[2m'; g=$'\033[32m'; y=$'\033[33m'; r=$'\033[31m'; n=$'\033[0m'
+K=/usr/local/bin/k3s
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+bar() { printf '%s──────────────────────────────────────────────%s\n' "$dim" "$n"; }
+
+printf '\n%s%s%s   %s\n' "$b" "$(hostname)" "$n" "$(uptime -p 2>/dev/null || true)"
+bar
+
+# ── Ressources ───────────────────────────────────────────────────────────────
+load=$(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null)
+ncpu=$(nproc 2>/dev/null || echo '?')
+mem=$(free -m 2>/dev/null | awk '/^Mem:/{printf "%d/%dMi (%d%%)", $3, $2, ($3*100/$2)}')
+swap=$(free -m 2>/dev/null | awk '/^Swap:/{if ($2==0) print "off"; else printf "%d/%dMi", $3,$2}')
+disk=$(df -h / 2>/dev/null | awk 'NR==2{printf "%s used, %s free (%s)", $3, $4, $5}')
+printf '%sRessources%s  load %s · %s vCPU\n' "$b" "$n" "$load" "$ncpu"
+printf '            ram  %s · swap %s\n' "$mem" "$swap"
+printf '            disk %s\n' "$disk"
+
+# ── Système ──────────────────────────────────────────────────────────────────
+failed=$(systemctl --failed --no-legend --plain 2>/dev/null | awk '{print $1}')
+fcount=$(printf '%s' "$failed" | grep -c . 2>/dev/null)
+if [ "${fcount:-0}" -gt 0 ]; then
+  printf '%sSystème%s     %s%s service(s) en échec%s: %s\n' "$b" "$n" "$r" "$fcount" "$n" "$(echo $failed | tr '\n' ' ')"
+else
+  printf '%sSystème%s     %stous les services OK%s\n' "$b" "$n" "$g" "$n"
+fi
+
+# ── Mises à jour (apt, cache local — pas de réseau) ───────────────────────────
+upg=$(apt-get -s -o Debug::NoLocking=true upgrade 2>/dev/null | grep -c '^Inst ')
+reboot=''
+[ -f /var/run/reboot-required ] && reboot=" ${y}· reboot requis${n}"
+if [ "${upg:-0}" -gt 0 ]; then
+  printf '%sMàJ apt%s     %s%s paquet(s) upgradable%s%b\n' "$b" "$n" "$y" "$upg" "$n" "$reboot"
+else
+  printf '%sMàJ apt%s     %ssystème à jour%s%b\n' "$b" "$n" "$g" "$n" "$reboot"
+fi
+
+# ── Santé k3s (en root via kubeconfig ; jamais bloquant) ──────────────────────
+if [ -r "$KUBECONFIG" ] && [ -x "$K" ]; then
+  nodes=$(timeout 3 "$K" kubectl get nodes --no-headers 2>/dev/null)
+  if [ -n "$nodes" ]; then
+    nready=$(printf '%s\n' "$nodes" | awk '$2 ~ /Ready/ && $2 !~ /NotReady/{c++} END{print c+0}')
+    ntot=$(printf '%s\n' "$nodes" | grep -c .)
+    bad=$(timeout 3 "$K" kubectl get pods -A --no-headers 2>/dev/null \
+          | awk '$4!="Running" && $4!="Completed" && $4!="" {c++} END{print c+0}')
+    col=$g; [ "$nready" -lt "$ntot" ] && col=$r
+    pcol=$g; [ "${bad:-0}" -gt 0 ] && pcol=$y
+    printf '%sk3s%s         nœuds %s%s/%s Ready%s · pods hors Running %s%s%s\n' \
+      "$b" "$n" "$col" "$nready" "$ntot" "$n" "$pcol" "${bad:-0}" "$n"
+  else
+    printf '%sk3s%s         %sAPI injoignable (timeout)%s\n' "$b" "$n" "$r" "$n"
+  fi
+else
+  printf '%sk3s%s         %s(infos réservées à root)%s\n' "$b" "$n" "$dim" "$n"
+fi
+bar

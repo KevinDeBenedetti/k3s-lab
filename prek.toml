@@ -25,7 +25,8 @@ hooks = [
   { id = "check-yaml", args = ["--allow-multiple-documents"], exclude = "^(kubernetes/.*/.*-values\\.yaml|charts/.*/templates/.*\\.yaml)$" },
   { id = "check-merge-conflict" },
   { id = "check-executables-have-shebangs" },
-  { id = "check-shebang-scripts-are-executable" },
+  # exclude Jinja2 templates: the shebang is for the rendered output, not the .j2 source
+  { id = "check-shebang-scripts-are-executable", exclude = "\\.j2$" },
   { id = "detect-private-key" },
   { id = "mixed-line-ending", args = ["--fix=lf"] },
 ]

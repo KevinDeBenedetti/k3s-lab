@@ -63,3 +63,18 @@
     - name: Enable UFW
       community.general.ufw:
         state: enabled
+
+- name: Configure login MOTD (server overview on SSH login)
+  when: common_motd_enabled
+  block:
+    - name: Ensure update-motd.d directory exists
+      ansible.builtin.file:
+        path: /etc/update-motd.d
+        state: directory
+        mode: "0755"
+
+    - name: Deploy dynamic MOTD script
+      ansible.builtin.template:
+        src: motd-k3s-info.sh.j2
+        dest: /etc/update-motd.d/10-k3s-info
+        mode: "0755"

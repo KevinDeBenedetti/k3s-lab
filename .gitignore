@@ -27,3 +27,4 @@ charts/**/charts/*.tgz
 .vscode/
 *.swp
 *~
+.claude/

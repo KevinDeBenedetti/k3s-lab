@@ -47,6 +47,9 @@ common_sysctl:
 # Disable swap
 common_disable_swap: true
 
+# Dynamic MOTD — server overview (resources, apt, k3s health) on SSH login
+common_motd_enabled: true
+
 # UFW defaults
 common_ufw_enabled: true
 common_ufw_default_policy: deny

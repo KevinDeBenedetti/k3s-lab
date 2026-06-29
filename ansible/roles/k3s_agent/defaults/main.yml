@@ -15,7 +15,7 @@ k3s_server_url: ""
 k3s_node_token: ""
 
 # Node IP for inter-node communication (private network)
-k3s_node_ip: "{{ ansible_default_ipv4.address }}"
+k3s_node_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
 
 # Extra args for the agent
 k3s_extra_agent_args: ""

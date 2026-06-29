@@ -18,7 +18,7 @@ k3s_flannel_backend: vxlan
 
 # Node IP used for inter-node communication (private network)
 # Override with the node's private IP from Hetzner network
-k3s_node_ip: "{{ ansible_default_ipv4.address }}"
+k3s_node_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
 
 # Disable bundled components (managed externally via Helm/ArgoCD)
 k3s_disable:
