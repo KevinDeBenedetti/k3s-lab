@@ -38,6 +38,11 @@ common_sysctl:
   net.ipv4.conf.default.accept_redirects: 0
   # Ignore ICMP broadcast requests
   net.ipv4.icmp_echo_ignore_broadcasts: 1
+  # inotify limits — k3s/containerd + kubelet + many pods blow past the kernel
+  # default of 128 instances, yielding "Failed to allocate directory watch:
+  # Too many open files" (systemd) and can stall pods. Raise for a busy node.
+  fs.inotify.max_user_instances: 1024
+  fs.inotify.max_user_watches: 524288
 
 # Disable swap
 common_disable_swap: true
