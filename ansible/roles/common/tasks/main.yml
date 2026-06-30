@@ -79,3 +79,22 @@
         src: motd-k3s-info.sh.j2
         dest: /etc/update-motd.d/10-k3s-info
         mode: "0755"
+
+# chkrootkit's daily scan emails its report via `mail`, but k3s nodes have no MTA
+# → chkrootkit.service exits 127 ("mail: not found") and shows as a failed unit.
+# Set MAILTO="" so the report goes to stdout (captured by the systemd journal /
+# /var/log/chkrootkit) instead of being mailed. Guarded: only acts if chkrootkit
+# is actually installed (it is not pulled in by this role).
+- name: Detect chkrootkit daily config
+  ansible.builtin.stat:
+    path: /etc/chkrootkit/chkrootkit.conf
+  register: chkrootkit_conf
+  tags: [chkrootkit]
+
+- name: Set chkrootkit daily scan to log-only (no MTA on k3s nodes)
+  ansible.builtin.lineinfile:
+    path: /etc/chkrootkit/chkrootkit.conf
+    regexp: '^MAILTO='
+    line: 'MAILTO=""'
+  when: chkrootkit_conf.stat.exists
+  tags: [chkrootkit]
