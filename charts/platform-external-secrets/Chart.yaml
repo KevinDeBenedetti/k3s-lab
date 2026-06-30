@@ -1,7 +1,7 @@
 apiVersion: v2
 name: platform-external-secrets
 description: External secrets management — External Secrets Operator
-version: 1.2.0
+version: 1.3.0
 type: application
 dependencies:
   - name: external-secrets
