@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v1.2.0...v1.3.0) (2026-06-30)
+
+
+### Features
+
+* **ansible/roles/common:** add log-only config for chkrootkit daily scan ([3f7b080](https://github.com/KevinDeBenedetti/k3s-lab/commit/3f7b080377bf6f24740ba83a3f075090e96b359f))
+
 ## [1.2.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.12.0...v1.2.0) (2026-06-29)
 
 
