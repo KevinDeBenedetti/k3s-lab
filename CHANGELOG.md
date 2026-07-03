@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v1.3.0...v1.4.0) (2026-07-03)
+
+
+### Features
+
+* **charts/platform-vault-seeder/templates/configmap-apps.yaml:** update URL encoding for sensitive values ([1916a41](https://github.com/KevinDeBenedetti/k3s-lab/commit/1916a41eb61e92ac5d21ea03d961cdfb30a24a0b))
+
 ## [1.3.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v1.2.0...v1.3.0) (2026-06-30)
 
 
