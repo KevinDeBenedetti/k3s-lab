@@ -121,17 +121,11 @@ test_assert "OIDC_CLIENT_ID from secret (optional)" \
 test_assert "OIDC_CLIENT_SECRET from secret (optional)" \
   "grep -q 'name: OIDC_CLIENT_SECRET' '$JOB2_TEMPLATE' && grep -q 'optional: true' '$JOB2_TEMPLATE'"
 
-test_assert "OIDC_PROVIDER_NAME from values" \
-  "grep -q 'OIDC_PROVIDER_NAME' '$JOB2_TEMPLATE' && grep -q '.Values.secrets.oidcProviderName' '$JOB2_TEMPLATE'"
-
-test_assert "OIDC_AUTH_URL from values" \
-  "grep -q 'OIDC_AUTH_URL' '$JOB2_TEMPLATE'"
-
-test_assert "OIDC_TOKEN_URL from values" \
-  "grep -q 'OIDC_TOKEN_URL' '$JOB2_TEMPLATE'"
-
-test_assert "OIDC_API_URL from values" \
-  "grep -q 'OIDC_API_URL' '$JOB2_TEMPLATE'"
+# Non-secret OIDC config (provider name, auth/token/api URLs) deliberately does
+# NOT transit through the seeder anymore — it lives at the consumer (grafana.ini,
+# argocd-cm). Guard against it creeping back in as job env.
+test_assert "No non-secret OIDC config injected (OIDC_PROVIDER_NAME/AUTH_URL/TOKEN_URL/API_URL)" \
+  "! grep -qE 'OIDC_(PROVIDER_NAME|AUTH_URL|TOKEN_URL|API_URL)' '$JOB2_TEMPLATE'"
 
 test_assert "ARGOCD_SERVER_SECRET_KEY from secret (optional)" \
   "grep -q 'ARGOCD_SERVER_SECRET_KEY' '$JOB2_TEMPLATE' && grep -q 'optional: true' '$JOB2_TEMPLATE'"
@@ -252,14 +246,19 @@ test_assert "secret/grafana/admin includes password" \
 test_assert "Seeds secret/grafana/oauth" \
   "grep -q 'secret/grafana/oauth' '$CONFIGMAP2_TEMPLATE'"
 
-test_assert "secret/grafana/oauth includes GF_AUTH_GENERIC_OAUTH_ENABLED" \
-  "grep -q 'GF_AUTH_GENERIC_OAUTH_ENABLED' '$CONFIGMAP2_TEMPLATE'"
-
 test_assert "secret/grafana/oauth includes GF_AUTH_GENERIC_OAUTH_CLIENT_ID" \
   "grep -q 'GF_AUTH_GENERIC_OAUTH_CLIENT_ID' '$CONFIGMAP2_TEMPLATE'"
 
-test_assert "secret/grafana/oauth includes GF_AUTH_GENERIC_OAUTH_AUTH_URL" \
-  "grep -q 'GF_AUTH_GENERIC_OAUTH_AUTH_URL' '$CONFIGMAP2_TEMPLATE'"
+test_assert "secret/grafana/oauth includes GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET" \
+  "grep -q 'GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET' '$CONFIGMAP2_TEMPLATE'"
+
+# secret/grafana/oauth seeds ONLY the two secret values. Non-secret OIDC config
+# (ENABLED, AUTH_URL, TOKEN_URL, scopes, …) must live in grafana.ini at the
+# consumer: Grafana lets env override grafana.ini, so a stale seeded key (e.g.
+# ALLOW_SIGN_UP=true) would silently defeat a lockdown. Guard the boundary.
+# Match only seeded KEY=\"…\" pairs — the template's comments cite these names.
+test_assert "secret/grafana/oauth seeds ONLY secret keys (no ENABLED/AUTH_URL/TOKEN_URL/…)" \
+  "! grep -qE 'GF_AUTH_GENERIC_OAUTH_(ENABLED|NAME|SCOPES|AUTH_URL|TOKEN_URL|API_URL|ALLOW_SIGN_UP)=\"' '$CONFIGMAP2_TEMPLATE'"
 
 test_assert "Seeds secret/ghcr/pull" \
   "grep -q 'secret/ghcr/pull' '$CONFIGMAP2_TEMPLATE'"

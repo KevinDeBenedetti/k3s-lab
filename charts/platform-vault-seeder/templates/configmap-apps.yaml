@@ -36,6 +36,23 @@ data:
     log() { echo "[vault-seeder-apps] $*"; }
     log_step() { echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo "→ $*"; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; }
 
+    # Percent-encode a value for embedding in a URL (userinfo or query part).
+    # Consumers URL-DECODE connection strings (Prisma, postgres.js, ioredis),
+    # so a raw base64 password with '/', '+' or '=' breaks parsing/auth and the
+    # drift returns at every reseed. Pure bash byte-wise loop — the job image
+    # (bitnami/kubectl) has no jq/python to lean on.
+    _urlenc() {
+      local LC_ALL=C s="$1" out='' c i
+      for (( i = 0; i < ${#s}; i++ )); do
+        c="${s:i:1}"
+        case "$c" in
+          [A-Za-z0-9._~-]) out+="$c" ;;
+          *) printf -v c '%%%02X' "'$c"; out+="$c" ;;
+        esac
+      done
+      printf '%s' "$out"
+    }
+
     _seeded=0
     _skipped=0
 
@@ -120,8 +137,11 @@ data:
     if [[ -n "${RR_AUTH_SECRET:-}" ]]; then
       local_db_pw="${RR_DB_PASSWORD:-}"
       local_bt="${RR_BROWSERLESS_TOKEN:-}"
-      local_db_url="${RR_DATABASE_URL:-postgresql://reactive_resume:${local_db_pw}@postgres:5432/reactive_resume}"
-      local_printer="${RR_PRINTER_ENDPOINT:-ws://browserless:3000?token=${local_bt}}"
+      # The password/token are percent-encoded inside the default URLs (the raw
+      # values stay raw in their own keys). An explicit RR_DATABASE_URL /
+      # RR_PRINTER_ENDPOINT is taken as-is — encode it yourself.
+      local_db_url="${RR_DATABASE_URL:-postgresql://reactive_resume:$(_urlenc "${local_db_pw}")@postgres:5432/reactive_resume}"
+      local_printer="${RR_PRINTER_ENDPOINT:-ws://browserless:3000?token=$(_urlenc "${local_bt}")}"
       _seed "secret/reactive-resume/prod" \
         AUTH_SECRET="${RR_AUTH_SECRET}" \
         DB_PASSWORD="${local_db_pw}" \
