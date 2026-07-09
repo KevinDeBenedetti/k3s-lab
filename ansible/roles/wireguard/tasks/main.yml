@@ -26,6 +26,7 @@
         content: "{{ wg_existing_key.stdout | trim }}"
         dest: /etc/wireguard/private.key
         mode: "0600"
+      no_log: true
       when:
         - not wg_key_stat.stat.exists
         - wg_existing_key.rc == 0
@@ -36,6 +37,7 @@
         cmd: wg genkey
       register: wg_new_key
       changed_when: true
+      no_log: true
       when:
         - not wg_key_stat.stat.exists
         - wg_existing_key.rc != 0 or wg_existing_key.stdout | trim | length == 0
@@ -45,6 +47,7 @@
         content: "{{ wg_new_key.stdout }}"
         dest: /etc/wireguard/private.key
         mode: "0600"
+      no_log: true
       when:
         - not wg_key_stat.stat.exists
         - wg_new_key is changed
@@ -53,17 +56,20 @@
       ansible.builtin.slurp:
         src: /etc/wireguard/private.key
       register: wg_private_key_file
+      no_log: true
 
     - name: Derive server public key
       ansible.builtin.shell:
         cmd: echo "{{ wg_private_key_file.content | b64decode | trim }}" | wg pubkey
       register: wg_public_key
       changed_when: false
+      no_log: true
 
     - name: Set WireGuard key facts
       ansible.builtin.set_fact:
         wireguard_server_public_key: "{{ wg_public_key.stdout | trim }}"
         wireguard_server_private_key: "{{ wg_private_key_file.content | b64decode | trim }}"
+      no_log: true
 
     - name: Open WireGuard port in UFW
       community.general.ufw:
