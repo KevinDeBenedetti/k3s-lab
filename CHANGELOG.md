@@ -12,6 +12,11 @@ renumérotées ici en 0.13.0 pour rester sur la ligne 0.x.
 * **charts/platform-vault-seeder/templates/configmap-apps.yaml:** update URL encoding for sensitive values ([1916a41](https://github.com/KevinDeBenedetti/k3s-lab/commit/1916a41eb61e92ac5d21ea03d961cdfb30a24a0b))
 * **ansible/roles/common:** add log-only config for chkrootkit daily scan ([3f7b080](https://github.com/KevinDeBenedetti/k3s-lab/commit/3f7b080377bf6f24740ba83a3f075090e96b359f))
 
+
+### Bug Fixes
+
+* **traefik:** bump subchart 40.2.0 -> 40.3.0 and pin proxy v3.7.8 ([7c84052](https://github.com/KevinDeBenedetti/k3s-lab/commit/7c840527))
+
 ## [0.12.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.11.2...v0.12.0) (2026-06-29)
 
 
