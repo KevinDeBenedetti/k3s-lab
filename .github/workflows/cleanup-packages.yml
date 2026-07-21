@@ -1,9 +1,16 @@
 # =============================================================================
 # cleanup-packages.yml — Purge old GHCR chart versions after each release
 #
-# Keeps the 5 most recent versions of each chart package.
+# Keeps the 30 most recent versions of each chart package.
 # Runs automatically after a GitHub Release is published, and can be
 # triggered manually from the Actions tab.
+#
+# ⚠️  La rétention doit rester bien supérieure au nombre de releases séparant
+# la version la plus ancienne encore épinglée par un consommateur (ArgoCD,
+# chart parapluie) de la dernière publiée. Avec une rétention de 5, la purge
+# du 2026-07-21 a supprimé platform-*:0.9.1, encore référencée par
+# l'ApplicationSet `platform` de infra/argocd — les Applications ne pouvaient
+# plus résoudre leur chart.
 # =============================================================================
 name: Cleanup GHCR packages
 
@@ -43,6 +50,6 @@ jobs:
         with:
           package-name: ${{ matrix.chart }}
           package-type: container
-          min-versions-to-keep: 5
+          min-versions-to-keep: 30
           ignore-versions: '^(latest|stable)$'
           token: ${{ secrets.GITHUB_TOKEN }}
