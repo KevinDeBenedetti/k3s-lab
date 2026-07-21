@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.13.1...v0.13.2) (2026-07-21)
+
+
+### Bug Fixes
+
+* **ci:** push the exact chart archive instead of a prefix glob ([bc5da66](https://github.com/KevinDeBenedetti/k3s-lab/commit/bc5da666ebd61f3af103b527b40ee9f588b89f9e))
+
 ## [0.13.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.13.0...v0.13.1) (2026-07-21)
 
 
