@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.13.0...v0.13.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* **ci:** raise GHCR retention to 30 and track all charts in release-please ([834be1c](https://github.com/KevinDeBenedetti/k3s-lab/commit/834be1c223e2f13a7b44bfd31fe9f2bfef0b6431))
+
 ## [0.13.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.12.0...v0.13.0) (2026-07-21)
 
 Les versions 1.2.0, 1.3.0 et 1.4.0 ont été produites par erreur (commit
