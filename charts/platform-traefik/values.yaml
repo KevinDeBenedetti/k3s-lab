@@ -6,9 +6,19 @@ traefik:
   # Le chart 40.3.0 pointe sur appVersion v3.7.4, encore affecté par
   # GHSA-8rxv-jg7p-wvg3 (HIGH, affecte <= v3.7.7, corrigé en v3.7.8) et
   # GHSA-cxjq-mrr5-89rv (HIGH, affecte <= v3.7.6). Aucun chart ne pinne v3.7.8 à ce jour.
-  # À retirer dès qu'une version du chart embarque v3.7.8 ou plus.
+  # À retirer (les deux clés) dès qu'une version du chart embarque v3.7.8 ou plus.
   image:
     tag: v3.7.8
+
+  # OBLIGATOIRE avec l'override ci-dessus. `templates/requirements.yaml` du subchart
+  # compare la version du proxy à l'annotation traefik.io/proxy-max-version (v3.7.4
+  # pour le chart 40.3.0) et fait échouer le rendu au-delà :
+  #   "ERROR: This version of the Chart only supports Traefik Proxy up to v3.7.4."
+  # `versionOverride` est l'échappatoire prévue : le helper traefik.proxyVersion le
+  # préfère à image.tag, donc le garde-fou voit v3.7.4 pendant que le conteneur
+  # tourne bien en v3.7.8. Entre ces deux patches il n'y a que des correctifs, donc
+  # le feature-gating du chart reste valide.
+  versionOverride: v3.7.4
 
   ingressRoute:
     dashboard:

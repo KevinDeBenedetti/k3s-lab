@@ -74,6 +74,13 @@ jobs:
     uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-helm.yml@main
     with:
       run-lint: true
+      # `helm lint` seul ne télécharge pas les dépendances : les garde-fous des
+      # subcharts (ex. traefik/templates/requirements.yaml, qui refuse tout proxy
+      # au-delà de traefik.io/proxy-max-version) ne sont donc jamais rendus. Le job
+      # template fait `helm dependency update` avant `helm template` — c'est lui qui
+      # attrape ces échecs. Sans lui, un chart impossible à rendre a été publié en
+      # 0.13.0, 0.13.1 et 0.13.2 sans qu'aucune CI ne bronche.
+      run-template: true
       chart-paths: charts/*
       helm-version: v3.17.0
 
