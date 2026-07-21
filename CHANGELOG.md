@@ -1,25 +1,16 @@
 # Changelog
 
-## [1.4.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v1.3.0...v1.4.0) (2026-07-03)
+## [0.13.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.12.0...v0.13.0) (2026-07-21)
+
+Les versions 1.2.0, 1.3.0 et 1.4.0 ont été produites par erreur (commit
+`Release-As: 1.2.0`) et n'ont jamais été taguées ni releasées. Elles sont
+renumérotées ici en 0.13.0 pour rester sur la ligne 0.x.
 
 
 ### Features
 
 * **charts/platform-vault-seeder/templates/configmap-apps.yaml:** update URL encoding for sensitive values ([1916a41](https://github.com/KevinDeBenedetti/k3s-lab/commit/1916a41eb61e92ac5d21ea03d961cdfb30a24a0b))
-
-## [1.3.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v1.2.0...v1.3.0) (2026-06-30)
-
-
-### Features
-
 * **ansible/roles/common:** add log-only config for chkrootkit daily scan ([3f7b080](https://github.com/KevinDeBenedetti/k3s-lab/commit/3f7b080377bf6f24740ba83a3f075090e96b359f))
-
-## [1.2.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.12.0...v1.2.0) (2026-06-29)
-
-
-### Miscellaneous Chores
-
-* release 1.2.0 ([686d7c9](https://github.com/KevinDeBenedetti/k3s-lab/commit/686d7c9b9afe3ae18559eb094f477f169b453cac))
 
 ## [0.12.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.11.2...v0.12.0) (2026-06-29)
 
