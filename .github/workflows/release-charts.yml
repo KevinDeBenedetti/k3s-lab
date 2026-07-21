@@ -88,7 +88,11 @@ jobs:
                 fi
               done
               helm package "$chart" -d /tmp/charts/
-              pkg=$(ls /tmp/charts/"${chart_name}"-*.tgz)
+              # Nom exact, jamais un glob : "${chart_name}-*" capture aussi les
+              # charts dont le nom est un préfixe (platform-vault-* attrape
+              # platform-vault-seeder-*.tgz), et `charts/*/` trie le seeder en
+              # premier — le slash final fait passer '-' avant '/'.
+              pkg="/tmp/charts/${chart_name}-${version}.tgz"
               helm push "$pkg" "oci://${registry_path}"
               published="${published}${chart_name}:${version} "
               echo "::endgroup::"
