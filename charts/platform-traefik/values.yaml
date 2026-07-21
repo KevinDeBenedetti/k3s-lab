@@ -3,6 +3,13 @@
 # Override per-cluster in infra/platform/traefik/values.yaml
 # =============================================================================
 traefik:
+  # Le chart 40.3.0 pointe sur appVersion v3.7.4, encore affecté par
+  # GHSA-8rxv-jg7p-wvg3 (HIGH, affecte <= v3.7.7, corrigé en v3.7.8) et
+  # GHSA-cxjq-mrr5-89rv (HIGH, affecte <= v3.7.6). Aucun chart ne pinne v3.7.8 à ce jour.
+  # À retirer dès qu'une version du chart embarque v3.7.8 ou plus.
+  image:
+    tag: v3.7.8
+
   ingressRoute:
     dashboard:
       enabled: false
