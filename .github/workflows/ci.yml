@@ -82,6 +82,15 @@ jobs:
       # 0.13.0, 0.13.1 et 0.13.2 sans qu'aucune CI ne bronche.
       run-template: true
       chart-paths: charts/*
+      # platform-deployment est un chart de composition : il n'a aucun template
+      # propre (juste NOTES.txt) et tire ses 7 dépendances depuis GHCR. Le rendre
+      # ici ne valide donc pas la source de ce repo mais le contenu du registry —
+      # ses sous-charts sont déjà rendus un par un par cette même boucle. Ce
+      # couplage a créé un blocage circulaire le 2026-07-21 : l'umbrella épinglait
+      # platform-traefik:0.13.0 (cassé), la CI échouait, et la porte workflow_run
+      # empêchait de publier la version corrigée. La validation de l'umbrella
+      # relève de release-charts, après publication des sous-charts.
+      template-exclude-paths: charts/platform-deployment
       helm-version: v3.17.0
 
   # ─── Resource limits check ────────────────────────────────────────────────

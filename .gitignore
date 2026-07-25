@@ -28,3 +28,4 @@ charts/**/charts/*.tgz
 *.swp
 *~
 .claude/
+TODO.md
