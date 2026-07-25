@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.14.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.13.2...v0.14.0) (2026-07-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** remove TODO.md and update CI workflow
+* **charts/platform-traefik:** This change modifies the CI pipeline and updates dependency handling. Existing pipelines may need adjustments after merging.
+
+### Bug Fixes
+
+* **charts/platform-traefik:** add dependency update step and fix CI pipeline ([04b41c1](https://github.com/KevinDeBenedetti/k3s-lab/commit/04b41c132bde21b29852d34f9e7ab15d7e2f612a))
+
+
+### Miscellaneous Chores
+
+* **deps:** remove TODO.md and update CI workflow ([6496a57](https://github.com/KevinDeBenedetti/k3s-lab/commit/6496a57d15119140cb4e1582311a11ba965de7d2))
+
 ## [0.13.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.13.1...v0.13.2) (2026-07-21)
 
 
