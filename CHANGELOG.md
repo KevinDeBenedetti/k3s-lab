@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.14.0...v0.15.0) (2026-07-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **scripts/check-traefik-image.sh:** Add script to register Helm repositories before building dependencies
+* The `docs` workflow now requires the `traefik-image` job to complete successfully before proceeding. This ensures that any changes to Traefik image pinning are properly validated before publishing updates.
+
+### Features
+
+* Introduce Traefik image pin check and update CI workflows ([11e0865](https://github.com/KevinDeBenedetti/k3s-lab/commit/11e086540be013e4abed162f9904a6c982a954cf))
+* **scripts/check-traefik-image.sh:** Add script to register Helm repositories before building dependencies ([e553d51](https://github.com/KevinDeBenedetti/k3s-lab/commit/e553d51276c4332fa24e850a07a181e00a7d04d0))
+
 ## [0.14.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.13.2...v0.14.0) (2026-07-25)
 
 
