@@ -1,0 +1,122 @@
+# =============================================================================
+# Traefik Advisories — watch over the traefik.image.tag pin
+#
+# The `traefik.image.tag` pin in charts/platform-traefik is a security decision
+# that goes stale **without any commit**. GHSA-3ccp-42pg-hgv6 was published 12
+# days after we froze v3.7.8: nothing in the repository had changed, so neither
+# CI nor renovate (which tracks *chart* versions, not proxy versions) had any
+# reason to fire. Only a periodic check can see that — hence this workflow,
+# independent of any repository activity.
+#
+# Opens (or updates) a tracking issue when the pin becomes vulnerable, and
+# closes it again when the pin is back in the clear.
+# =============================================================================
+name: Traefik Advisories
+
+on:
+  schedule:
+    # Daily: the observed exposure window is measured in days, not weeks.
+    # 06:12 UTC — offset from the top of the hour, which GitHub saturates.
+    - cron: "12 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: traefik-advisories
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  ISSUE_TITLE: "🔒 Traefik: the image.tag pin is covered by an advisory"
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Confront the pin with the traefik/traefik advisories
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          ./scripts/check-traefik-advisories.sh 2>&1 | tee /tmp/advisories.log
+          status="${PIPESTATUS[0]}"
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Traefik advisory watch"
+            echo ""
+            echo '```'
+            cat /tmp/advisories.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit 0
+
+      - name: Open or update the tracking issue
+        if: steps.check.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          body_file=/tmp/issue-body.md
+          {
+            echo "The \`scripts/check-traefik-advisories.sh\` check reports that the"
+            echo "\`traefik.image.tag\` pin in \`charts/platform-traefik/values.yaml\` is covered"
+            echo "by at least one vulnerable range, or that a range could not be evaluated."
+            echo ""
+            echo '```'
+            cat /tmp/advisories.log
+            echo '```'
+            echo ""
+            echo "### What to do"
+            echo ""
+            echo "1. Raise \`traefik.image.tag\` to the patched version listed above."
+            echo "2. Update the comment in \`values.yaml\` **and** the advisory table in"
+            echo "   \`charts/platform-traefik/README.md\`."
+            echo "3. Verify the render: \`./scripts/check-traefik-image.sh\`."
+            echo ""
+            echo "If the subchart's \`traefik.io/proxy-max-version\` ceiling blocks the bump,"
+            echo "see the procedure in \`charts/platform-traefik/README.md\`."
+            echo ""
+            echo "---"
+            echo "_Updated by [\`traefik-advisories\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) on $(date -u '+%Y-%m-%d %H:%M UTC')._"
+          } > "$body_file"
+
+          existing=$(gh issue list --state open --search "$ISSUE_TITLE in:title" \
+            --json number --jq '.[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file "$body_file"
+            echo "♻️  Issue #$existing updated"
+          else
+            gh issue create --title "$ISSUE_TITLE" --body-file "$body_file" \
+              --label security
+            echo "🆕 Tracking issue created"
+          fi
+
+      - name: Close the tracking issue when the pin is clean
+        if: steps.check.outputs.status == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh issue list --state open --search "$ISSUE_TITLE in:title" \
+            --json number --jq '.[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" \
+              --comment "The pin is no longer covered by any known vulnerable range — closed automatically."
+            echo "✅ Issue #$existing closed"
+          else
+            echo "✅ Pin is clean, no open issue"
+          fi
+
+      - name: Fail when the pin is vulnerable
+        if: steps.check.outputs.status != '0'
+        run: |
+          echo "::error::The traefik.image.tag pin is covered by an advisory — see the tracking issue."
+          exit 1

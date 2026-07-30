@@ -14,6 +14,7 @@
         { "type": "yaml", "path": "charts/platform-cert-manager/Chart.yaml", "jsonpath": "$.version" },
         { "type": "yaml", "path": "charts/platform-deployment/Chart.yaml", "jsonpath": "$.version" },
         { "type": "yaml", "path": "charts/platform-vault-seeder/Chart.yaml", "jsonpath": "$.version" },
+        { "type": "yaml", "path": "charts/platform-vault-seeder/Chart.yaml", "jsonpath": "$.appVersion" },
         { "type": "yaml", "path": "charts/platform-external-secrets/Chart.yaml", "jsonpath": "$.version" },
         { "type": "yaml", "path": "charts/platform-traefik/Chart.yaml", "jsonpath": "$.version" },
         { "type": "yaml", "path": "charts/platform-vault/Chart.yaml", "jsonpath": "$.version" },

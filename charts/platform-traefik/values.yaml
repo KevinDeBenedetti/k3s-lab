@@ -3,22 +3,27 @@
 # Override per-cluster in infra/platform/traefik/values.yaml
 # =============================================================================
 traefik:
-  # Le chart 40.3.0 pointe sur appVersion v3.7.4, encore affecté par
-  # GHSA-8rxv-jg7p-wvg3 (HIGH, affecte <= v3.7.7, corrigé en v3.7.8) et
-  # GHSA-cxjq-mrr5-89rv (HIGH, affecte <= v3.7.6). Aucun chart ne pinne v3.7.8 à ce jour.
-  # À retirer (les deux clés) dès qu'une version du chart embarque v3.7.8 ou plus.
+  # Chart 41.0.2 points at appVersion v3.7.6, which is affected by two HIGH
+  # advisories that do apply to our configuration:
+  #   - GHSA-cxjq-mrr5-89rv (auth bypass via path traversal in ReplacePathRegex):
+  #     affects v3.7.0–v3.7.6, patched in v3.7.7.
+  #   - GHSA-3ccp-42pg-hgv6 (cross-user response poisoning via proxied CONNECT on
+  #     the shared keep-alive pool): affects everything <= v3.7.8, patched in
+  #     v3.7.9. Published 2026-07-27, i.e. 12 days after we froze v3.7.8 — hence
+  #     the need to re-check the advisories at every review of this pin.
+  # GHSA-8rxv-jg7p-wvg3, which motivated the original pin, does NOT concern us:
+  # it targets the kubernetesIngressNGINX provider, which we do not enable (see
+  # the providers section below).
+  # Drop this pin as soon as a chart ships a proxy at least as recent.
+  #
+  # `versionOverride` is no longer needed since chart 41.0.0: its
+  # templates/requirements.yaml only fails the render on a *major* version gap
+  # (traefik.isMajorAboveMax helper). A v3.7.8 against a
+  # traefik.io/proxy-max-version of v3.7.6 only produces a warning in NOTES.txt.
+  # The guard therefore stays active where it matters, and the version seen by
+  # the chart's feature-gating is finally the version actually deployed.
   image:
-    tag: v3.7.8
-
-  # OBLIGATOIRE avec l'override ci-dessus. `templates/requirements.yaml` du subchart
-  # compare la version du proxy à l'annotation traefik.io/proxy-max-version (v3.7.4
-  # pour le chart 40.3.0) et fait échouer le rendu au-delà :
-  #   "ERROR: This version of the Chart only supports Traefik Proxy up to v3.7.4."
-  # `versionOverride` est l'échappatoire prévue : le helper traefik.proxyVersion le
-  # préfère à image.tag, donc le garde-fou voit v3.7.4 pendant que le conteneur
-  # tourne bien en v3.7.8. Entre ces deux patches il n'y a que des correctifs, donc
-  # le feature-gating du chart reste valide.
-  versionOverride: v3.7.4
+    tag: v3.7.9
 
   ingressRoute:
     dashboard:
@@ -46,12 +51,14 @@ traefik:
     limits:
       memory: 256Mi
 
-  # Logs
-  logs:
-    general:
-      level: INFO
-    access:
-      enabled: true
+  # Logs — syntax aligned with upstream since chart 41.0.0: `logs.general` became
+  # `log`, `logs.access` became `accessLog`. This is not cosmetic:
+  # values.schema.json declares additionalProperties: false, so the old `logs`
+  # key would fail the render instead of being ignored.
+  log:
+    level: INFO
+  accessLog:
+    enabled: true
 
   # Providers
   providers:

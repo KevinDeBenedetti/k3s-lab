@@ -88,10 +88,10 @@ jobs:
                 fi
               done
               helm package "$chart" -d /tmp/charts/
-              # Nom exact, jamais un glob : "${chart_name}-*" capture aussi les
-              # charts dont le nom est un préfixe (platform-vault-* attrape
-              # platform-vault-seeder-*.tgz), et `charts/*/` trie le seeder en
-              # premier — le slash final fait passer '-' avant '/'.
+              # Exact name, never a glob: "${chart_name}-*" also captures charts
+              # whose name is a prefix (platform-vault-* catches
+              # platform-vault-seeder-*.tgz), and `charts/*/` sorts the seeder
+              # first — the trailing slash makes '-' sort before '/'.
               pkg="/tmp/charts/${chart_name}-${version}.tgz"
               helm push "$pkg" "oci://${registry_path}"
               published="${published}${chart_name}:${version} "
@@ -108,7 +108,64 @@ jobs:
             echo "✅ Published: $published"
           fi
 
+      # ─── Umbrella validation (post-publish) ─────────────────────────────────
+      # platform-deployment is excluded from the CI render
+      # (`template-exclude-paths`): its 7 dependencies come from GHCR, so
+      # rendering it from source CI would validate the registry's state rather
+      # than the repo's source. That coupling created a circular deadlock on
+      # 2026-07-21 — the umbrella pinned a broken platform-traefik, CI failed,
+      # and the workflow_run gate prevented publishing the fix.
+      #
+      # Here the subcharts have just been pushed: this is the only place where
+      # the umbrella chart can be rendered. Without this step, nobody renders it
+      # at all.
+      #
+      # ⚠️ This check is *post-publish*: it detects an unrenderable umbrella, it
+      # does not prevent pushing one. That is the price of not reintroducing the
+      # circular deadlock.
+      - name: Render platform-deployment (post-publish validation)
+        id: render
+        run: |
+          chart="charts/platform-deployment"
+
+          for attempt in 1 2 3 4 5; do
+            if helm dependency update "$chart"; then
+              break
+            fi
+            echo "⚠️  helm dependency update failed (attempt $attempt/5) — retrying in 10s…"
+            sleep 10
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::umbrella: helm dependency update failed after 5 attempts"
+              exit 1
+            fi
+          done
+
+          # `helm dependency update` can succeed while leaving a dependency
+          # unresolved; `dependency list` is what reveals that.
+          helm dependency list "$chart"
+          if helm dependency list "$chart" | grep -qE '(missing|wrong version)'; then
+            echo "::error::umbrella: unresolved dependency — pins out of sync with the registry?"
+            exit 1
+          fi
+
+          if ! helm template platform-deployment "$chart" > /tmp/umbrella.yaml; then
+            echo "::error::umbrella: helm template failed — umbrella chart is not renderable"
+            exit 1
+          fi
+
+          # An empty render must never count as a success: all 7 subcharts are
+          # enabled by default, so the umbrella has to produce volume.
+          docs=$(grep -c '^---' /tmp/umbrella.yaml || true)
+          if [ "$docs" -lt 7 ]; then
+            echo "::error::umbrella: only $docs manifest(s) rendered — suspicious render"
+            exit 1
+          fi
+
+          echo "✅ platform-deployment rendered: $docs manifests"
+          echo "documents=$docs" >> "$GITHUB_OUTPUT"
+
       - name: Summary
+        if: always()
         run: |
           echo "## Chart Release Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -137,4 +194,13 @@ jobs:
 
           if [ -z "$published" ] && [ -z "$skipped" ]; then
             echo "No charts found." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### 🧪 Umbrella render" >> "$GITHUB_STEP_SUMMARY"
+          docs="${{ steps.render.outputs.documents }}"
+          if [ -n "$docs" ]; then
+            echo "- \`platform-deployment\` rendered: **$docs** manifests" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ❌ \`platform-deployment\` not renderable — see the step log" >> "$GITHUB_STEP_SUMMARY"
           fi

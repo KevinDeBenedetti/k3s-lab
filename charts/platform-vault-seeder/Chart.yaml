@@ -3,7 +3,13 @@ name: platform-vault-seeder
 description: Helm Job-based Vault seeding for k3s cluster (core secrets + app secrets)
 type: application
 version: 0.14.0
-appVersion: 0.1.0
+# The "application" this chart ships is its own seeding scripts: they are
+# embedded in the ConfigMaps (configmap-core.yaml, configmap-apps.yaml) and run
+# as-is on a generic bitnami/kubectl image. There is therefore no application
+# artifact versioned independently of the chart, so appVersion follows version.
+# Kept in sync by release-please (jsonpath $.appVersion); without that, the
+# app.kubernetes.io/version label drifts again — it had been stuck at 0.1.0.
+appVersion: 0.14.0
 home: https://github.com/KevinDeBenedetti/k3s-lab
 sources:
   - >-

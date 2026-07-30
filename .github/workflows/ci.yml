@@ -74,22 +74,22 @@ jobs:
     uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-helm.yml@main
     with:
       run-lint: true
-      # `helm lint` seul ne télécharge pas les dépendances : les garde-fous des
-      # subcharts (ex. traefik/templates/requirements.yaml, qui refuse tout proxy
-      # au-delà de traefik.io/proxy-max-version) ne sont donc jamais rendus. Le job
-      # template fait `helm dependency update` avant `helm template` — c'est lui qui
-      # attrape ces échecs. Sans lui, un chart impossible à rendre a été publié en
-      # 0.13.0, 0.13.1 et 0.13.2 sans qu'aucune CI ne bronche.
+      # `helm lint` alone does not download dependencies, so the subchart guards
+      # (e.g. traefik/templates/requirements.yaml, which rejects any proxy above
+      # traefik.io/proxy-max-version) are never rendered. The template job runs
+      # `helm dependency update` before `helm template` — that is what catches
+      # these failures. Without it, an unrenderable chart was published as
+      # 0.13.0, 0.13.1 and 0.13.2 without any CI complaining.
       run-template: true
       chart-paths: charts/*
-      # platform-deployment est un chart de composition : il n'a aucun template
-      # propre (juste NOTES.txt) et tire ses 7 dépendances depuis GHCR. Le rendre
-      # ici ne valide donc pas la source de ce repo mais le contenu du registry —
-      # ses sous-charts sont déjà rendus un par un par cette même boucle. Ce
-      # couplage a créé un blocage circulaire le 2026-07-21 : l'umbrella épinglait
-      # platform-traefik:0.13.0 (cassé), la CI échouait, et la porte workflow_run
-      # empêchait de publier la version corrigée. La validation de l'umbrella
-      # relève de release-charts, après publication des sous-charts.
+      # platform-deployment is a composition chart: it has no templates of its
+      # own (just NOTES.txt) and pulls its 7 dependencies from GHCR. Rendering it
+      # here would validate the registry's contents rather than this repo's
+      # source — and its subcharts are already rendered one by one by this same
+      # loop. That coupling created a circular deadlock on 2026-07-21: the
+      # umbrella pinned platform-traefik:0.13.0 (broken), CI failed, and the
+      # workflow_run gate prevented publishing the fix. Validating the umbrella
+      # belongs to release-charts, after the subcharts are published.
       template-exclude-paths: charts/platform-deployment
       helm-version: v3.17.0
 
@@ -101,11 +101,28 @@ jobs:
       - name: Check resource limits in chart values
         run: ./scripts/check-resource-limits.sh
 
+  # ─── Traefik image pin check ──────────────────────────────────────────────
+  # helm-lint above renders the chart and proves it is *renderable*; it does not
+  # say which image comes out. The traefik.image.tag pin is a security decision
+  # (GHSA-cxjq <= v3.7.6, GHSA-3ccp <= v3.7.8) that the subchart has already had
+  # the means to neutralise silently — versionOverride, or the
+  # traefik.io/proxy-max-version guard falling back to the chart's appVersion.
+  # This job compares the image actually rendered against the pinned tag.
+  traefik-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v5
+        with:
+          version: v3.17.0
+      - name: Verify that the rendered Traefik image matches the pinned tag
+        run: ./scripts/check-traefik-image.sh
+
   # ─── Docs dispatch (push to main only) ───────────────────────────────────
   # cd-docs.yml now authenticates via GitHub App (client-id + APP_PRIVATE_KEY);
   # passing an undeclared secret (the old PAT_TOKEN) startup-fails the whole run.
   docs:
-    needs: [shell-ci, kubernetes, security, helm-lint, resource-limits]
+    needs: [shell-ci, kubernetes, security, helm-lint, resource-limits, traefik-image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     uses: KevinDeBenedetti/github-workflows/.github/workflows/cd-docs.yml@main
     with:
