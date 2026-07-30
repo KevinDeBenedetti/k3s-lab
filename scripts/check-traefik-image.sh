@@ -58,6 +58,39 @@ log_step "Expected tag: $expected"
 
 # ─── Render ─────────────────────────────────────────────────────────────────
 if [ "$UPDATE_DEPS" -eq 1 ]; then
+  # `helm dependency build` resolves Chart.lock against the *registered* repos,
+  # and fails with "no repository definition for <url>" when a dependency's
+  # repository is unknown — which is exactly the state of a fresh CI runner.
+  # So register them first.
+  #
+  # `helm dependency update` would sidestep the registration, but it re-resolves
+  # and rewrites Chart.lock: the check would then validate whatever the upstream
+  # repo serves today rather than the version this repo committed. For a pin
+  # whose whole point is reproducibility, `build` is the right verb.
+  #
+  # The repos are registered in a throwaway helm config so that running this
+  # script never mutates the caller's own `helm repo list`.
+  # Explicit template: BSD mktemp (macOS) ignores TMPDIR for the bare `-d` form
+  # and goes through confstr instead, which GNU mktemp does not.
+  helm_home="$(mktemp -d "${TMPDIR:-/tmp}/traefik-image-check.XXXXXX")"
+  trap 'rm -rf "$helm_home"' EXIT
+  export HELM_REPOSITORY_CONFIG="$helm_home/repositories.yaml"
+  export HELM_REPOSITORY_CACHE="$helm_home/cache"
+
+  n=0
+  while read -r url; do
+    [ -n "$url" ] || continue
+    n=$((n + 1))
+    log_info "helm repo add dep${n} $url"
+    helm repo add "dep${n}" "$url" --force-update >/dev/null
+  done < <(
+    awk '
+      /^dependencies:/ { deps = 1; next }
+      deps && /^[^[:space:]-]/ { deps = 0 }
+      deps && /^[[:space:]]*repository:[[:space:]]*https?:\/\// { print $NF }
+    ' "$CHART_DIR/Chart.yaml" | sort -u
+  )
+
   log_info "helm dependency build $CHART_DIR"
   helm dependency build "$CHART_DIR" >/dev/null
 fi
