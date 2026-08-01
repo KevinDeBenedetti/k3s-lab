@@ -18,15 +18,8 @@ description: |
 
   Each subchart can be enabled/disabled independently via values.
 type: application
-version: 0.15.0
-# appVersion tracks version deliberately, and release-please bumps both (see
-# $.appVersion in .github/release/release-please-config.json). This chart is a
-# pure umbrella: no templates of its own beyond NOTES.txt, no image, no
-# application versioned independently of the chart itself. There is therefore
-# nothing for appVersion to designate *except* the chart version, and any other
-# value is drift by definition — it sat at 0.13.0 for three releases because
-# only $.version was being bumped.
-appVersion: 0.15.0
+version: 0.16.0
+appVersion: 0.16.0
 dependencies:
   - name: platform-argocd
     version: 0.15.0
