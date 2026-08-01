@@ -6,12 +6,18 @@ disabled, resource limits sized for a small node.
 
 | | |
 |---|---|
-| Subchart | `traefik` [`41.0.2`](https://traefik.github.io/charts) |
-| Deployed proxy | `docker.io/traefik:v3.7.9` (pinned, see below) |
+| Subchart | `traefik` [`41.1.0`](https://traefik.github.io/charts) |
+| Deployed proxy | `docker.io/traefik:v3.7.9` (subchart appVersion — **no pin**, see below) |
 | Per-cluster overrides | `infra/platform/traefik/values.yaml` |
 
+> The two versions in that table are copies of `Chart.lock` and of the value
+> `lib/traefik-pin.sh` resolves. They are **verified, not generated**:
+> `scripts/check-traefik-image.sh` fails if either falls out of step, so a
+> subchart bump is not finished until this page agrees with it. The advisory
+> table further down intentionally names older versions and is not checked.
+
 > [!IMPORTANT]
-> Before touching `traefik.image.tag` or bumping the subchart, read
+> Before adding `traefik.image.tag` or bumping the subchart, read
 > [The `traefik.io/proxy-max-version` constraint](#the-traefikioproxy-max-version-constraint).
 > This ceiling is invisible from the parent chart and has already caused two
 > outages.
@@ -24,11 +30,11 @@ The upstream Traefik chart declares, **in its `Chart.yaml` annotations**, the
 range of proxy versions it knows how to configure:
 
 ```yaml
-# charts/traefik/Chart.yaml (subchart 41.0.2)
+# charts/traefik/Chart.yaml (subchart 41.1.0)
 annotations:
   traefik.io/proxy-min-version: v3.6.0
-  traefik.io/proxy-max-version: v3.7.6
-appVersion: v3.7.6
+  traefik.io/proxy-max-version: v3.7.9
+appVersion: v3.7.9
 ```
 
 `templates/requirements.yaml` compares the proxy version against that range on
@@ -43,11 +49,19 @@ it does not download dependencies.
 
 1. `versionOverride` if set — **it short-circuits everything else**;
 2. otherwise `image.tag`;
-3. otherwise the subchart's `.Chart.AppVersion` (so `v3.7.6` here).
+3. otherwise the subchart's `.Chart.AppVersion` (so `v3.7.9` here).
 
-In other words, forgetting `image.tag` raises no error at all: you silently fall
-back to the subchart's appVersion. That is exactly what the `traefik-image` CI
-job (`scripts/check-traefik-image.sh`) exists to catch.
+Step 3 is where we sit today, deliberately. It is also a trap in the other
+direction: *forgetting* `image.tag` back when it was load-bearing raised no
+error at all, it just silently downgraded the proxy. `lib/traefik-pin.sh`
+mirrors steps 2 and 3 so that both checks always speak about the version really
+shipped, whether or not a pin exists.
+
+| | `traefik.image.tag` set | not set |
+|---|---|---|
+| Version deployed | the pin | subchart appVersion |
+| What the checks compare against | the pin | subchart appVersion |
+| When it applies | an advisory is ahead of upstream | upstream is current (**today**) |
 
 ### What fails, and what only warns
 
@@ -58,7 +72,11 @@ Since subchart **41.0.0**, the guard has been relaxed
 |---|---|
 | Proxy below `proxy-min-version` | **`fail`** — render impossible |
 | Proxy whose **major** exceeds `proxy-max-version` | **`fail`** — render impossible |
-| Proxy at a minor/patch above the max (our case: v3.7.9 > v3.7.6) | warning in `NOTES.txt` only |
+| Proxy at a minor/patch above the max | warning in `NOTES.txt` only |
+
+Since the pin was dropped we no longer trip any of these: the proxy *is* the
+subchart's appVersion, so it sits exactly on the ceiling. Between 2026-07-22 and
+2026-07-30 we were in the third row.
 
 Before 41.0.0, the third row was a `fail` too. That is the root cause of the two
 outages on **2026-07-20** and **2026-07-21**: `platform-traefik` was published as
@@ -80,12 +98,16 @@ not only for the ceiling, but also for around twenty feature-gating guards
 v3.7.1, `http.underscoreHeadersStrategy` >= v3.7.6, …). Lying about the version
 makes the chart take the wrong decision on all of those at once.
 
-### Procedure — raising the proxy above the ceiling
+### Procedure — pinning the proxy ahead of the subchart
+
+Needed when an advisory lands before upstream ships the fix. Prefer bumping the
+subchart (next section); pin only when upstream has nothing newer to offer.
 
 1. Check that the gap is only a minor/patch one. **A major above the ceiling
    cannot be worked around**: the subchart has to be bumped.
-2. Update `traefik.image.tag` in [`values.yaml`](values.yaml), documenting the
-   advisory or the reason right above it.
+2. Add `traefik.image.tag` to [`values.yaml`](values.yaml), documenting the
+   advisory or the reason right above it. Both checks pick the pin up
+   automatically — it takes precedence over the subchart's appVersion.
 3. Render and verify the image actually produced:
 
    ```bash
@@ -106,14 +128,20 @@ makes the chart take the wrong decision on all of those at once.
    `additionalProperties: false`, so a renamed key is not ignored, it is
    **fatal**. 41.0.0 renamed `logs.general` → `log` and `logs.access` →
    `accessLog` this way.
-3. Read the new `proxy-min-version` / `proxy-max-version` annotations: that is
-   the only way to know whether the `image.tag` pin remains tenable.
-4. `./scripts/check-traefik-image.sh` must pass.
+3. Read the new `proxy-min-version` / `proxy-max-version` annotations, and the
+   new `appVersion`: with no pin set, that appVersion *is* the proxy you are
+   about to deploy.
+4. If a pin is currently set, check whether the new appVersion has caught up
+   with it — if so, drop the pin rather than carrying it forward.
+5. `./scripts/check-traefik-image.sh` must pass, and
+   `./scripts/check-traefik-advisories.sh` must come back clean on the version
+   the bump lands on.
 
-## The `traefik.image.tag` pin
+## Proxy version history — why there was a pin
 
-This is a **security decision**, not a preference: the upstream chart is
-consistently behind on proxy fixes.
+The proxy version is a **security decision**, not a preference: for most of
+July 2026 the upstream chart lagged behind the proxy's own fixes, so
+`traefik.image.tag` was carried here to get ahead of it.
 
 | Advisory | Affected versions | Patched in |
 |---|---|---|
@@ -123,22 +151,69 @@ consistently behind on proxy fixes.
 `GHSA-8rxv-jg7p-wvg3`, which motivated the original pin, **does not concern
 us**: it targets the `kubernetesIngressNGINX` provider, which we do not enable.
 
+Chart **41.1.0** (2026-07-30) ships appVersion `v3.7.9` — the exact version the
+pin was forcing — so the pin was dropped: it had become a duplicate statement of
+upstream's own value, and a duplicate that only drifts. Deploying v3.7.9 clears
+both advisories above.
+
 > [!WARNING]
-> This pin goes stale silently. `GHSA-3ccp` was published **12 days** after we
-> froze v3.7.8, with nothing to signal it. Traefik advisories are not in
-> GitHub's global database — `GET /advisories/<GHSA>` returns 404 — so the
-> repository has to be queried:
+> Dropping the pin removed a redundancy, **not** the risk. The version still
+> goes stale silently, and now nothing in this repository even names it:
+> `GHSA-3ccp` was published **12 days** after we froze v3.7.8, with nothing to
+> signal it, and an upstream chart sitting on a vulnerable appVersion would be
+> just as quiet. Always query the **repository** advisories, never the global
+> database — see [Looking Traefik advisories up](#looking-traefik-advisories-up):
 >
 > ```bash
 > gh api /repos/traefik/traefik/security-advisories \
 >   --jq '.[] | {ghsa_id, severity, published_at, vulnerable: [.vulnerabilities[].vulnerable_version_range]}'
 > ```
 >
-> `scripts/check-traefik-advisories.sh` automates exactly this comparison, and
-> the `traefik-advisories` workflow runs it daily.
+> `scripts/check-traefik-advisories.sh` automates exactly this comparison
+> against the version we really deploy, and the `traefik-advisories` workflow
+> runs it daily.
 
-The pin can only be dropped once an upstream chart ships a proxy at least as
-recent — tracked in [`TODO.md`](../../TODO.md).
+> [!CAUTION]
+> **"What this repo deploys" and "what the cluster runs" are different
+> questions.** The cluster resolves a *published* chart, pinned in
+> `infra/argocd/applicationsets/platform.yaml`, which can lag this source by any
+> number of releases. Between 2026-07-27 and 2026-08-01 the two disagreed: the
+> repository was on v3.7.9 and the daily watch reported clean every morning,
+> while production ran v3.7.8 under `GHSA-3ccp` because infra still pinned the
+> previous chart. Fixing the version here does **not** fix production — it has
+> to be released *and* pinned. `scripts/check-deployed-traefik.sh` is the check
+> that asks the second question.
+
+## Looking Traefik advisories up
+
+Getting this wrong has already cost us a wrong conclusion recorded for nine
+days: a 404 was read as "that CVE is made up", and the mistaken finding was then
+propagated into a triage comment in `infra`. Two rules.
+
+**1. To list what affects Traefik, query the repository, not the global
+database.** Only the advisories that were assigned a CVE ID are mirrored
+globally; the ones without one exist *only* on the repository endpoint:
+
+| Advisory | CVE | `GET /advisories/<GHSA>` |
+|---|---|---|
+| `GHSA-xf64-8mw2-4gr2` | CVE-2026-48020 | found |
+| `GHSA-6jwx-7vp4-9847` | CVE-2026-40912 | found |
+| `GHSA-6384-m2mw-rf54` | CVE-2026-35051 | found |
+| `GHSA-3ccp-42pg-hgv6` | *none* | **404** |
+| `GHSA-cxjq-mrr5-89rv` | *none* | **404** |
+| `GHSA-8rxv-jg7p-wvg3` | *none* | **404** |
+
+So a 404 there proves nothing at all — and `GHSA-3ccp`, the one that mattered
+most to us, is in the 404 column.
+
+**2. To go from a CVE ID to an advisory, use the query parameter.** The path
+form takes a *GHSA* ID, so handing it a CVE returns 404 — which reads exactly
+like "this CVE does not exist", and is what misled us:
+
+```bash
+gh api "/advisories?cve_id=CVE-2026-48020"   # ✅ correct
+gh api /advisories/CVE-2026-48020            # ❌ always 404, whatever the CVE
+```
 
 ## Values
 
@@ -149,7 +224,7 @@ full list.
 
 | Key | Default | Note |
 |---|---|---|
-| `traefik.image.tag` | `v3.7.9` | security pin — see above |
+| `traefik.image.tag` | *unset* | escape hatch only — see above |
 | `traefik.ingressRoute.dashboard.enabled` | `false` | exposed separately if needed |
 | `traefik.ports.web` | `8000`, exposed as `80` | redirects to `websecure` |
 | `traefik.ports.websecure` | `8443`, exposed as `443` | |
@@ -162,6 +237,8 @@ full list.
 ## See also
 
 - [`scripts/check-traefik-image.sh`](../../scripts/check-traefik-image.sh) — render conformance check
-- [`scripts/check-traefik-advisories.sh`](../../scripts/check-traefik-advisories.sh) — advisory watch
+- [`scripts/check-traefik-advisories.sh`](../../scripts/check-traefik-advisories.sh) — advisory watch, on the version *this repo* would deploy
+- [`scripts/check-deployed-traefik.sh`](../../scripts/check-deployed-traefik.sh) — advisory watch, on the version the *cluster is running*
+- [`lib/traefik-pin.sh`](../../lib/traefik-pin.sh) — resolves the effective proxy version for both
 - [`platform-deployment`](../platform-deployment/README.md) — umbrella chart that embeds this one
 - [Upstream Traefik chart](https://github.com/traefik/traefik-helm-chart)

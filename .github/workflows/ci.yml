@@ -101,13 +101,15 @@ jobs:
       - name: Check resource limits in chart values
         run: ./scripts/check-resource-limits.sh
 
-  # ─── Traefik image pin check ──────────────────────────────────────────────
+  # ─── Traefik image check ──────────────────────────────────────────────────
   # helm-lint above renders the chart and proves it is *renderable*; it does not
-  # say which image comes out. The traefik.image.tag pin is a security decision
+  # say which image comes out. The proxy version is a security decision
   # (GHSA-cxjq <= v3.7.6, GHSA-3ccp <= v3.7.8) that the subchart has already had
   # the means to neutralise silently — versionOverride, or the
   # traefik.io/proxy-max-version guard falling back to the chart's appVersion.
-  # This job compares the image actually rendered against the pinned tag.
+  # This job compares the image actually rendered against the version the chart
+  # is meant to deploy: the traefik.image.tag pin when one is set, otherwise the
+  # locked subchart's appVersion (no pin since 2026-07-30, upstream caught up).
   traefik-image:
     runs-on: ubuntu-latest
     steps:
@@ -115,12 +117,55 @@ jobs:
       - uses: azure/setup-helm@v5
         with:
           version: v3.17.0
-      - name: Verify that the rendered Traefik image matches the pinned tag
+      - name: Verify that the rendered Traefik image matches the expected version
         run: ./scripts/check-traefik-image.sh
+
+  # ─── Traefik advisory check ───────────────────────────────────────────────
+  # The daily `traefik-advisories` workflow catches a version that *goes* stale.
+  # It cannot catch a version that is already vulnerable the moment it is
+  # written — between the commit and the next 06:12 UTC run there is a window,
+  # and that window is exactly where the decision was made. Running the same
+  # check here closes it at the point of change.
+  #
+  # Deliberately not path-filtered: the check is one API call, and now that the
+  # proxy version comes from the subchart's appVersion, the set of files that
+  # can change it is wider than it looks (values.yaml, Chart.yaml, Chart.lock).
+  # Running it always is cheaper than getting that list wrong.
+  traefik-advisories:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Confront the deployed proxy version with the traefik advisories
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/check-traefik-advisories.sh
+
+  # ─── Umbrella pin drift ───────────────────────────────────────────────────
+  # platform-deployment pins its 7 subcharts by hand, one edit per release. The
+  # edit is easy; remembering it is not — the umbrella sat on 0.13.0 for three
+  # consecutive releases while resolving, rendering and publishing perfectly.
+  # This job only reports drift and never writes: keeping the pins manual is a
+  # deliberate choice (an alignment script was written and removed on
+  # 2026-07-30), so what was missing was the detection, not the automation.
+  umbrella-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compare the umbrella pins with what is published on GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/check-umbrella-pins.sh
 
   # ─── Docs dispatch (push to main only) ───────────────────────────────────
   # cd-docs.yml now authenticates via GitHub App (client-id + APP_PRIVATE_KEY);
   # passing an undeclared secret (the old PAT_TOKEN) startup-fails the whole run.
+  # `traefik-advisories` and `umbrella-pins` are deliberately NOT in `needs`:
+  # both judge external state (the advisory API, the GHCR registry) that moves
+  # without a commit, so either can go red on a tree that has not changed. They
+  # already fail the CI run, which is the signal we want; blocking publication
+  # of the documentation on them would mean a new upstream advisory, or the
+  # normal window between a release and its follow-up pin commit, also silently
+  # freezes the docs site.
   docs:
     needs: [shell-ci, kubernetes, security, helm-lint, resource-limits, traefik-image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

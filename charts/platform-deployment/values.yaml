@@ -6,7 +6,7 @@
 #
 # Usage:
 #   helm install platform-deployment oci://ghcr.io/kevindebenedetti/charts/platform-deployment \
-#     --version 1.0.0 \
+#     --version 0.15.0 \
 #     -f cluster-values.yaml
 #
 # See platform-argocd/values.yaml, platform-monitoring/values.yaml, etc.

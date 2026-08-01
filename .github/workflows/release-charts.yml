@@ -153,14 +153,18 @@ jobs:
             exit 1
           fi
 
-          # An empty render must never count as a success: all 7 subcharts are
-          # enabled by default, so the umbrella has to produce volume.
-          docs=$(grep -c '^---' /tmp/umbrella.yaml || true)
-          if [ "$docs" -lt 7 ]; then
-            echo "::error::umbrella: only $docs manifest(s) rendered — suspicious render"
+          # Which subcharts actually produced manifests — not how many documents
+          # came out. The previous test accepted any render of 7+ documents, on
+          # the reasoning "one manifest per subchart". It does not hold: measured
+          # on 2026-08-01, an umbrella missing four of its seven subcharts
+          # (ingress included) still rendered 17 documents, against 401 for a
+          # healthy one, and passed. See scripts/check-umbrella-render.sh.
+          if ! ./scripts/check-umbrella-render.sh --chart "$chart" --render /tmp/umbrella.yaml; then
+            echo "::error::umbrella: hollow render — a subchart contributed nothing"
             exit 1
           fi
 
+          docs=$(grep -c '^# Source:' /tmp/umbrella.yaml || true)
           echo "✅ platform-deployment rendered: $docs manifests"
           echo "documents=$docs" >> "$GITHUB_OUTPUT"
 

@@ -2,17 +2,41 @@
 
 Umbrella Helm chart combining all k3s-lab platform components into a single, cohesive deployment.
 
+> [!IMPORTANT]
+> **This chart is published, but nothing currently deploys it.** As of
+> 2026-08-01 no ArgoCD `ApplicationSet` references it: the cluster deploys
+> `platform-cert-manager`, `platform-external-secrets` and `platform-traefik`
+> individually, pinned in `infra/argocd/applicationsets/platform.yaml`. The rest
+> of this page therefore describes how the chart *would* be used, not how the
+> cluster is currently run. Check before relying on it:
+>
+> ```bash
+> grep -rn platform-deployment infra/argocd/applicationsets/
+> ```
+
 ## Overview
 
 This chart aggregates the following platform components as dependencies:
 
-- **platform-argocd** (0.9.2) — GitOps via ArgoCD
-- **platform-monitoring** (0.9.1) — Observability (Grafana, Prometheus, Loki)
-- **platform-external-secrets** (0.9.1) — Vault integration via External Secrets Operator
-- **platform-vault** (0.9.1) — Secret management
-- **platform-cert-manager** (0.8.0) — TLS/ACME certificate management
-- **platform-traefik** (0.8.0) — Ingress controller
-- **platform-security** (0.8.0) — Pod security + network policies
+- **platform-argocd** — GitOps via ArgoCD
+- **platform-monitoring** — Observability (Grafana, Prometheus, Loki)
+- **platform-external-secrets** — Vault integration via External Secrets Operator
+- **platform-vault** — Secret management
+- **platform-cert-manager** — TLS/ACME certificate management
+- **platform-traefik** — Ingress controller
+- **platform-security** — Pod security + network policies
+
+All seven are pinned to the same version, and [`Chart.yaml`](Chart.yaml) is the
+only place that states it — the per-component version numbers that used to be
+listed here drifted five releases behind before anyone noticed, so they are
+deliberately not repeated. To see what this chart actually resolves:
+
+```bash
+helm dependency list charts/platform-deployment
+```
+
+The pins are advanced by hand once per release; the `umbrella-pins` CI job
+fails when they fall behind what is published on GHCR.
 
 Each subchart can be enabled/disabled independently and customized via values.
 
@@ -27,12 +51,12 @@ helm registry login ghcr.io
 # Pull and install
 helm install platform-deployment \
   oci://ghcr.io/kevindebenedetti/charts/platform-deployment \
-  --version 1.0.0 \
+  --version 0.15.0 \
   -f values.yaml \
   -n argocd
 ```
 
-### Via ArgoCD Application (recommended)
+### Via ArgoCD Application (the intended path, not currently in use)
 
 Create `argocd/applications/platform.yaml`:
 
@@ -47,7 +71,7 @@ spec:
   source:
     repoURL: "oci://ghcr.io/kevindebenedetti/charts"
     chart: platform-deployment
-    targetRevision: "1.0.0"
+    targetRevision: "0.15.0"
     helm:
       releaseName: platform
       values: |
@@ -181,7 +205,7 @@ kubectl get app platform -n argocd
 kubectl get pods --all-namespaces | grep -E '(argocd|monitoring|vault|traefik|cert-manager)'
 
 # Check Helm chart versions
-helm show values oci://ghcr.io/kevindebenedetti/charts/platform-deployment --version 1.0.0
+helm show values oci://ghcr.io/kevindebenedetti/charts/platform-deployment --version 0.15.0
 ```
 
 ## Troubleshooting
@@ -233,42 +257,33 @@ platform-vault:
 
 ## Upgrades
 
-### Upgrade all subcharts
+Upgrading means moving to a newer **published version of this chart**. The
+subchart versions are fixed when the release is cut — they are not something a
+consumer selects:
 
 ```bash
-# Update dependencies
-helm dependency update
-
-# Upgrade Helm release
-helm upgrade platform-deployment oci://ghcr.io/kevindebenedetti/charts/platform-deployment \
-  --version 1.0.1 \
+helm upgrade platform-deployment \
+  oci://ghcr.io/kevindebenedetti/charts/platform-deployment \
+  --version <newer> \
   -f values.yaml
 ```
 
-### Upgrade single subchart
+> [!NOTE]
+> There is no way to upgrade a single subchart from the consumer side, and the
+> previous version of this section was wrong to suggest otherwise. It advised
+> running `helm dependency update` and editing the wrapper's `Chart.yaml` —
+> neither of which a consumer of a published chart can do. Pulling the chart
+> gives you the subchart versions that were pinned at release time, and nothing
+> in `values.yaml` overrides them; the `enabled` flags turn a subchart off, they
+> do not re-version it.
+>
+> To move one component independently, deploy it as its own chart rather than
+> through this umbrella — which is exactly what the cluster does today for
+> `cert-manager`, `external-secrets` and `traefik`.
 
-Edit values to change version of one platform-* chart:
-
-```yaml
-platform-argocd:
-  # This version comes from Chart.yaml dependency version
-  # Edit Chart.yaml to change
-```
-
-Actually, to update a subchart version, edit the wrapper's `Chart.yaml`:
-
-```yaml
-dependencies:
-  - name: platform-argocd
-    version: "0.9.3"  # ← Change this
-```
-
-Then run:
-
-```bash
-helm dependency update
-helm upgrade platform-deployment ...
-```
+Changing a subchart pin is a **producer** action in this repository: edit
+[`Chart.yaml`](Chart.yaml), then cut a release so the new umbrella is published.
+The `umbrella-pins` CI job fails when those pins fall behind what is published.
 
 ## Rollback
 
@@ -283,7 +298,11 @@ helm rollback platform-deployment 1 -n argocd
 ## See Also
 
 - [Helm Umbrella Charts](https://helm.sh/docs/chart_template_guide/subcharts_and_globals/)
-- [platform-argocd](../platform-argocd/README.md)
-- [platform-monitoring](../platform-monitoring/README.md)
-- [platform-vault](../platform-vault/README.md)
+- [platform-traefik](../platform-traefik/README.md) — ingress, and the proxy-version constraint
+- [platform-vault-seeder](../platform-vault-seeder/README.md) — Vault seeding jobs
+- [Helm umbrella guide](../../docs/helm-platform-deployment.md) — architecture and rationale
 - [ArgoCD Helm Integration](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/)
+
+The subcharts without a README of their own are documented by their
+`values.yaml`; `helm show values oci://ghcr.io/kevindebenedetti/charts/<chart>`
+prints it for a published version.

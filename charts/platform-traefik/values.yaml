@@ -3,27 +3,25 @@
 # Override per-cluster in infra/platform/traefik/values.yaml
 # =============================================================================
 traefik:
-  # Chart 41.0.2 points at appVersion v3.7.6, which is affected by two HIGH
-  # advisories that do apply to our configuration:
-  #   - GHSA-cxjq-mrr5-89rv (auth bypass via path traversal in ReplacePathRegex):
-  #     affects v3.7.0–v3.7.6, patched in v3.7.7.
-  #   - GHSA-3ccp-42pg-hgv6 (cross-user response poisoning via proxied CONNECT on
-  #     the shared keep-alive pool): affects everything <= v3.7.8, patched in
-  #     v3.7.9. Published 2026-07-27, i.e. 12 days after we froze v3.7.8 — hence
-  #     the need to re-check the advisories at every review of this pin.
-  # GHSA-8rxv-jg7p-wvg3, which motivated the original pin, does NOT concern us:
-  # it targets the kubernetesIngressNGINX provider, which we do not enable (see
-  # the providers section below).
-  # Drop this pin as soon as a chart ships a proxy at least as recent.
+  # NO `image.tag` HERE — deliberate, since 2026-07-30. Subchart 41.1.0 ships
+  # appVersion v3.7.9, which is exactly the version the pin used to force, so the
+  # override became redundant: the proxy version now comes from the subchart
+  # (traefik.proxyVersion resolves versionOverride → image.tag → appVersion).
+  # Dropping it also puts us back under traefik.io/proxy-max-version (v3.7.9),
+  # which the pin had been overshooting since 2026-07-22.
   #
-  # `versionOverride` is no longer needed since chart 41.0.0: its
-  # templates/requirements.yaml only fails the render on a *major* version gap
-  # (traefik.isMajorAboveMax helper). A v3.7.8 against a
-  # traefik.io/proxy-max-version of v3.7.6 only produces a warning in NOTES.txt.
-  # The guard therefore stays active where it matters, and the version seen by
-  # the chart's feature-gating is finally the version actually deployed.
-  image:
-    tag: v3.7.9
+  # This is still a security-relevant value, it is just no longer stated here.
+  # scripts/check-traefik-advisories.sh confronts the *effective* version — pin
+  # if one is set, otherwise the subchart's appVersion — with the traefik/traefik
+  # advisories, daily. Two HIGH advisories are the reason this file ever carried
+  # a pin, both now behind us: GHSA-cxjq-mrr5-89rv (auth bypass via path
+  # traversal in ReplacePathRegex, <= v3.7.6, patched v3.7.7) and
+  # GHSA-3ccp-42pg-hgv6 (cross-user response poisoning via proxied CONNECT on the
+  # shared keep-alive pool, <= v3.7.8, patched v3.7.9).
+  #
+  # Bring `image.tag` back — and only it, never `versionOverride` — the next time
+  # an advisory lands ahead of the chart. Both checks honour it as an override.
+  # See README.md for the procedure and for why `versionOverride` stays out.
 
   ingressRoute:
     dashboard:

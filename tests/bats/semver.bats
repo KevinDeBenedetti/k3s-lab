@@ -130,3 +130,42 @@ setup() {
   run semver_in_range v3.7.9 ''
   [ "$status" -eq 2 ]
 }
+
+# ─── semver_latest ──────────────────────────────────────────────────────────
+
+@test "semver_latest picks the highest version regardless of input order" {
+  run bash -c 'source "'"${REPO_ROOT}"'/lib/semver.sh"; printf "0.14.0\n0.15.0\n0.12.0\n" | semver_latest'
+  [ "$output" = "0.15.0" ]
+}
+
+@test "semver_latest compares numerically, not lexically" {
+  # The case a `sort` would get wrong: 0.9.0 sorts after 0.15.0 as text.
+  run bash -c 'source "'"${REPO_ROOT}"'/lib/semver.sh"; printf "0.9.0\n0.15.0\n" | semver_latest'
+  [ "$output" = "0.15.0" ]
+}
+
+@test "semver_latest ignores floating registry tags" {
+  # A registry also serves `latest`/`stable`; ordering those against real
+  # versions is meaningless, so they must not win.
+  run bash -c 'source "'"${REPO_ROOT}"'/lib/semver.sh"; printf "latest\n0.15.0\nstable\n" | semver_latest'
+  [ "$output" = "0.15.0" ]
+}
+
+@test "semver_latest ignores pre-releases" {
+  # semver_cmp truncates the suffix, so v1.0.0-rc.1 would tie with v1.0.0 and
+  # could be reported as the newest published release when it is not one.
+  run bash -c 'source "'"${REPO_ROOT}"'/lib/semver.sh"; printf "1.0.0-rc.1\n0.15.0\n" | semver_latest'
+  [ "$output" = "0.15.0" ]
+}
+
+@test "semver_latest keeps the v prefix it was given" {
+  run bash -c 'source "'"${REPO_ROOT}"'/lib/semver.sh"; printf "v3.7.8\nv3.7.9\n" | semver_latest'
+  [ "$output" = "v3.7.9" ]
+}
+
+@test "semver_latest prints nothing when no input is release-shaped" {
+  # Callers must fail on this silence, not read it as "nothing newer exists".
+  run bash -c 'source "'"${REPO_ROOT}"'/lib/semver.sh"; printf "latest\n\n" | semver_latest'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}

@@ -1,15 +1,20 @@
 # =============================================================================
-# Traefik Advisories — watch over the traefik.image.tag pin
+# Traefik Advisories — watch over the proxy version we deploy
 #
-# The `traefik.image.tag` pin in charts/platform-traefik is a security decision
-# that goes stale **without any commit**. GHSA-3ccp-42pg-hgv6 was published 12
-# days after we froze v3.7.8: nothing in the repository had changed, so neither
-# CI nor renovate (which tracks *chart* versions, not proxy versions) had any
-# reason to fire. Only a periodic check can see that — hence this workflow,
-# independent of any repository activity.
+# The Traefik proxy version shipped by charts/platform-traefik is a security
+# decision that goes stale **without any commit**. GHSA-3ccp-42pg-hgv6 was
+# published 12 days after we froze v3.7.8: nothing in the repository had
+# changed, so neither CI nor renovate (which tracks *chart* versions, not proxy
+# versions) had any reason to fire. Only a periodic check can see that — hence
+# this workflow, independent of any repository activity.
 #
-# Opens (or updates) a tracking issue when the pin becomes vulnerable, and
-# closes it again when the pin is back in the clear.
+# Since 2026-07-30 there is no `traefik.image.tag` pin: the version is the
+# subchart's appVersion. That makes this watch *more* necessary, not less — an
+# upstream chart lagging behind an advisory goes stale just as silently as a
+# frozen pin did, and now nothing in this repo even states the version.
+#
+# Opens (or updates) a tracking issue when that version becomes vulnerable, and
+# closes it again when it is back in the clear.
 # =============================================================================
 name: Traefik Advisories
 
@@ -29,7 +34,7 @@ permissions:
   issues: write
 
 env:
-  ISSUE_TITLE: "🔒 Traefik: the image.tag pin is covered by an advisory"
+  ISSUE_TITLE: "🔒 Traefik: the deployed proxy version is covered by an advisory"
 
 jobs:
   watch:
@@ -37,22 +42,65 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Confront the pin with the traefik/traefik advisories
+      - name: Confront the deployed proxy version with the traefik/traefik advisories
         id: check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INFRA_TOKEN: ${{ secrets.INFRA_READ_TOKEN }}
         run: |
           set +e
+
+          # ─── 1. What this repository would deploy ───────────────────────────
           ./scripts/check-traefik-advisories.sh 2>&1 | tee /tmp/advisories.log
           status="${PIPESTATUS[0]}"
+
+          # ─── 2. What the cluster is actually running ────────────────────────
+          # A different question, and the two have already disagreed for five
+          # days: the repo sat on v3.7.9 and reported clean every morning while
+          # production ran v3.7.8 under GHSA-3ccp, because infra still pinned the
+          # previous chart. The authoritative answer lives in infra's
+          # ApplicationSet, which is a private repo this workflow cannot see
+          # without a token — so the check is conditional, and its absence is
+          # reported rather than passed over in silence.
+          if [ -n "${INFRA_TOKEN:-}" ]; then
+            git clone --depth 1 --quiet \
+              "https://x-access-token:${INFRA_TOKEN}@github.com/KevinDeBenedetti/infra.git" \
+              /tmp/infra 2>/dev/null
+            clone_status=$?
+
+            if [ "$clone_status" -ne 0 ]; then
+              echo "::error::could not clone infra — the deployed version was NOT checked"
+              status=1
+              echo "could not clone infra" > /tmp/deployed.log
+            else
+              ./scripts/check-deployed-traefik.sh \
+                --applicationset /tmp/infra/argocd/applicationsets/platform.yaml \
+                2>&1 | tee /tmp/deployed.log
+              deployed_status="${PIPESTATUS[0]}"
+              [ "$deployed_status" -ne 0 ] && status="$deployed_status"
+            fi
+          else
+            # Not a pass. The most consequential of the two checks is the one
+            # not running, and that has to stay visible on every green run.
+            echo "::warning::INFRA_READ_TOKEN is not set — the version RUNNING IN \
+          PRODUCTION was not checked, only the one this repo would deploy."
+            printf 'SKIPPED — INFRA_READ_TOKEN not set.\n' > /tmp/deployed.log
+          fi
+
           set -e
           echo "status=$status" >> "$GITHUB_OUTPUT"
 
           {
             echo "## Traefik advisory watch"
             echo ""
+            echo "### 1. Version this repository would deploy"
             echo '```'
             cat /tmp/advisories.log
+            echo '```'
+            echo ""
+            echo "### 2. Version running in production (infra ApplicationSet pin)"
+            echo '```'
+            cat /tmp/deployed.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -65,20 +113,43 @@ jobs:
         run: |
           body_file=/tmp/issue-body.md
           {
-            echo "The \`scripts/check-traefik-advisories.sh\` check reports that the"
-            echo "\`traefik.image.tag\` pin in \`charts/platform-traefik/values.yaml\` is covered"
-            echo "by at least one vulnerable range, or that a range could not be evaluated."
+            echo "At least one Traefik proxy version is covered by a vulnerable range, or a"
+            echo "range could not be evaluated. **Read both sections** — they answer different"
+            echo "questions, and only the second one is about production."
+            echo ""
+            echo "### 1. Version this repository would deploy"
             echo ""
             echo '```'
             cat /tmp/advisories.log
             echo '```'
             echo ""
+            echo "### 2. Version running in production"
+            echo ""
+            echo '```'
+            cat /tmp/deployed.log
+            echo '```'
+            echo ""
             echo "### What to do"
             echo ""
-            echo "1. Raise \`traefik.image.tag\` to the patched version listed above."
-            echo "2. Update the comment in \`values.yaml\` **and** the advisory table in"
+            echo "**If section 2 is failing, that is the urgent one** — the cluster is serving"
+            echo "traffic on a vulnerable proxy right now. Raise the \`platform-traefik\` pin in"
+            echo "\`infra/argocd/applicationsets/platform.yaml\` to a published chart whose proxy"
+            echo "is patched, and let ArgoCD reconcile. Check a candidate before pinning it:"
+            echo "\`scripts/check-deployed-traefik.sh --chart-version <candidate>\`."
+            echo ""
+            echo "If section 1 is failing, the fix is in this repository:"
+            echo ""
+            echo "1. Prefer bumping the \`traefik\` subchart in \`Chart.yaml\`, if a newer one"
+            echo "   already ships the patched proxy — that keeps us on upstream's own version."
+            echo "2. Otherwise re-add the \`traefik.image.tag\` pin at the patched version listed"
+            echo "   above. **Never \`versionOverride\`** — see the README for why."
+            echo "3. Update the comment in \`values.yaml\` **and** the advisory table in"
             echo "   \`charts/platform-traefik/README.md\`."
-            echo "3. Verify the render: \`./scripts/check-traefik-image.sh\`."
+            echo "4. Verify the render: \`./scripts/check-traefik-image.sh\`."
+            echo ""
+            echo "Note that fixing section 1 does **not** fix section 2: the cluster resolves a"
+            echo "published chart, so a repository fix only reaches production once released"
+            echo "**and** pinned. That gap ran for five days between 2026-07-27 and 2026-08-01."
             echo ""
             echo "If the subchart's \`traefik.io/proxy-max-version\` ceiling blocks the bump,"
             echo "see the procedure in \`charts/platform-traefik/README.md\`."
@@ -99,7 +170,7 @@ jobs:
             echo "🆕 Tracking issue created"
           fi
 
-      - name: Close the tracking issue when the pin is clean
+      - name: Close the tracking issue when the deployed version is clean
         if: steps.check.outputs.status == '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -109,14 +180,14 @@ jobs:
 
           if [ -n "$existing" ]; then
             gh issue close "$existing" \
-              --comment "The pin is no longer covered by any known vulnerable range — closed automatically."
+              --comment "The deployed proxy version is no longer covered by any known vulnerable range — closed automatically."
             echo "✅ Issue #$existing closed"
           else
-            echo "✅ Pin is clean, no open issue"
+            echo "✅ Deployed version is clean, no open issue"
           fi
 
-      - name: Fail when the pin is vulnerable
+      - name: Fail when the deployed version is vulnerable
         if: steps.check.outputs.status != '0'
         run: |
-          echo "::error::The traefik.image.tag pin is covered by an advisory — see the tracking issue."
+          echo "::error::The deployed Traefik proxy version is covered by an advisory — see the tracking issue."
           exit 1

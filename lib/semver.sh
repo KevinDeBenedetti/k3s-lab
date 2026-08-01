@@ -6,6 +6,7 @@
 # Source this file, then use:
 #   semver_cmp A B              → prints -1, 0 or 1
 #   semver_in_range VER RANGE   → exits 0 if VER falls inside the range
+#   semver_latest < versions    → prints the highest of the versions on stdin
 #
 # The `v` prefix is optional on either side. Pre-release suffixes are
 # **truncated** before comparison: `v3.7.0-rc.1` is treated as `v3.7.0`. That is
@@ -13,7 +14,8 @@
 # final version puts us on the cautious side of a vulnerability range. Do not
 # reuse these helpers to order pre-releases.
 #
-# Used by scripts/check-traefik-advisories.sh, its only caller so far.
+# Used by scripts/check-traefik-advisories.sh and
+# scripts/check-umbrella-pins.sh.
 
 _semver_field() {
   local v="${1:-0}"
@@ -77,4 +79,26 @@ semver_in_range() {
   done < <(printf '%s\n' "$range" | tr ',' '\n')
 
   return 0
+}
+
+# semver_latest — reads versions on stdin, one per line, prints the highest.
+# Anything that is not a bare X.Y.Z (optionally v-prefixed) is **skipped**: a
+# registry also serves floating tags like `latest`, and ordering those against
+# real versions is meaningless. Pre-releases are skipped too — semver_cmp
+# truncates their suffix, so `v1.0.0-rc.1` would compare equal to `v1.0.0` and
+# could be reported as the newest published release when it is not.
+# Prints nothing on empty input; callers must treat that as an anomaly rather
+# than as "nothing newer exists".
+semver_latest() {
+  local version best=""
+  while IFS= read -r version; do
+    version="${version#"${version%%[![:space:]]*}"}"
+    version="${version%"${version##*[![:space:]]}"}"
+    [[ "$version" =~ ^[vV]?[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+    if [ -z "$best" ] || [ "$(semver_cmp "$version" "$best")" = "1" ]; then
+      best="$version"
+    fi
+  done
+  [ -n "$best" ] || return 0
+  printf '%s\n' "$best"
 }

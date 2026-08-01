@@ -10,6 +10,27 @@
 # latest published one. With a retention of 5, the 2026-07-21 purge deleted
 # platform-*:0.9.1, still referenced by the `platform` ApplicationSet in
 # infra/argocd — the Applications could no longer resolve their chart.
+#
+# ─── Checking what is actually published, before any purge ───────────────────
+#
+# Do NOT use `gh api "/user/packages/container/charts%2F<chart>/versions"` for
+# this. On 2026-07-26 it returned an **empty list** while the package was in
+# fact populated — and a `DELETE` against that very same encoded URL worked at
+# the same moment, so the emptiness was in the listing, not in the registry. An
+# empty answer there is not evidence that a package is empty, and treating it as
+# such is how you conclude there is nothing to lose right before a purge.
+#
+# Prefer the OCI distribution API: it answers the question that actually
+# matters — which versions can a consumer still resolve — and needs no GitHub
+# token for a public package:
+#
+#   repo=kevindebenedetti/charts/platform-traefik
+#   token=$(curl -s "https://ghcr.io/token?scope=repository:${repo}:pull&service=ghcr.io" | jq -r .token)
+#   curl -s -H "Authorization: Bearer $token" "https://ghcr.io/v2/${repo}/tags/list" | jq .tags
+#
+# Verified working on 2026-07-30 (returned 0.12.0, 0.14.0, 0.15.0). If you do go
+# through the GitHub packages API, use `/users/KevinDeBenedetti/packages/…`
+# rather than `/user/packages/…`.
 # =============================================================================
 name: Cleanup GHCR packages
 
