@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.16.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.15.0...v0.16.0) (2026-08-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* 
+
+### Features
+
+* Add comprehensive CI checks for Traefik and umbrella pins ([7a24f7b](https://github.com/KevinDeBenedetti/k3s-lab/commit/7a24f7b63cb37cbbdb4dfa381cd5e5e284ad49ad))
+
 ## [0.15.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.14.0...v0.15.0) (2026-07-30)
 
 
