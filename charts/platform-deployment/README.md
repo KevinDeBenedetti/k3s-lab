@@ -3,16 +3,51 @@
 Umbrella Helm chart combining all k3s-lab platform components into a single, cohesive deployment.
 
 > [!IMPORTANT]
-> **This chart is published, but nothing currently deploys it.** As of
-> 2026-08-01 no ArgoCD `ApplicationSet` references it: the cluster deploys
-> `platform-cert-manager`, `platform-external-secrets` and `platform-traefik`
-> individually, pinned in `infra/argocd/applicationsets/platform.yaml`. The rest
-> of this page therefore describes how the chart *would* be used, not how the
-> cluster is currently run. Check before relying on it:
+> **This chart is the "try the whole platform" entry point — it is not how the
+> author's cluster runs.** That cluster deploys `platform-cert-manager`,
+> `platform-external-secrets` and `platform-traefik` individually, pinned in a
+> private ApplicationSet, because operating in production favors bumping one
+> component at a time. Use this chart to evaluate the platform in one command;
+> graduate to the individual charts to run it for real.
 >
-> ```bash
-> grep -rn platform-deployment infra/argocd/applicationsets/
-> ```
+> First verified install: 2026-08-03, on a disposable k3d cluster (k3s
+> v1.35.5), from the published 0.16.0 artifact — see the caveats below, both
+> discovered that day.
+
+## Known install caveats
+
+Two things bite a first install, verified on a real blank cluster:
+
+1. **Stock k3s ships its own Traefik.** On an unmodified k3s (or k3d), the
+   bundled Traefik's CRDs conflict with `platform-traefik`'s and the install
+   fails on `hub.traefik.io` CRDs. Disable the bundled components first — the
+   same thing this repo's Ansible role does on real nodes
+   (`k3s_disable: [traefik, servicelb]`):
+
+   ```bash
+   k3d cluster create try-k3s-lab \
+     --k3s-arg "--disable=traefik@server:0" \
+     --k3s-arg "--disable=servicelb@server:0"
+   ```
+
+2. **`platform-security` cannot install in the same release yet.** Its Kyverno
+   `ClusterPolicy` resources are validated by Helm before the Kyverno CRDs from
+   the very same release exist, so a default install fails with `no matches
+   for kind "ClusterPolicy"`. ArgoCD papers over this ordering with retries;
+   plain Helm does not. Until the chart sequences this itself, install with:
+
+   ```bash
+   --set platform-security.enabled=false
+   ```
+
+   and add the security layer in a second step if you want it.
+
+With those two caveats, the 0.16.0 artifact reaches **15/17 workloads fully
+ready** on a blank cluster (Traefik, the full ArgoCD stack, Prometheus, Loki,
+cert-manager, External Secrets). The two stragglers are real-deployment
+dependencies, not bugs: `vault-0` waits for a `vault-tls` secret (and needs
+init/unseal regardless), and Grafana waits for a `grafana-admin-secret` —
+both provided by External Secrets + Vault once those are configured.
 
 ## Overview
 
@@ -51,7 +86,7 @@ helm registry login ghcr.io
 # Pull and install
 helm install platform-deployment \
   oci://ghcr.io/kevindebenedetti/charts/platform-deployment \
-  --version 0.15.0 \
+  --version 0.16.0 \
   -f values.yaml \
   -n argocd
 ```

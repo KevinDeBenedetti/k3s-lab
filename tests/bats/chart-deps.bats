@@ -103,6 +103,65 @@ EOF
   [[ "$output" == *platform-traefik* ]]
 }
 
+# ─── applicationset_chart_repo ──────────────────────────────────────────────
+
+@test "applicationset_chart_repo reads the repoURL of the chart source" {
+  cat > "${FIXTURE}/as.yaml" <<'YAML'
+spec:
+  generators:
+    - list:
+        elements:
+          - name: traefik
+            chart: platform-traefik
+            version: "0.16.0"
+  template:
+    spec:
+      sources:
+        - repoURL: 'ghcr.io/acme/charts'
+          chart: '{{ .chart }}'
+          targetRevision: '{{ .version }}'
+        - repoURL: 'https://github.com/acme/infra.git'
+          targetRevision: main
+          ref: values
+YAML
+  run applicationset_chart_repo "${FIXTURE}/as.yaml"
+  [ "$output" = "ghcr.io/acme/charts" ]
+}
+
+@test "applicationset_chart_repo ignores the values source even listed first" {
+  # The values source has no `chart:` — returning its git URL would send the
+  # registry client to a repository that serves no charts at all.
+  cat > "${FIXTURE}/as.yaml" <<'YAML'
+spec:
+  template:
+    spec:
+      sources:
+        - repoURL: 'https://github.com/acme/infra.git'
+          targetRevision: main
+          ref: values
+        - repoURL: 'oci://ghcr.io/acme/charts'
+          chart: '{{ .chart }}'
+YAML
+  run applicationset_chart_repo "${FIXTURE}/as.yaml"
+  [ "$output" = "ghcr.io/acme/charts" ]
+}
+
+@test "applicationset_chart_repo is not fooled by generator chart fields" {
+  # `chart:` lines also appear in the generator elements, far from any
+  # repoURL; they must not produce a phantom registry.
+  cat > "${FIXTURE}/as.yaml" <<'YAML'
+spec:
+  generators:
+    - list:
+        elements:
+          - name: traefik
+            chart: platform-traefik
+YAML
+  run applicationset_chart_repo "${FIXTURE}/as.yaml"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 # ─── chart_oci_registry ─────────────────────────────────────────────────────
 
 @test "chart_oci_registry splits host from repository path" {

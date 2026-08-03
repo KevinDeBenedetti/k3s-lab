@@ -45,8 +45,8 @@ source "$REPO_ROOT/lib/log.sh"
 source "$REPO_ROOT/lib/semver.sh"
 # shellcheck source=../lib/traefik-pin.sh
 source "$REPO_ROOT/lib/traefik-pin.sh"
-# shellcheck source=../lib/traefik-advisories.sh
-source "$REPO_ROOT/lib/traefik-advisories.sh"
+# shellcheck source=../lib/advisories.sh
+source "$REPO_ROOT/lib/advisories.sh"
 
 CHART_DIR="$REPO_ROOT/charts/platform-traefik"
 SOURCE_FILE=""
@@ -96,10 +96,10 @@ fi
 log_step "Deployed proxy: $deployed"
 
 # ─── Advisories ─────────────────────────────────────────────────────────────
-advisories="$(traefik_advisories_fetch "$SOURCE_FILE")"
-rows="$(traefik_advisory_rows "$advisories")"
+advisories="$(advisories_fetch traefik/traefik "$SOURCE_FILE")"
+rows="$(advisory_rows "$advisories")"
 
-if ! traefik_advisory_scan "$deployed" "$rows"; then
+if ! advisory_scan "$deployed" "$rows"; then
   log_error "Fix: bump the traefik subchart if a newer one already ships the patched"
   log_error "proxy, otherwise re-add the traefik.image.tag pin (never versionOverride)."
   log_error "Reminder: update the comment in $CHART_DIR/values.yaml and the advisory"

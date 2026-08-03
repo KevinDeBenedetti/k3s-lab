@@ -76,6 +76,25 @@ applicationset_chart_version() {
   ' "$1"
 }
 
+# applicationset_chart_repo APPLICATIONSET — the registry the ApplicationSet
+# actually pulls its charts from: the `repoURL` of the template source that
+# carries a `chart:` field (the values source has none). Printed as written,
+# minus quotes and an optional oci:// scheme — e.g. `ghcr.io/acme/charts`.
+#
+# Exists so that checks reading the ApplicationSet stop carrying their own
+# copy of the registry path: the file that names the chart version is also the
+# file that names where it resolves from, and a second copy of that truth
+# drifts exactly like the version pins did.
+applicationset_chart_repo() {
+  awk '
+    $1 == "-" && $2 == "repoURL:" { url = $3; next }
+    $1 == "chart:" && url != ""   { gsub(/["'"'"']/, "", url)
+                                    sub(/^oci:\/\//, "", url)
+                                    print url; exit }
+    $1 == "-"                     { url = "" }
+  ' "$1"
+}
+
 # chart_oci_registry REPOSITORY NAME — the registry host and repository path a
 # chart is published under, printed as "host<TAB>path". `oci://ghcr.io/acme/charts`
 # plus `platform-traefik` gives `ghcr.io` and `acme/charts/platform-traefik`,

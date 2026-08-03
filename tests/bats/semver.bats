@@ -119,6 +119,40 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+# ─── semver_in_range: comma lists that cannot mean AND ──────────────────────
+# Both forms were found as-published on components we deploy (cert-manager
+# GHSA-gx3x-vq4p-mhhv and GHSA-r4pg-vg54-wxx4). Read as AND they can only
+# under-report — the exact failure mode these checks exist to prevent.
+
+@test "semver_in_range reads a list of exact versions as an enumeration" {
+  # AND of two different `=` is always false; a version in the list must match…
+  run semver_in_range v1.18.1 'v1.18.0,v1.18.1,v1.19.0'
+  [ "$status" -eq 0 ]
+  # …and one outside it must not.
+  run semver_in_range v1.20.2 'v1.18.0,v1.18.1,v1.19.0'
+  [ "$status" -eq 1 ]
+}
+
+@test "semver_in_range reads uniform upper bounds as per-line ceilings" {
+  # `<v1.12.14,<v1.15.4,<v1.16.2` is one ceiling per backported release line.
+  # v1.15.3 is not < v1.12.14, so the AND reading calls it clean — it is
+  # vulnerable on its own line.
+  run semver_in_range v1.15.3 '<v1.12.14,<v1.15.4,<v1.16.2'
+  [ "$status" -eq 0 ]
+  # Above every ceiling stays clean.
+  run semver_in_range v1.20.2 '<v1.12.14,<v1.15.4,<v1.16.2'
+  [ "$status" -eq 1 ]
+}
+
+@test "semver_in_range keeps AND for mixed-direction intervals" {
+  # The documented GitHub form: a bracket. OR would swallow everything below
+  # the ceiling, including versions under the floor.
+  run semver_in_range v1.17.9 '>= 1.18.0, <= 1.20.2'
+  [ "$status" -eq 1 ]
+  run semver_in_range v1.20.2 '>= 1.18.0, <= 1.20.2'
+  [ "$status" -eq 0 ]
+}
+
 # ─── semver_in_range: refusing to guess at the unparsable ───────────────────
 
 @test "semver_in_range returns 2 on an unknown operator rather than 'not vulnerable'" {

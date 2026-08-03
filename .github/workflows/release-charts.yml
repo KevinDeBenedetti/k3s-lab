@@ -168,6 +168,72 @@ jobs:
           echo "✅ platform-deployment rendered: $docs manifests"
           echo "documents=$docs" >> "$GITHUB_OUTPUT"
 
+      # ─── Umbrella pin bump (post-publish PR) ────────────────────────────────
+      # The subchart versions just published are, by definition, versions the
+      # umbrella's pins may now reference — this is the one moment where the
+      # "pins may only point at published versions" constraint holds by
+      # construction. Decided on 2026-08-03, when the umbrella became the
+      # repository's public entry point and its once-per-release manual bump
+      # stopped being acceptable as a recurring red CI.
+      #
+      # A PR rather than a direct push: check-umbrella-pins.sh stays the
+      # watchdog, CI runs on the branch, and a human merges. The commit is a
+      # `chore:` on purpose — a releasing type (fix:/feat:) would trigger
+      # release-please, whose release would republish charts and open the next
+      # bump PR: an infinite release loop. With `chore:` the aligned pins ship
+      # with the *next* release, which is exactly the one-release lag the
+      # umbrella already has by design.
+      #
+      # The app token (not GITHUB_TOKEN) matters: PRs opened with the default
+      # token do not trigger CI, and an unchecked pin bump defeats the purpose.
+      - name: Create app token for the pin-bump PR
+        id: app-token
+        if: steps.publish.outputs.published != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Open a PR aligning the umbrella pins
+        if: steps.publish.outputs.published != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          version=$(grep '^version:' charts/platform-deployment/Chart.yaml | awk '{print $2}')
+          branch="chore/umbrella-pins-${version}"
+
+          out=$(./scripts/bump-umbrella-pins.sh --version "$version")
+          echo "$out"
+          if printf '%s' "$out" | grep -q "nothing to do"; then
+            echo "ℹ️  Pins already aligned at $version — no PR needed"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add charts/platform-deployment/Chart.yaml
+          git commit -m "chore(charts/platform-deployment): align subchart pins to ${version}" \
+            -m "The ${version} release just published every subchart; the umbrella's pins may now reference it. Opened automatically by release-charts after publishing — see scripts/bump-umbrella-pins.sh."
+          git push --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" \
+            "$branch"
+
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "♻️  PR for $branch already open — branch updated"
+          else
+            {
+              echo "The \`${version}\` release published every subchart, so the umbrella's pins can now reference it. Opened automatically by \`release-charts\` right after publishing."
+              echo ""
+              echo "The \`umbrella-pins\` CI job on this PR is the proof the alignment is correct — merge on green. The commit is a \`chore:\` so merging does **not** trigger a new release; the aligned pins ship with the next one (the umbrella's structural one-release lag, by design)."
+              echo ""
+              echo "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+            } > /tmp/pr-body.md
+            gh pr create --head "$branch" \
+              --title "chore(charts/platform-deployment): align subchart pins to ${version}" \
+              --body-file /tmp/pr-body.md
+          fi
+
       - name: Summary
         if: always()
         run: |

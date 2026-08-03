@@ -62,6 +62,11 @@ jobs:
           # ApplicationSet, which is a private repo this workflow cannot see
           # without a token — so the check is conditional, and its absence is
           # reported rather than passed over in silence.
+          #
+          # Since 2026-08-03 this side covers every chart pinned in the
+          # ApplicationSet (traefik, cert-manager, external-secrets), not just
+          # Traefik: same mechanics, same failure mode, and the first extended
+          # run found a live HIGH on cert-manager.
           if [ -n "${INFRA_TOKEN:-}" ]; then
             git clone --depth 1 --quiet \
               "https://x-access-token:${INFRA_TOKEN}@github.com/KevinDeBenedetti/infra.git" \
@@ -69,11 +74,11 @@ jobs:
             clone_status=$?
 
             if [ "$clone_status" -ne 0 ]; then
-              echo "::error::could not clone infra — the deployed version was NOT checked"
+              echo "::error::could not clone infra — the deployed versions were NOT checked"
               status=1
               echo "could not clone infra" > /tmp/deployed.log
             else
-              ./scripts/check-deployed-traefik.sh \
+              ./scripts/check-deployed-charts.sh \
                 --applicationset /tmp/infra/argocd/applicationsets/platform.yaml \
                 2>&1 | tee /tmp/deployed.log
               deployed_status="${PIPESTATUS[0]}"
@@ -98,7 +103,7 @@ jobs:
             cat /tmp/advisories.log
             echo '```'
             echo ""
-            echo "### 2. Version running in production (infra ApplicationSet pin)"
+            echo "### 2. Versions running in production (infra ApplicationSet pins)"
             echo '```'
             cat /tmp/deployed.log
             echo '```'
@@ -123,7 +128,7 @@ jobs:
             cat /tmp/advisories.log
             echo '```'
             echo ""
-            echo "### 2. Version running in production"
+            echo "### 2. Versions running in production"
             echo ""
             echo '```'
             cat /tmp/deployed.log
@@ -132,10 +137,13 @@ jobs:
             echo "### What to do"
             echo ""
             echo "**If section 2 is failing, that is the urgent one** — the cluster is serving"
-            echo "traffic on a vulnerable proxy right now. Raise the \`platform-traefik\` pin in"
-            echo "\`infra/argocd/applicationsets/platform.yaml\` to a published chart whose proxy"
-            echo "is patched, and let ArgoCD reconcile. Check a candidate before pinning it:"
-            echo "\`scripts/check-deployed-traefik.sh --chart-version <candidate>\`."
+            echo "traffic on a vulnerable component right now. If the *published chart* already"
+            echo "ships a patched component, raise that chart's pin in"
+            echo "\`infra/argocd/applicationsets/platform.yaml\` and let ArgoCD reconcile."
+            echo "Otherwise fix the source first: bump the wrapped subchart in"
+            echo "\`charts/<name>/Chart.yaml\`, release, then raise the pin. Check a candidate"
+            echo "before pinning it:"
+            echo "\`scripts/check-deployed-charts.sh --only <chart> --chart-version <candidate>\`."
             echo ""
             echo "If section 1 is failing, the fix is in this repository:"
             echo ""
