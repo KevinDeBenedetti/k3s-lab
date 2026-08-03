@@ -2,8 +2,8 @@ apiVersion: v2
 name: platform-vault-seeder
 description: Helm Job-based Vault seeding for k3s cluster (core secrets + app secrets)
 type: application
-version: 0.18.0
-appVersion: 0.18.0
+version: 0.18.1
+appVersion: 0.18.1
 home: https://github.com/KevinDeBenedetti/k3s-lab
 sources:
   - >-
