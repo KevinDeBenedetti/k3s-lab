@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.17.0...v0.18.0) (2026-08-03)
+
+
+### Features
+
+* **traefik-advisories:** update workflow to check all pinned charts ([5a67ad6](https://github.com/KevinDeBenedetti/k3s-lab/commit/5a67ad6ff65788f1940b36f537104670dbb2e08e))
+
+
+### Bug Fixes
+
+* **security:** pin traefik v3.7.10 and bump cert-manager to v1.20.3 ([acfc7ee](https://github.com/KevinDeBenedetti/k3s-lab/commit/acfc7ee4e3dfeab024b64ce708f0dc9057aed323))
+
 ## [0.17.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.16.0...v0.17.0) (2026-08-03)
 
 
