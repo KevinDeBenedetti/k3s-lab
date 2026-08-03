@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.18.0...v0.18.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **charts/platform-deployment:** align subchart pins to 0.18.0 ([525feab](https://github.com/KevinDeBenedetti/k3s-lab/commit/525feab6365718f5da5bb3a65a7b7f5145e9bf44))
+
 ## [0.18.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.17.0...v0.18.0) (2026-08-03)
 
 
