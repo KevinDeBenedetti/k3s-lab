@@ -39,6 +39,14 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Without this, checkout stores GITHUB_TOKEN in
+          # `http.https://github.com/.extraheader`, which git sends on *every*
+          # github.com URL — overriding the app-token credentials embedded in
+          # the pin-bump push URL below. This job's GITHUB_TOKEN is
+          # `contents: read`, so the push 403s before any branch is created.
+          # That is exactly how the 0.18.0 run failed on 2026-08-03.
+          # Nothing else in this job performs authenticated git operations.
+          persist-credentials: false
 
       - name: Set lowercase registry path
         id: registry
@@ -202,9 +210,12 @@ jobs:
           version=$(grep '^version:' charts/platform-deployment/Chart.yaml | awk '{print $2}')
           branch="chore/umbrella-pins-${version}"
 
-          out=$(./scripts/bump-umbrella-pins.sh --version "$version")
-          echo "$out"
-          if printf '%s' "$out" | grep -q "nothing to do"; then
+          ./scripts/bump-umbrella-pins.sh --version "$version"
+
+          # Ask git, not the script's wording, whether there is anything to
+          # commit: `git commit` on an empty index fails the step, and an
+          # already-aligned umbrella is a normal outcome, not an error.
+          if git diff --quiet -- charts/platform-deployment/Chart.yaml; then
             echo "ℹ️  Pins already aligned at $version — no PR needed"
             exit 0
           fi
