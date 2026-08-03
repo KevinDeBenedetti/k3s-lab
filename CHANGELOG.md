@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.17.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.16.0...v0.17.0) (2026-08-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **infra:** 
+
+### Bug Fixes
+
+* **charts/platform-deployment:** update dependencies to latest versions ([b21ccf6](https://github.com/KevinDeBenedetti/k3s-lab/commit/b21ccf6e4ab41e3c022011d054c158d8ec7cdc70))
+* **infra:** update pins and add tests for deployed charts ([83e2aab](https://github.com/KevinDeBenedetti/k3s-lab/commit/83e2aabd52e4ecd07839cd04422dfbe0a72a7907))
+
 ## [0.16.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.15.0...v0.16.0) (2026-08-01)
 
 
