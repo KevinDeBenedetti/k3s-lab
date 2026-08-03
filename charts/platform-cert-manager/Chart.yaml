@@ -1,13 +1,9 @@
 apiVersion: v2
 name: platform-cert-manager
 description: TLS certificate management — cert-manager with CRDs
-version: 0.17.0
+version: 0.18.0
 type: application
 dependencies:
   - name: cert-manager
-    # v1.20.3 — v1.20.2 is covered by GHSA-8rvj-mm4h-c258 (HIGH, 2026-06-25:
-    # direct ACME Challenge resources bypass the Issuer's DNS01 solver policy
-    # and can use the ClusterIssuer's DNS credentials). Found by
-    # check-deployed-charts.sh on 2026-08-03, its first run.
     version: v1.20.3
     repository: https://charts.jetstack.io
