@@ -3,25 +3,28 @@
 # Override per-cluster in infra/platform/traefik/values.yaml
 # =============================================================================
 traefik:
-  # NO `image.tag` HERE — deliberate, since 2026-07-30. Subchart 41.1.0 ships
-  # appVersion v3.7.9, which is exactly the version the pin used to force, so the
-  # override became redundant: the proxy version now comes from the subchart
-  # (traefik.proxyVersion resolves versionOverride → image.tag → appVersion).
-  # Dropping it also puts us back under traefik.io/proxy-max-version (v3.7.9),
-  # which the pin had been overshooting since 2026-07-22.
+  # PIN RE-ADDED 2026-08-03 — three advisories published that day cover every
+  # v3.7.x up to and including v3.7.9, patched in v3.7.10 (proxy released
+  # 2026-07-31; the advisories are its coordinated disclosure):
+  #   GHSA-fgjj-px3w-67xx (HIGH)   Gateway API route identity collision →
+  #                                cross-namespace backend hijacking
+  #   GHSA-62fc-8686-hfmq (medium) allowCrossNamespace=false bypass via
+  #                                @kubernetescrd TraefikService backendRef
+  #   GHSA-6765-c87h-8mrf (low)    BasicAuth singleflight key collision →
+  #                                authenticated identity spoofing
+  # No upstream chart ships v3.7.10 yet (41.1.1 still declares appVersion
+  # v3.7.9), so this is exactly the escape hatch this comment has always
+  # described: `image.tag` — and only it, never `versionOverride`, see
+  # README.md. Both checks pick the pin up automatically.
   #
-  # This is still a security-relevant value, it is just no longer stated here.
-  # scripts/check-traefik-advisories.sh confronts the *effective* version — pin
-  # if one is set, otherwise the subchart's appVersion — with the traefik/traefik
-  # advisories, daily. Two HIGH advisories are the reason this file ever carried
-  # a pin, both now behind us: GHSA-cxjq-mrr5-89rv (auth bypass via path
-  # traversal in ReplacePathRegex, <= v3.7.6, patched v3.7.7) and
-  # GHSA-3ccp-42pg-hgv6 (cross-user response poisoning via proxied CONNECT on the
-  # shared keep-alive pool, <= v3.7.8, patched v3.7.9).
+  # The pin overshoots the subchart's traefik.io/proxy-max-version (v3.7.9) by
+  # one patch: since 41.0.0 that guard only warns on a minor/patch gap
+  # (NOTES.txt), it no longer fails the render.
   #
-  # Bring `image.tag` back — and only it, never `versionOverride` — the next time
-  # an advisory lands ahead of the chart. Both checks honour it as an override.
-  # See README.md for the procedure and for why `versionOverride` stays out.
+  # DROP this pin at the next subchart bump whose appVersion is >= v3.7.10 —
+  # a pin that upstream has caught up with is a duplicate that only drifts.
+  image:
+    tag: v3.7.10
 
   ingressRoute:
     dashboard:

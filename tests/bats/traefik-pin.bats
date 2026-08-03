@@ -18,6 +18,18 @@ setup() {
   FIXTURE="${BATS_TEST_TMPDIR}"
 }
 
+@test "traefik_pinned_tag strips surrounding quotes" {
+  # `tag: "v3.7.10"` and `tag: v3.7.10` are the same pin; downstream checks
+  # compare the value against rendered manifests by string equality.
+  cat > "${FIXTURE}/values.yaml" <<'EOF'
+traefik:
+  image:
+    tag: "v3.7.10"
+EOF
+  run traefik_pinned_tag "${FIXTURE}/values.yaml"
+  [ "$output" = "v3.7.10" ]
+}
+
 traefik_values() {
   cat > "${FIXTURE}/values.yaml" <<EOF
 traefik:

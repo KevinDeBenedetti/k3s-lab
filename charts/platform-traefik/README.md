@@ -7,7 +7,7 @@ disabled, resource limits sized for a small node.
 | | |
 |---|---|
 | Subchart | `traefik` [`41.1.0`](https://traefik.github.io/charts) |
-| Deployed proxy | `docker.io/traefik:v3.7.9` (subchart appVersion — **no pin**, see below) |
+| Deployed proxy | `docker.io/traefik:v3.7.10` (**pinned** via `image.tag` since 2026-08-03, see below) |
 | Per-cluster overrides | `infra/platform/traefik/values.yaml` |
 
 > The two versions in that table are copies of `Chart.lock` and of the value
@@ -51,17 +51,19 @@ it does not download dependencies.
 2. otherwise `image.tag`;
 3. otherwise the subchart's `.Chart.AppVersion` (so `v3.7.9` here).
 
-Step 3 is where we sit today, deliberately. It is also a trap in the other
-direction: *forgetting* `image.tag` back when it was load-bearing raised no
-error at all, it just silently downgraded the proxy. `lib/traefik-pin.sh`
-mirrors steps 2 and 3 so that both checks always speak about the version really
-shipped, whether or not a pin exists.
+Step 2 is where we sit today (`image.tag: v3.7.10`, re-added 2026-08-03 —
+three advisories cover `<= v3.7.9` and no upstream chart ships v3.7.10 yet).
+Step 3 is the resting state whenever upstream is current. The pinless state is
+also a trap in the other direction: *forgetting* `image.tag` back when it was
+load-bearing raised no error at all, it just silently downgraded the proxy.
+`lib/traefik-pin.sh` mirrors steps 2 and 3 so that both checks always speak
+about the version really shipped, whether or not a pin exists.
 
 | | `traefik.image.tag` set | not set |
 |---|---|---|
 | Version deployed | the pin | subchart appVersion |
 | What the checks compare against | the pin | subchart appVersion |
-| When it applies | an advisory is ahead of upstream | upstream is current (**today**) |
+| When it applies | an advisory is ahead of upstream (**today**) | upstream is current |
 
 ### What fails, and what only warns
 
@@ -147,14 +149,21 @@ July 2026 the upstream chart lagged behind the proxy's own fixes, so
 |---|---|---|
 | `GHSA-cxjq-mrr5-89rv` — auth bypass via path traversal in `ReplacePathRegex` | v3.7.0 – v3.7.6 | v3.7.7 |
 | `GHSA-3ccp-42pg-hgv6` — cross-user response poisoning via proxied CONNECT | <= v3.7.8 | v3.7.9 |
+| `GHSA-fgjj-px3w-67xx` (HIGH) — Gateway API route identity collision, cross-namespace backend hijacking | v3.7.0 – v3.7.9 | v3.7.10 |
+| `GHSA-62fc-8686-hfmq` — `allowCrossNamespace=false` bypass via `@kubernetescrd` TraefikService backendRef | v3.7.0 – v3.7.9 | v3.7.10 |
+| `GHSA-6765-c87h-8mrf` — BasicAuth singleflight key collision, identity spoofing | v3.7.0 – v3.7.9 | v3.7.10 |
 
 `GHSA-8rxv-jg7p-wvg3`, which motivated the original pin, **does not concern
 us**: it targets the `kubernetesIngressNGINX` provider, which we do not enable.
 
 Chart **41.1.0** (2026-07-30) ships appVersion `v3.7.9` — the exact version the
-pin was forcing — so the pin was dropped: it had become a duplicate statement of
-upstream's own value, and a duplicate that only drifts. Deploying v3.7.9 clears
-both advisories above.
+pin was then forcing — so the pin was dropped on 2026-07-30: it had become a
+duplicate statement of upstream's own value, and a duplicate that only drifts.
+
+It came **back** on 2026-08-03, when the three v3.7.10 advisories landed with
+no upstream chart shipping the fix (41.1.1 still declares appVersion v3.7.9) —
+the exact scenario the escape hatch exists for. Drop it again at the first
+subchart bump whose appVersion reaches v3.7.10.
 
 > [!WARNING]
 > Dropping the pin removed a redundancy, **not** the risk. The version still

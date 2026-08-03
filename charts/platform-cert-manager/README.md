@@ -5,7 +5,7 @@ for a small node. It deliberately ships **no issuers**.
 
 | | |
 |---|---|
-| Subchart | `cert-manager` [`v1.20.2`](https://charts.jetstack.io) |
+| Subchart | `cert-manager` [`v1.20.3`](https://charts.jetstack.io) |
 | Namespace | `cert-manager` |
 | Per-cluster overrides | `infra/platform/cert-manager/values.yaml` |
 

@@ -27,12 +27,14 @@
 # pin is set, which is the normal state since 2026-07-30: the absence is a
 # fallback to the subchart's appVersion, resolved by traefik_effective_tag.
 traefik_pinned_tag() {
+  # Quotes are stripped: `tag: "v3.7.10"` and `tag: v3.7.10` are the same pin,
+  # and downstream comparisons are string equality against rendered manifests.
   awk '
     /^traefik:/             { root = 1; next }
     root && /^[^[:space:]]/ { root = 0 }
     root && /^  image:/     { img = 1; next }
     img && /^  [^ ]/        { img = 0 }
-    img && /^    tag:[[:space:]]*/ { print $2; exit }
+    img && /^    tag:[[:space:]]*/ { gsub(/["'"'"']/, "", $2); print $2; exit }
   ' "$1"
 }
 
