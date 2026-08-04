@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.3](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.18.2...v0.18.3) (2026-08-04)
+
+
+### Bug Fixes
+
+* add script to check deployed pins and update CI workflow ([f716f9f](https://github.com/KevinDeBenedetti/k3s-lab/commit/f716f9fdf581fb78236793b619627697b4ad4eeb))
+
 ## [0.18.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.18.1...v0.18.2) (2026-08-04)
 
 
