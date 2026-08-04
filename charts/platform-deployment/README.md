@@ -30,17 +30,26 @@ Two things bite a first install, verified on a real blank cluster:
      --k3s-arg "--disable=servicelb@server:0"
    ```
 
-2. **`platform-security` cannot install in the same release yet.** Its Kyverno
-   `ClusterPolicy` resources are validated by Helm before the Kyverno CRDs from
-   the very same release exist, so a default install fails with `no matches
-   for kind "ClusterPolicy"`. ArgoCD papers over this ordering with retries;
-   plain Helm does not. Until the chart sequences this itself, install with:
+2. **The Kyverno policies arrive in a second step.** Helm validates every
+   rendered manifest against the API server *before* applying any of it, so a
+   `ClusterPolicy` cannot be created by the release that also introduces the
+   Kyverno CRDs — upstream hits the same wall, which is why `kyverno` and
+   `kyverno-policies` are two separate charts. This umbrella therefore ships
+   `platform-security.kyvernoPolicies.enabled: false`: Falco, Tetragon, Trivy
+   and the Kyverno engine all install normally, only the six ClusterPolicies
+   wait. The CRDs exist once the release is in place, so turn them on with:
 
    ```bash
-   --set platform-security.enabled=false
+   helm upgrade platform oci://ghcr.io/kevindebenedetti/charts/platform-deployment \
+     --namespace platform --reuse-values \
+     --set platform-security.kyvernoPolicies.enabled=true
    ```
 
-   and add the security layer in a second step if you want it.
+   `NOTES.txt` prints that command after any install where the policies are
+   off, because a Kyverno that enforces nothing should never be silent. Note
+   that the standalone `platform-security` chart keeps them **on** by default:
+   on a cluster that already has the CRDs, losing the policies quietly would
+   be the worse failure.
 
 With those two caveats, the 0.16.0 artifact reaches **15/17 workloads fully
 ready** on a blank cluster (Traefik, the full ArgoCD stack, Prometheus, Loki,

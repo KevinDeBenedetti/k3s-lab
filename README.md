@@ -39,11 +39,10 @@ One command installs the stack — ArgoCD, monitoring, Vault, cert-manager, Trae
 
 ```bash
 helm install platform oci://ghcr.io/kevindebenedetti/charts/platform-deployment \
-  --version 0.16.0 --namespace platform --create-namespace \
-  --set platform-security.enabled=false
+  --version 0.18.1 --namespace platform --create-namespace
 ```
 
-Two caveats, both load-bearing: on stock k3s/k3d, **disable the bundled Traefik first** (`--k3s-arg "--disable=traefik@server:0"` — its CRDs conflict), and `platform-security` currently cannot install in the same release as its own Kyverno CRDs — details and the full verified-install report in the [chart's README](charts/platform-deployment/README.md). Each component can be switched off independently and configured through nested values. Check the [releases page](https://github.com/KevinDeBenedetti/k3s-lab/releases) for the latest version; the umbrella's sub-chart pins always reference already-published versions, so they lag the latest release by one — by design.
+One caveat worth knowing up front: on stock k3s or k3d, **disable the bundled Traefik first** (`--k3s-arg "--disable=traefik@server:0"`), since its CRDs conflict with this chart's — the same thing this repo's Ansible role does on real nodes. The Kyverno ClusterPolicies also come in a second `helm upgrade`, for a Helm ordering reason explained (with the command) in the [chart's README](charts/platform-deployment/README.md), which also carries the full verified-install report. Each component can be switched off independently and configured through nested values. Check the [releases page](https://github.com/KevinDeBenedetti/k3s-lab/releases) for the latest version; the umbrella's sub-chart pins always reference already-published versions, so they lag the latest release by one — by design.
 
 ### Provision a cluster from scratch (Ansible)
 

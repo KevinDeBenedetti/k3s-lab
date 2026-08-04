@@ -34,6 +34,33 @@ platform-traefik:
 
 platform-security:
   enabled: true
+  # Falco, Tetragon and Trivy Operator install normally here. Kyverno does not,
+  # and cannot: it does not fit in a Helm release.
+  #
+  # Helm stores every release as a Kubernetes Secret, capped at 1 MiB, holding
+  # the chart plus all rendered manifests. Kyverno delivers its CRDs from
+  # `templates/` rather than a `crds/` directory (deliberately upstream, since
+  # Helm never upgrades what it finds in `crds/`), so they land in that Secret:
+  # `kyverno.io_clusterpolicies.yaml` and `kyverno.io_policies.yaml` are
+  # 1391 KiB *each*. Measured on 2026-08-04: this umbrella renders 10.41 MiB
+  # with Kyverno and 4.95 MiB without, and only the second one installs —
+  # the first dies on `Secret "sh.helm.release.v1…" is invalid: data: Too long`
+  # before a single resource is applied.
+  #
+  # The same `templates/` placement also means a ClusterPolicy cannot be
+  # created by the release that introduces its CRD, since Helm validates every
+  # manifest against the API server before applying any of it. Two independent
+  # walls, one cause — and upstream's own answer to it is to publish `kyverno`
+  # and `kyverno-policies` as separate charts. So Kyverno gets its own release
+  # here too; NOTES.txt prints the command after every install.
+  #
+  # charts/platform-security keeps both of these ON by default: installed on
+  # its own it is well under the limit, and a security chart that silently
+  # enforces nothing is worse than one that fails loudly.
+  kyverno:
+    enabled: false
+  kyvernoPolicies:
+    enabled: false
 
 # =============================================================================
 # Per-subchart configuration (pass through to dependencies)

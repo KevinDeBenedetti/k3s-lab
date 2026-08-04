@@ -105,7 +105,16 @@ promtail:
   config:
     logLevel: info
     clients:
-      - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+      # Short name on purpose: promtail and loki are both subcharts of
+      # platform-monitoring, so they always land in the same namespace, and the
+      # pod's search domain resolves this wherever the chart is installed. The
+      # fully-qualified form used until 2026-08-04 hardcoded `monitoring`, which
+      # only held when the chart was deployed into a namespace of that name —
+      # under the platform-deployment umbrella everything shares the release
+      # namespace, so promtail could not reach Loki at all and log shipping was
+      # silently broken (found on a k3d install, promtail stuck NotReady with
+      # "no such host").
+      - url: http://loki:3100/loki/api/v1/push
   resources:
     requests:
       cpu: 25m

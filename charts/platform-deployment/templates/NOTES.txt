@@ -1,38 +1,79 @@
-1. Platform deployment started — Check status:
+{{ .Chart.Name }} {{ .Chart.Version }} installed as "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
 
-  kubectl get applications -n argocd
-  kubectl get helmreleases -n platform-system
-  kubectl get pods --all-namespaces | grep platform
+Every subchart deploys into that one namespace — there are no per-component
+namespaces unless you configure them yourself.
 
-2. Verify subcharts are deployed:
+1. Watch it come up:
 
-  kubectl get deployment -n argocd       # ArgoCD
-  kubectl get deployment -n monitoring   # Grafana, Prometheus
-  kubectl get pod -n vault               # Vault
-  kubectl get deployment -n kube-system  # Traefik (usually here or traefik namespace)
+  kubectl get pods -n {{ .Release.Namespace }} -w
 
-3. Access ArgoCD UI:
+  On a fresh cluster two pods stay unready until they are given secrets, and
+  that is expected rather than broken:
+    vault-0             wants a "vault-tls" secret, and needs init/unseal
+    monitoring-grafana  wants a "grafana-admin-secret"
+  Both are normally supplied by Vault + External Secrets once configured.
 
-  kubectl port-forward -n argocd svc/argo-cd-argocd-server 8080:443
-  # Then: https://localhost:8080
+2. Reach the UIs — no Ingress is created by default, so port-forward:
+{{- if index .Values "platform-argocd" "enabled" }}
 
-4. Check Grafana:
+  # ArgoCD, then https://localhost:8080 (user: admin)
+  kubectl get secret -n {{ .Release.Namespace }} argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-argocd-server 8080:443
+{{- end }}
+{{- if index .Values "platform-monitoring" "enabled" }}
 
-  kubectl get secret -n monitoring grafana-admin-password -o jsonpath='{.data.GF_SECURITY_ADMIN_PASSWORD}' | base64 -d
-  kubectl port-forward -n monitoring svc/grafana 3000:80
+  # Grafana, then http://localhost:3000
+  kubectl port-forward -n {{ .Release.Namespace }} svc/monitoring-grafana 3000:80
+{{- end }}
+{{- if index .Values "platform-vault" "enabled" }}
 
-5. Check Vault:
+  # Vault — initialise it first:
+  #   kubectl exec -n {{ .Release.Namespace }} vault-0 -- vault operator init
+  kubectl port-forward -n {{ .Release.Namespace }} svc/vault 8200:8200
+{{- end }}
 
-  kubectl get pod -n vault
-  kubectl port-forward -n vault svc/vault 8200:8200
+3. Configure and upgrade:
 
-6. To update:
+  helm show values oci://ghcr.io/kevindebenedetti/charts/{{ .Chart.Name }} --version {{ .Chart.Version }}
 
-  helm dependency update charts/platform-deployment
-  helm upgrade platform-deployment charts/platform-deployment -f values.yaml
+  Values nest under each subchart's name, so anything an individual chart
+  accepts is reachable from here:
 
-7. For more info:
+    platform-traefik:
+      traefik:
+        deployment:
+          replicas: 2
 
-  helm show values oci://ghcr.io/kevindebenedetti/charts/platform-deployment --version 1.0.0
-  helm show values oci://ghcr.io/kevindebenedetti/charts/platform-argocd --version 0.9.2
-  ... and so on for other subcharts
+  Apply changes with `helm upgrade {{ .Release.Name }} … -f your-values.yaml`.
+
+4. Running this for real?
+
+  This umbrella is the "try the whole platform in one command" path. To
+  operate a cluster, deploy the individual platform-* charts pinned to
+  versions you choose — then a security bump on one component does not mean
+  re-releasing all seven. See https://github.com/KevinDeBenedetti/k3s-lab
+{{- if and (index .Values "platform-security" "enabled") (not (index .Values "platform-security" "kyverno" "enabled")) }}
+
+⚠️  NO ADMISSION CONTROL — KYVERNO IS NOT INSTALLED.
+
+  Falco, Tetragon and Trivy Operator are running, but nothing is enforcing
+  admission policy: no image-tag rule, no privilege-escalation block, no
+  non-root or read-only-rootfs requirement, no resource-limit enforcement.
+
+  Kyverno cannot ship inside this umbrella. Helm keeps each release in a
+  Secret capped at 1 MiB, and Kyverno's CRDs alone are 2.7 MiB of YAML —
+  the install fails outright ("data: Too long") before applying anything.
+  Upstream splits `kyverno` and `kyverno-policies` into separate charts for
+  the same reason, so give it its own release:
+
+    helm install security oci://ghcr.io/kevindebenedetti/charts/platform-security \
+      --version {{ .Chart.Version }} --namespace {{ .Release.Namespace }} \
+      --set falco.enabled=false --set tetragon.enabled=false \
+      --set trivy-operator.enabled=false --set kyvernoPolicies.enabled=false
+
+  Then, once its CRDs exist, add the six policies:
+
+    helm upgrade security oci://ghcr.io/kevindebenedetti/charts/platform-security \
+      --version {{ .Chart.Version }} --namespace {{ .Release.Namespace }} \
+      --reuse-values --set kyvernoPolicies.enabled=true
+{{- end }}

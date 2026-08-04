@@ -110,3 +110,32 @@ kyverno:
         release: prometheus  # Match Prometheus selector
   # Generate events for policy violations
   generateSuccessEvents: false  # Only generate events for failures to reduce noise
+
+# =============================================================================
+# Kyverno ClusterPolicies shipped by this chart (templates/kyverno-policies/)
+#
+# Separate from `kyverno.enabled` on purpose: the engine and the policies it
+# evaluates cannot always be installed in the same Helm release.
+#
+# Kyverno delivers its CRDs through a `crds` subchart whose manifests live in
+# `templates/`, not in a `crds/` directory — a deliberate upstream choice, since
+# Helm never upgrades what it finds in `crds/`. But Helm builds and validates
+# *every* rendered manifest against the API server before applying any of them,
+# so on a cluster where the Kyverno CRDs do not exist yet, these ClusterPolicies
+# fail the build:
+#
+#   no matches for kind "ClusterPolicy" in version "kyverno.io/v1"
+#   ensure CRDs are installed first
+#
+# Upstream hits the same wall and answers it the same way: `kyverno` and
+# `kyverno-policies` are two separate charts.
+#
+# Default `true` — on a cluster that already has the CRDs (a re-install, an
+# upgrade, or an ArgoCD sync, which retries until they exist) the policies must
+# ship with the chart; a security chart that silently enforces nothing is worse
+# than one that fails loudly. Set to `false` for the first install on a blank
+# cluster, then re-enable with `helm upgrade`. The platform-deployment umbrella
+# does exactly that — see its values.yaml.
+# =============================================================================
+kyvernoPolicies:
+  enabled: true

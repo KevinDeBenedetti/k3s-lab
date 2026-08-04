@@ -6,7 +6,7 @@ four upstream charts and trimmed to fit an 8 GB single-node VPS.
 | | |
 |---|---|
 | Subcharts | `grafana` `10.5.15`, `loki` `7.0.0`, `promtail` `6.17.1`, `kube-prometheus-stack` `86.1.0` |
-| Namespace | `monitoring` |
+| Namespace (convention) | `monitoring` — set at install time; this chart neither creates nor enforces it |
 | Per-cluster overrides | `infra/platform/monitoring/values.yaml` |
 
 > [!IMPORTANT]
