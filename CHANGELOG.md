@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.2](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.18.1...v0.18.2) (2026-08-04)
+
+
+### Bug Fixes
+
+* **charts:** update deployment and fix installation issues ([51f3466](https://github.com/KevinDeBenedetti/k3s-lab/commit/51f3466a59d97ce2c94539161d18673500d1a5c7))
+
 ## [0.18.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.18.0...v0.18.1) (2026-08-03)
 
 
