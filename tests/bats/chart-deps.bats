@@ -103,6 +103,102 @@ EOF
   [[ "$output" == *platform-traefik* ]]
 }
 
+# ─── applicationset_charts ──────────────────────────────────────────────────
+# This decides *which* charts check-deployed-pins.sh looks at. Dropping one
+# means that component is never compared with the registry — silently, which
+# is the exact failure the check exists to prevent.
+
+@test "applicationset_charts lists every pinned chart with its version" {
+  cat > "${FIXTURE}/as.yaml" <<'YAML'
+spec:
+  generators:
+    - list:
+        elements:
+          - name: cert-manager
+            chart: platform-cert-manager
+            namespace: cert-manager
+            version: "0.18.0"
+          - name: traefik
+            chart: platform-traefik
+            namespace: ingress
+            version: "0.18.2"
+YAML
+  run applicationset_charts "${FIXTURE}/as.yaml"
+  [ "${#lines[@]}" -eq 2 ]
+  [ "${lines[0]}" = "$(printf 'platform-cert-manager\t0.18.0')" ]
+  [ "${lines[1]}" = "$(printf 'platform-traefik\t0.18.2')" ]
+}
+
+@test "applicationset_charts does not pair a chart with its neighbour's version" {
+  # The dangerous miscount: reporting platform-traefik as current because it
+  # picked up cert-manager's newer pin.
+  cat > "${FIXTURE}/as.yaml" <<'YAML'
+spec:
+  generators:
+    - list:
+        elements:
+          - name: cert-manager
+            chart: platform-cert-manager
+            version: "0.18.2"
+          - name: traefik
+            chart: platform-traefik
+            version: "0.12.0"
+YAML
+  run applicationset_charts "${FIXTURE}/as.yaml"
+  [ "${lines[1]}" = "$(printf 'platform-traefik\t0.12.0')" ]
+}
+
+@test "applicationset_charts skips an element with no version" {
+  # Emitting an empty version would have the caller compare against "".
+  cat > "${FIXTURE}/as.yaml" <<'YAML'
+spec:
+  generators:
+    - list:
+        elements:
+          - name: traefik
+            chart: platform-traefik
+            namespace: ingress
+          - name: vault
+            chart: platform-vault
+            version: "0.18.2"
+YAML
+  run applicationset_charts "${FIXTURE}/as.yaml"
+  [ "${#lines[@]}" -eq 1 ]
+  [ "${lines[0]}" = "$(printf 'platform-vault\t0.18.2')" ]
+}
+
+@test "applicationset_charts strips quotes and ignores commented-out elements" {
+  cat > "${FIXTURE}/as.yaml" <<'YAML'
+spec:
+  generators:
+    - list:
+        elements:
+          # - name: monitoring
+          #   chart: platform-monitoring
+          #   version: "0.1.0"
+          - name: vault
+            chart: platform-vault
+            version: "0.18.2"
+YAML
+  run applicationset_charts "${FIXTURE}/as.yaml"
+  [ "${#lines[@]}" -eq 1 ]
+  [[ "$output" != *'"'* ]]
+  [[ "$output" != *monitoring* ]]
+}
+
+@test "applicationset_charts prints nothing when no chart is pinned" {
+  cat > "${FIXTURE}/as.yaml" <<'YAML'
+spec:
+  template:
+    spec:
+      sources:
+        - repoURL: 'ghcr.io/acme/charts'
+YAML
+  run applicationset_charts "${FIXTURE}/as.yaml"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 # ─── applicationset_chart_repo ──────────────────────────────────────────────
 
 @test "applicationset_chart_repo reads the repoURL of the chart source" {

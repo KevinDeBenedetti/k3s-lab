@@ -77,12 +77,28 @@ jobs:
               echo "::error::could not clone infra — the deployed versions were NOT checked"
               status=1
               echo "could not clone infra" > /tmp/deployed.log
+              cp /tmp/deployed.log /tmp/pins.log
             else
               ./scripts/check-deployed-charts.sh \
                 --applicationset /tmp/infra/argocd/applicationsets/platform.yaml \
                 2>&1 | tee /tmp/deployed.log
               deployed_status="${PIPESTATUS[0]}"
               [ "$deployed_status" -ne 0 ] && status="$deployed_status"
+
+              # ─── 3. How far the pins have drifted from the registry ───────
+              # A different question again: sections 1 and 2 ask whether what
+              # runs is vulnerable *today*. This one asks whether production is
+              # quietly falling behind — the state that let 0.9.1 stay pinned
+              # for two weeks after being purged, freezing the proxy on v3.7.1
+              # while every other check reported green. Drift is reported in
+              # full and only fails past the threshold, because holding a
+              # version back is legitimate and a daily red is a signal nobody
+              # reads.
+              ./scripts/check-deployed-pins.sh \
+                --applicationset /tmp/infra/argocd/applicationsets/platform.yaml \
+                2>&1 | tee /tmp/pins.log
+              pins_status="${PIPESTATUS[0]}"
+              [ "$pins_status" -ne 0 ] && status="$pins_status"
             fi
           else
             # Not a pass. The most consequential of the two checks is the one
@@ -90,6 +106,7 @@ jobs:
             echo "::warning::INFRA_READ_TOKEN is not set — the version RUNNING IN \
           PRODUCTION was not checked, only the one this repo would deploy."
             printf 'SKIPPED — INFRA_READ_TOKEN not set.\n' > /tmp/deployed.log
+            cp /tmp/deployed.log /tmp/pins.log
           fi
 
           set -e
@@ -106,6 +123,11 @@ jobs:
             echo "### 2. Versions running in production (infra ApplicationSet pins)"
             echo '```'
             cat /tmp/deployed.log
+            echo '```'
+            echo ""
+            echo "### 3. How far those pins trail the registry"
+            echo '```'
+            cat /tmp/pins.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -134,6 +156,12 @@ jobs:
             cat /tmp/deployed.log
             echo '```'
             echo ""
+            echo "### 3. How far those pins trail the registry"
+            echo ""
+            echo '```'
+            cat /tmp/pins.log
+            echo '```'
+            echo ""
             echo "### What to do"
             echo ""
             echo "**If section 2 is failing, that is the urgent one** — the cluster is serving"
@@ -144,6 +172,13 @@ jobs:
             echo "\`charts/<name>/Chart.yaml\`, release, then raise the pin. Check a candidate"
             echo "before pinning it:"
             echo "\`scripts/check-deployed-charts.sh --only <chart> --chart-version <candidate>\`."
+            echo ""
+            echo "**If only section 3 is failing, nothing is vulnerable right now** — the pins"
+            echo "have simply drifted past the staleness threshold. Either raise them in"
+            echo "\`infra/argocd/applicationsets/platform.yaml\`, or, if the lag is deliberate,"
+            echo "raise \`--max-behind\` in the workflow so the alarm keeps meaning something."
+            echo "This is the section that would have caught 0.9.1 sitting pinned for two"
+            echo "weeks after it was purged from the registry."
             echo ""
             echo "If section 1 is failing, the fix is in this repository:"
             echo ""

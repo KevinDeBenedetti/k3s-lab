@@ -76,6 +76,31 @@ applicationset_chart_version() {
   ' "$1"
 }
 
+# applicationset_charts APPLICATIONSET — every chart the list generator pins,
+# as "chart<TAB>version" per line, in file order.
+#
+# The plural of applicationset_chart_version, for callers that must cover
+# everything deployed rather than one named chart. Enumerating matters more
+# than it looks: a check that only ever asks about charts it already knows the
+# names of goes blind the day a component is added to the ApplicationSet — the
+# new one is simply never checked, silently.
+#
+# Matches on `chart:`, not `name:`, because the two differ
+# (`name: traefik` / `chart: platform-traefik`) and only `chart:` is what gets
+# pulled from the registry. An element without a `version:` is skipped rather
+# than emitted with an empty one, so callers never compare against "".
+applicationset_charts() {
+  awk '
+    $1 == "-" && $2 == "name:" { chart = ""; next }
+    $1 == "chart:"             { chart = $2; next }
+    chart != "" && $1 == "version:" {
+      gsub(/["'"'"']/, "", $2)
+      if ($2 != "") print chart "\t" $2
+      chart = ""
+    }
+  ' "$1"
+}
+
 # applicationset_chart_repo APPLICATIONSET — the registry the ApplicationSet
 # actually pulls its charts from: the `repoURL` of the template source that
 # carries a `chart:` field (the values source has none). Printed as written,

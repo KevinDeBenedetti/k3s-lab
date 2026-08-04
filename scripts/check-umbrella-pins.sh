@@ -38,6 +38,8 @@ source "$REPO_ROOT/lib/log.sh"
 source "$REPO_ROOT/lib/semver.sh"
 # shellcheck source=../lib/chart-deps.sh
 source "$REPO_ROOT/lib/chart-deps.sh"
+# shellcheck source=../lib/registry.sh
+source "$REPO_ROOT/lib/registry.sh"
 
 CHART_DIR="$REPO_ROOT/charts/platform-deployment"
 
@@ -53,25 +55,6 @@ command -v jq >/dev/null || { log_error "jq is required"; exit 2; }
 
 CHART_YAML="$CHART_DIR/Chart.yaml"
 [ -f "$CHART_YAML" ] || { log_error "No Chart.yaml in $CHART_DIR"; exit 2; }
-
-# registry_tags HOST PATH — every tag published for that repository.
-registry_tags() {
-  local host="$1" path="$2" token auth=()
-
-  # Anonymous pull tokens work for public packages; GITHUB_TOKEN is only needed
-  # for private ones. Failing to obtain a token must abort, never yield "no
-  # tags" — see the exit-1-on-empty rule below.
-  [ -n "${GITHUB_TOKEN:-}" ] && auth=(-u "x:${GITHUB_TOKEN}")
-  token="$(
-    curl -sSf --max-time 30 "${auth[@]+"${auth[@]}"}" \
-      "https://${host}/token?scope=repository:${path}:pull&service=${host}" |
-      jq -r '.token // empty'
-  )"
-  [ -n "$token" ] || return 1
-
-  curl -sSf --max-time 30 -H "Authorization: Bearer ${token}" \
-    "https://${host}/v2/${path}/tags/list" | jq -r '.tags[]? // empty'
-}
 
 log_step "Checking dependency pins in $CHART_YAML"
 
