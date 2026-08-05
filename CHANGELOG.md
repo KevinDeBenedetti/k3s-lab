@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.4](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.18.3...v0.18.4) (2026-08-05)
+
+
+### Bug Fixes
+
+* **ci:** pin workflow SHAs, restrict permissions, verify k3s installer ([766e756](https://github.com/KevinDeBenedetti/k3s-lab/commit/766e756e346e200811db55f592a61fe278290a5b))
+
 ## [0.18.3](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.18.2...v0.18.3) (2026-08-04)
 
 
