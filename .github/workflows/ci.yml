@@ -121,7 +121,7 @@ jobs:
   resource-limits:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check resource limits in chart values
         run: ./scripts/check-resource-limits.sh
 
@@ -137,7 +137,7 @@ jobs:
   traefik-image:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: v3.17.0
@@ -158,7 +158,7 @@ jobs:
   traefik-advisories:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Confront the deployed proxy version with the traefik advisories
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -174,7 +174,7 @@ jobs:
   umbrella-pins:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Compare the umbrella pins with what is published on GHCR
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
