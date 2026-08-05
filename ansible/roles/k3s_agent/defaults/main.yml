@@ -3,10 +3,18 @@
 
 k3s_version: "v1.32.13+k3s1"
 
-# Optional integrity pin for the get.k3s.io installer script (runs as root).
-# Set to e.g. "sha256:abc123..." to verify the download; empty = no check.
-# Compute with: curl -fsSL https://get.k3s.io | shasum -a 256
-k3s_installer_checksum: ""
+# Integrity pin for the get.k3s.io installer script, which is downloaded and
+# then executed as root on every node. Empty = no verification at all, which is
+# what this was until 2026-08-06.
+#
+# Computed 2026-08-06 (38620 bytes, digest confirmed stable across two fetches):
+#   curl -fsSL https://get.k3s.io | shasum -a 256
+#
+# ⚠️ Keep this in step with roles/k3s_server/defaults/main.yml — both roles fetch
+# the same script, and a digest updated in only one of them fails the agent play
+# after the server play has already succeeded. This pins the *installer script*,
+# revised upstream independently of k3s releases, not the k3s version.
+k3s_installer_checksum: "sha256:ed01f89fd977bf20ac1516bbebf8370bf3ddbaa55dac8aba610956a4c78cc00b"
 
 # Server URL to join (set from k3s_server group)
 k3s_server_url: ""

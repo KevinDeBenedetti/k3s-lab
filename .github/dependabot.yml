@@ -1,0 +1,50 @@
+# =============================================================================
+# dependabot.yml — automated bumps for the SHA-pinned `uses:` refs
+#
+# Why this file exists: on 2026-08-06 every `uses:` in .github/workflows was
+# pinned to a 40-character commit SHA (audit finding 5 — five reusable workflows
+# ran from `@main`, so any push to github-workflows changed what executed here
+# with this repo's secrets, and floating `@v5` tags are mutable besides).
+#
+# Pinning to a SHA trades one failure mode for another: the ref is now immutable
+# and therefore silently stale. A CVE in `actions/checkout` would never reach us
+# on its own. This file is the other half of that trade — Dependabot re-resolves
+# each SHA and opens a PR, so the pin stays reviewed rather than merely frozen.
+#
+# Dependabot understands SHA pins natively: it rewrites the SHA *and* the
+# trailing `# vX.Y.Z` comment, which is why that comment format is load-bearing.
+# Keep it when editing a pin by hand.
+#
+# `github-actions` is the only ecosystem here on purpose. This repo vendors no
+# npm/pip/go dependencies; Helm chart versions are pinned in charts/*/Chart.yaml
+# and are not a Dependabot ecosystem — they are guarded by check-deployed-pins.sh
+# and check-umbrella-pins.sh instead.
+# =============================================================================
+version: 2
+
+updates:
+  # Covers both the third-party actions (actions/checkout, azure/setup-helm, …)
+  # and the reusable workflows called from KevinDeBenedetti/github-workflows.
+  # Dependabot treats a reusable-workflow `uses:` the same as an action `uses:`.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    commit-message:
+      # Matches the Conventional Commits parser release-please uses, so an
+      # action bump lands under "chore" and never triggers a release of its own.
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      # One PR for the whole set rather than five. These move together in
+      # practice, and a single PR is one CI run and one review instead of five.
+      actions:
+        patterns:
+          - "*"

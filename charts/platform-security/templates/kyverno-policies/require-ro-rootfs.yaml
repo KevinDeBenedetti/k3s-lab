@@ -13,7 +13,7 @@ metadata:
       Read-only root filesystem prevents malicious actors from writing to the container
       filesystem. This policy requires readOnlyRootFilesystem: true.
 spec:
-  validationFailureAction: Enforce
+  validationFailureAction: {{ .Values.kyvernoPolicies.validationFailureAction }}
   background: true
   rules:
     - name: readonly-root-filesystem

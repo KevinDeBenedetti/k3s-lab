@@ -36,8 +36,13 @@ tetragon:
       cpu: 100m
       memory: 128Mi
 
+# Deployed upstream, not by this chart. infra's `platform-vendor` ApplicationSet
+# installs the aquasecurity `trivy-operator` chart directly into `trivy-system`
+# (see infra/argocd/applicationsets/platform-vendor.yaml). Enabling it here too
+# would give two operators reconciling the same VulnerabilityReport CRDs.
+# Set back to `true` only on a cluster where infra does not already provide it.
 trivy-operator:
-  enabled: true
+  enabled: false
   fullnameOverride: trivy-operator
   operator:
     scannerReportTTL: "24h"
@@ -139,3 +144,19 @@ kyverno:
 # =============================================================================
 kyvernoPolicies:
   enabled: true
+
+  # How a violation is handled. `Audit` records it in a PolicyReport and lets the
+  # pod through; `Enforce` rejects the pod at admission.
+  #
+  # Defaults to `Audit` deliberately. Until 2026-08-05 these six policies shipped
+  # hardcoded to `Enforce` and were installed on no cluster at all, so the setting
+  # had never once been exercised against a real workload. Switching that on
+  # blind, against 54 running workloads including third-party ones (langfuse,
+  # reactive-resume, portfolio), rejects pods on the first sync — `require-ro-rootfs`
+  # and `require-non-root` in particular.
+  #
+  # The staged path: deploy with `Audit`, read the PolicyReports
+  # (`kubectl get polr -A`), fix or exclude what violates, then move to `Enforce`.
+  # It is a per-policy decision, so override it per install rather than assuming
+  # the whole set graduates together.
+  validationFailureAction: Audit

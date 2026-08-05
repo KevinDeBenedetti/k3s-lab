@@ -42,17 +42,44 @@ silently enforces nothing is a worse outcome than one that fails loudly. The
 `platform-deployment` umbrella is the one place that flips it to `false`, for
 its first install only, and its `NOTES.txt` says so every time.
 
-> [!WARNING]
-> **The six Kyverno policies are `Enforce`, not `Audit`.** Enabling Kyverno does
-> not merely report violations — it *rejects* non-compliant pods at admission.
-> Deploy this into a cluster with existing workloads and some of them will stop
-> being schedulable. Read the table below first.
+> [!IMPORTANT]
+> **The six Kyverno policies default to `Audit`, not `Enforce`.** They record
+> violations in a PolicyReport and let the pod through. Nothing is rejected at
+> admission until you set `kyvernoPolicies.validationFailureAction: Enforce`.
+>
+> This was the reverse until 2026-08-05, when an audit found the policies had
+> shipped hardcoded to `Enforce` while being installed on no cluster at all — so
+> the setting had never been exercised against a real workload. `Audit` first is
+> the only way to learn what a cluster actually violates before it starts losing
+> pods over it.
 
 ## Kyverno policies
 
-All six are `ClusterPolicy` with `validationFailureAction: Enforce`, gated
-collectively on `kyverno.enabled` **and** `kyvernoPolicies.enabled` — the
-engine and the policies are separate switches, for the reason above.
+All six are `ClusterPolicy`, gated collectively on `kyverno.enabled` **and**
+`kyvernoPolicies.enabled` — the engine and the policies are separate switches,
+for the reason above. Their failure action comes from a single value:
+
+```yaml
+kyvernoPolicies:
+  validationFailureAction: Audit   # or Enforce
+```
+
+### Going from Audit to Enforce
+
+Deploy with `Audit`, let the background scan run, then read what actually
+violates:
+
+```bash
+kubectl get policyreport -A
+kubectl get clusterpolicyreport
+```
+
+Fix or exclude each violation, then flip to `Enforce`. Treat it as a per-policy
+decision rather than one switch for the whole set — `require-ro-rootfs` and
+`require-non-root` are the two that most workloads fail first, and they can stay
+on `Audit` long after the other four are enforced. Per-policy overrides go
+through Kyverno's own `validationFailureActionOverrides` on the individual
+`ClusterPolicy`.
 
 Every policy carries its **own** exclusion list — they are not uniform, and the
 differences are deliberate: each one exempts exactly the platform namespaces
@@ -91,6 +118,13 @@ There is no per-policy toggle: either switch set to `false` removes all six —
   24h scan interval and report TTL. The node collector is **off**, so this scans
   workloads rather than the host.
 
+  **Disabled by default since 2026-08-05.** infra installs the upstream
+  `aquasecurity/trivy-operator` chart directly into `trivy-system` via its
+  `platform-vendor` ApplicationSet, and two operators reconciling the same
+  `VulnerabilityReport` CRDs is not a configuration worth having. Set
+  `trivy-operator.enabled: true` only on a cluster where nothing else provides
+  it.
+
 Kyverno exposes metrics with a `ServiceMonitor` labelled `release: prometheus`
 to match the Prometheus selector in
 [`platform-monitoring`](../platform-monitoring/README.md), and only emits events
@@ -104,10 +138,11 @@ readable.
 | `falco.enabled` | `true` | `modern_ebpf` driver |
 | `falcosidekick.enabled` | `false` | needs `config.webhook.address` first |
 | `tetragon.enabled` | `true` | |
-| `trivy-operator.enabled` | `true` | `ignoreUnfixed: true`, 24h interval |
+| `trivy-operator.enabled` | `false` | infra deploys it upstream; `ignoreUnfixed: true`, 24h interval when on |
 | `trivy-operator.nodeCollector.enabled` | `false` | workloads only |
 | `kyverno.enabled` | `true` | the admission engine; `false` also drops the policies |
-| `kyvernoPolicies.enabled` | `true` | **the six Enforce policies**; needs the CRDs to already exist |
+| `kyvernoPolicies.enabled` | `true` | the six policies; needs the CRDs to already exist |
+| `kyvernoPolicies.validationFailureAction` | `Audit` | `Enforce` rejects non-compliant pods at admission |
 | `kyverno.metrics.serviceMonitor.enabled` | `true` | `release: prometheus` |
 | `kyverno.generateSuccessEvents` | `false` | failures only |
 

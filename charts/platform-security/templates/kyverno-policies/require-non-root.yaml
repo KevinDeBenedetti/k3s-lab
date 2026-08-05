@@ -13,7 +13,7 @@ metadata:
       Running containers as root increases the attack surface. This policy requires
       containers to run as non-root user (runAsNonRoot: true).
 spec:
-  validationFailureAction: Enforce
+  validationFailureAction: {{ .Values.kyvernoPolicies.validationFailureAction }}
   background: true
   rules:
     - name: run-as-non-root

@@ -3,10 +3,21 @@
 
 k3s_version: "v1.32.13+k3s1"
 
-# Optional integrity pin for the get.k3s.io installer script (runs as root).
-# Set to e.g. "sha256:abc123..." to verify the download; empty = no check.
-# Compute with: curl -fsSL https://get.k3s.io | shasum -a 256
-k3s_installer_checksum: ""
+# Integrity pin for the get.k3s.io installer script, which is downloaded and
+# then executed as root on every node. Empty = no verification at all, which is
+# what this was until 2026-08-06: the hook existed and was documented, so it was
+# off everywhere. An unverified root-executed download is the one failure in
+# this role that is not recoverable.
+#
+# Computed 2026-08-06 (38620 bytes, digest confirmed stable across two fetches):
+#   curl -fsSL https://get.k3s.io | shasum -a 256
+#
+# ⚠️ This pins the *installer script*, which upstream revises independently of
+# k3s releases — not the k3s version (that is `k3s_version`). When Rancher edits
+# the script the download starts failing with a checksum mismatch: that is the
+# pin working, not a bug. Re-run the command above, read the diff if you care to,
+# and update the digest and the date on this line together.
+k3s_installer_checksum: "sha256:ed01f89fd977bf20ac1516bbebf8370bf3ddbaa55dac8aba610956a4c78cc00b"
 
 # Networking
 k3s_pod_cidr: "10.42.0.0/16"

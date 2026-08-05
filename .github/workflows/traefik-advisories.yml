@@ -40,7 +40,7 @@ jobs:
   watch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Confront the deployed proxy version with the traefik/traefik advisories
         id: check
@@ -101,11 +101,23 @@ jobs:
               [ "$pins_status" -ne 0 ] && status="$pins_status"
             fi
           else
-            # Not a pass. The most consequential of the two checks is the one
-            # not running, and that has to stay visible on every green run.
-            echo "::warning::INFRA_READ_TOKEN is not set — the version RUNNING IN \
-          PRODUCTION was not checked, only the one this repo would deploy."
-            printf 'SKIPPED — INFRA_READ_TOKEN not set.\n' > /tmp/deployed.log
+            # A failure, not a warning. This was `::warning::` until 2026-08-05,
+            # on the reasoning that the skip "has to stay visible on every green
+            # run" — but a warning on a green run is not visible, it is decoration.
+            # The audit of that date found every deployed chart behind by one to
+            # three patches and platform-argocd nine minors behind, drifting for
+            # nine weeks under a daily green check whose most consequential half
+            # had quietly not been running.
+            #
+            # The check that answers "what is actually in production" is the one
+            # that must never be skippable in silence. If the token is missing or
+            # expired, that is itself the finding.
+            echo "::error::INFRA_READ_TOKEN is not set — the version RUNNING IN \
+          PRODUCTION was not checked, only the one this repo would deploy. \
+          This is a failure: set the secret, or the deployed-version check is \
+          not running at all."
+            status=1
+            printf 'FAILED — INFRA_READ_TOKEN not set, deployed version NOT checked.\n' > /tmp/deployed.log
             cp /tmp/deployed.log /tmp/pins.log
           fi
 
@@ -229,8 +241,12 @@ jobs:
             echo "✅ Deployed version is clean, no open issue"
           fi
 
-      - name: Fail when the deployed version is vulnerable
+      # Three causes now reach this step, so it no longer names only one of them:
+      # the deployed proxy is covered by an advisory, a pin has drifted past the
+      # threshold, or INFRA_READ_TOKEN was missing and the deployed version could
+      # not be read at all. The step summary above says which.
+      - name: Fail when the deployed version is vulnerable, drifted, or unverifiable
         if: steps.check.outputs.status != '0'
         run: |
-          echo "::error::The deployed Traefik proxy version is covered by an advisory — see the tracking issue."
+          echo "::error::Traefik advisory watch failed — the deployed proxy is covered by an advisory, its pin has drifted, or it could not be checked. See the job summary and the tracking issue."
           exit 1

@@ -13,7 +13,7 @@ metadata:
       Requiring resource limits prevents resource exhaustion and improves cluster stability.
       This policy ensures all containers define both CPU and memory requests and limits.
 spec:
-  validationFailureAction: Enforce
+  validationFailureAction: {{ .Values.kyvernoPolicies.validationFailureAction }}
   background: true
   rules:
     - name: require-cpu-memory-requests-limits

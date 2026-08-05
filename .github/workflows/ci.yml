@@ -10,6 +10,21 @@
 #   security    — Gitleaks secret scanning
 #   helm-lint   — Helm chart linting
 #   resource-limits — Verify all charts define resource limits
+#
+# Every `uses:` here is pinned to a 40-character commit SHA with the version in
+# a trailing comment. Do not "tidy" them back into tags: until 2026-08-06 the
+# four reusable workflows below came from `@main`, so any push to
+# github-workflows changed what ran here — with this repo's secrets
+# (DOCS_APP_PRIVATE_KEY) and `security-events: write` — without a PR, a review
+# or a signal. Tags are no better: they are mutable and can be repointed at any
+# commit. The SHAs chosen were the exact commits `@main` and `@v5`/`@v2` already
+# resolved to, so pinning changed nothing about what executes.
+#
+# ⚠️ Nothing bumps these automatically. This repo has no dependabot.yml and no
+# renovate.json (docs/configuration.md claims otherwise — it is wrong), so a
+# pinned SHA stays pinned until someone edits it. That is the trade pinning
+# makes: immutable, and therefore silently stale. Until an updater is
+# configured, re-resolve them by hand when a CVE lands in one of these actions.
 # =============================================================================
 name: CI
 
@@ -23,11 +38,20 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Least privilege for every job that does not say otherwise. Without this the
+# whole workflow inherited the repository default, which on a repo that has
+# never had it narrowed is read/write on all scopes — handed to four jobs that
+# shell out to scripts processing external input (the GitHub advisory API in
+# traefik-advisories, the GHCR catalog in umbrella-pins). `security` below
+# raises what it needs; nothing else here writes anything.
+permissions:
+  contents: read
+
 jobs:
 
   # ─── Shell linting ─────────────────────────────────────────────────────────
   shell-ci:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@main
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
     with:
       run-shellcheck: true
       shellcheck-severity: warning
@@ -41,7 +65,7 @@ jobs:
 
   # ─── Kubernetes validation + .env.example check ──────────────────────────
   kubernetes:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-kubernetes.yml@main
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-kubernetes.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
     with:
       run-kubeconform: true
       kubeconform-paths: kubernetes/
@@ -56,7 +80,7 @@ jobs:
 
   # ─── Secret scanning ──────────────────────────────────────────────────────
   security:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/security.yml@main
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/security.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
     permissions:
       security-events: write
       actions: read
@@ -71,7 +95,7 @@ jobs:
 
   # ─── Helm chart linting ─────────────────────────────────────────────────────
   helm-lint:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-helm.yml@main
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-helm.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
     with:
       run-lint: true
       # `helm lint` alone does not download dependencies, so the subchart guards
@@ -97,7 +121,7 @@ jobs:
   resource-limits:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Check resource limits in chart values
         run: ./scripts/check-resource-limits.sh
 
@@ -113,8 +137,8 @@ jobs:
   traefik-image:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: azure/setup-helm@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: v3.17.0
       - name: Verify that the rendered Traefik image matches the expected version
@@ -134,7 +158,7 @@ jobs:
   traefik-advisories:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Confront the deployed proxy version with the traefik advisories
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -150,7 +174,7 @@ jobs:
   umbrella-pins:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Compare the umbrella pins with what is published on GHCR
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -169,7 +193,7 @@ jobs:
   docs:
     needs: [shell-ci, kubernetes, security, helm-lint, resource-limits, traefik-image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/cd-docs.yml@main
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/cd-docs.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
     with:
       client-id: ${{ vars.DOCS_APP_CLIENT_ID }}
     secrets:
