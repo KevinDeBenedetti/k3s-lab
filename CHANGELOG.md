@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.19.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.18.4...v0.19.0) (2026-08-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **ci:** The CI workflow now enforces stricter checks on rendered Helm chart images, requiring that repository and tag pins match between values.yaml and the actual rendered manifests.
+
+### Features
+
+* **ci:** add rendered image pin verification and update environment examples ([f442c8d](https://github.com/KevinDeBenedetti/k3s-lab/commit/f442c8d4f7d28a8131bac9ee1b5ddec7d56fdd1d))
+
 ## [0.18.4](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.18.3...v0.18.4) (2026-08-05)
 
 
