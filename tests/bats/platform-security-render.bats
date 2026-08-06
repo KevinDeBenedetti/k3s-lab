@@ -10,15 +10,22 @@
 # freezes that decision so a later edit cannot quietly promote the whole set
 # back to `Enforce` and reject pods on the next sync.
 #
-# It also pins the two enable-gates that carry the same risk in reverse: a chart
-# that silently renders *no* policy is the failure mode the audit actually found,
-# and it looks identical to a healthy run unless something counts.
+# ⚠️ Why the chart is copied and stripped instead of rendered in place:
+# `charts/**/charts/*.tgz` is gitignored (.gitignore:22), so the vendored
+# subcharts exist only on a machine that has run `helm dependency build`. The
+# first version of this file rendered the chart directly; it passed locally off
+# those leftover tarballs and failed all eight tests on a clean CI checkout,
+# where `helm template` cannot resolve the dependencies. Copying the chart and
+# deleting its `dependencies:` block removes that hidden requirement: the six
+# policies live in this chart's own templates/, so they render with no subchart
+# present, no network, and no `helm dependency build`.
 #
-# All subcharts are vendored under charts/platform-security/charts/, so every
-# render here is offline.
+# The corollary is that nothing here may assert on a subchart's output — that
+# would reintroduce the same dependency. The trivy-operator case below is
+# therefore checked as a values+condition contract rather than a render.
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
-CHART="${REPO_ROOT}/charts/platform-security"
+CHART_SRC="${REPO_ROOT}/charts/platform-security"
 
 POLICIES=(
   require-non-root
@@ -29,20 +36,24 @@ POLICIES=(
   require-pod-resources
 )
 
-# render [--set k=v ...] — falco and tetragon are DaemonSets irrelevant to every
-# assertion here and slow to template; they are off in all cases.
-render() {
-  helm template ps "$CHART" \
-    --set falco.enabled=false \
-    --set tetragon.enabled=false \
-    "$@" 2>&1
+setup() {
+  CHART="${BATS_TEST_TMPDIR}/chart"
+  cp -R "$CHART_SRC" "$CHART"
+  rm -rf "${CHART}/charts" "${CHART}/Chart.lock"
+  # `dependencies:` is the last block in Chart.yaml, so truncating at it leaves
+  # a valid chart. Asserted below rather than assumed — if upstream reorders the
+  # file, this must fail loudly instead of silently rendering nothing.
+  awk '/^dependencies:/{exit} {print}' "${CHART_SRC}/Chart.yaml" > "${CHART}/Chart.yaml"
+  grep -q '^name: platform-security' "${CHART}/Chart.yaml"
+  grep -q '^version:' "${CHART}/Chart.yaml"
 }
 
-# policy_docs — only the ClusterPolicy manifests this chart itself owns.
-# Scoping by `# Source:` is load-bearing: the Kyverno subchart ships a
-# `clusterpolicies.kyverno.io` CRD whose schema text contains both the literal
-# `kind: ClusterPolicy` and the word `validationFailureAction`, so an unscoped
-# grep counts the CRD as a policy and reports a pass with zero policies present.
+render() {
+  helm template ps "$CHART" "$@" 2>&1
+}
+
+# policy_docs — only the ClusterPolicy manifests this chart owns. Scoping by
+# `# Source:` keeps the assertions honest if a subchart is ever reintroduced.
 policy_docs() {
   awk '
     /^# Source: platform-security\/templates\/kyverno-policies\// { keep = 1; print; next }
@@ -51,10 +62,14 @@ policy_docs() {
   '
 }
 
+policy_count() {
+  policy_docs <<<"$1" | grep -c '^kind: ClusterPolicy$'
+}
+
 @test "renders all six ClusterPolicies by default" {
-  run bash -c "$(declare -f render policy_docs); CHART='$CHART'; render | policy_docs | grep -c '^kind: ClusterPolicy$'"
-  [ "$status" -eq 0 ]
-  [ "$output" -eq 6 ]
+  local out
+  out="$(render)"
+  [ "$(policy_count "$out")" -eq 6 ]
 }
 
 @test "every policy is present by name" {
@@ -69,8 +84,7 @@ policy_docs() {
 }
 
 @test "defaults to Audit, never Enforce" {
-  # The whole point of the 2026-08-05 rollout. Six policies, six Audit values,
-  # and no Enforce anywhere in this chart's own manifests.
+  # The whole point of the 2026-08-05 rollout.
   local out
   out="$(render | policy_docs)"
   [ "$(grep -c 'validationFailureAction: Audit' <<<"$out")" -eq 6 ]
@@ -85,14 +99,11 @@ policy_docs() {
   [ "$(grep -c 'validationFailureAction: Audit' <<<"$out")" -eq 0 ]
 }
 
-@test "kyvernoPolicies.enabled=false removes the policies but keeps the engine" {
+@test "kyvernoPolicies.enabled=false removes the policies" {
   # The documented first-install path on a cluster with no Kyverno CRDs yet.
   local out
   out="$(render --set kyvernoPolicies.enabled=false)"
-  [ "$(policy_docs <<<"$out" | grep -c '^kind: ClusterPolicy$')" -eq 0 ]
-  # The engine must still be installed — otherwise the second step of the
-  # rollout has nothing to enable against.
-  [[ "$out" == *"name: kyverno-admission-controller"* ]]
+  [ "$(policy_count "$out")" -eq 0 ]
 }
 
 @test "policies are gated on the engine, not shipped without it" {
@@ -101,37 +112,30 @@ policy_docs() {
   # 'no matches for kind "ClusterPolicy"'.
   local out
   out="$(render --set kyverno.enabled=false)"
-  [ "$(policy_docs <<<"$out" | grep -c '^kind: ClusterPolicy$')" -eq 0 ]
-}
-
-@test "trivy-operator stays off — infra already provides it" {
-  # Enabling it here too gives two operators reconciling the same
-  # VulnerabilityReport CRDs (infra's platform-vendor ApplicationSet installs the
-  # aquasecurity chart into trivy-system). The comment in values.yaml says so;
-  # this asserts it.
-  #
-  # Counting the subchart's own `# Source:` attribution rather than grepping for
-  # the string "trivy-operator": that string also appears in this chart's values
-  # comments and in unrelated RBAC names, so a substring check would pass whether
-  # the subchart rendered or not.
-  local out
-  out="$(render)"
-  [ "$(grep -c '^# Source: platform-security/charts/trivy-operator/' <<<"$out")" -eq 0 ]
-}
-
-@test "the trivy-operator gate is real, not vacuously satisfied" {
-  # Guards the test above: if the subchart could never render under any setting,
-  # asserting its absence would prove nothing. Turning it on must produce
-  # manifests — that is what makes the default-off assertion meaningful.
-  local out
-  out="$(render --set trivy-operator.enabled=true)"
-  [ "$(grep -c '^# Source: platform-security/charts/trivy-operator/' <<<"$out")" -gt 0 ]
+  [ "$(policy_count "$out")" -eq 0 ]
 }
 
 @test "every rendered policy declares a concrete failure action" {
   # A policy whose action templated to empty is accepted by the API server and
-  # silently defaults — the exact class of bug this chart already had once.
+  # silently defaults. The count-of-6 guard first is deliberate: grep -c on an
+  # empty render also returns 0, so without it a failed render would pass this
+  # test — which is exactly how the previous version of this file reported a
+  # green result while rendering nothing at all in CI.
   local out
   out="$(render | policy_docs)"
+  [ "$(grep -c '^kind: ClusterPolicy$' <<<"$out")" -eq 6 ]
   [ "$(grep -c 'validationFailureAction:[[:space:]]*$' <<<"$out")" -eq 0 ]
+}
+
+@test "trivy-operator is off by default and its subchart is condition-gated" {
+  # infra's platform-vendor ApplicationSet already installs the aquasecurity
+  # chart into trivy-system; a second operator would reconcile the same
+  # VulnerabilityReport CRDs. Asserted as a values+condition contract rather
+  # than by rendering the subchart, which this file cannot do offline — the two
+  # together are what guarantee it stays out of the render.
+  grep -A1 '^trivy-operator:' "${CHART_SRC}/values.yaml" | grep -q 'enabled: false'
+  awk '
+    $1 == "-" && $2 == "name:" { dep = ($3 == "trivy-operator") }
+    dep && $1 == "condition:"  { print $2; exit }
+  ' "${CHART_SRC}/Chart.yaml" | grep -qx 'trivy-operator.enabled'
 }
