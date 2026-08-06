@@ -59,7 +59,7 @@ SERVER_IP=1.2.3.4
 AGENT_IP=5.6.7.8
 SSH_USER=ubuntu
 SSH_KEY=~/.ssh/id_ed25519
-K3S_VERSION=v1.32.2+k3s1
+K3S_VERSION=v1.32.13+k3s1
 DOMAIN=example.com
 EMAIL=you@example.com
 DASHBOARD_DOMAIN=dashboard.example.com
@@ -106,7 +106,7 @@ task kubeconfig:fetch      # Merge kubeconfig locally
 kubectl config use-context k3s-lab
 task status:nodes
 # NAME     STATUS   ROLES                  AGE   VERSION
-# server   Ready    control-plane,master   5m    v1.32.2+k3s1
+# server   Ready    control-plane,master   5m    v1.32.13+k3s1
 ```
 
 ---

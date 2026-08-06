@@ -11,13 +11,13 @@
 #   SERVER_IP            for deploy post-install hint
 #
 # Vars (override via includes vars:):
-#   ARGOCD_VERSION            default: 9.5.2
+#   ARGOCD_VERSION            default: 9.5.17
 #   ARGOCD_VALUES_FILE        default: platform/argocd/values.yaml
 # =============================================================================
 version: '3'
 
 vars:
-  ARGOCD_VERSION: '{{.ARGOCD_VERSION | default "9.5.2"}}'
+  ARGOCD_VERSION: '{{.ARGOCD_VERSION | default "9.5.17"}}'
   ARGOCD_VALUES_FILE: '{{.ARGOCD_VALUES_FILE | default "platform/argocd/values.yaml"}}'
   ARGOCD_REPO_SECRET_NAME: '{{.ARGOCD_REPO_SECRET_NAME | default "argocd-repo"}}'
 

@@ -34,22 +34,52 @@ cp .env.example .env
 
 | Variable         | Example         | Required | Description                                                     |
 | ---------------- | --------------- | -------- | --------------------------------------------------------------- |
-| `K3S_VERSION`    | `v1.32.2+k3s1`  | ✅        | Pinned k3s version — must match on server and agent             |
+| `K3S_VERSION`    | `v1.32.13+k3s1`  | ✅        | Pinned k3s version — must match on server and agent             |
 | `K3S_NODE_TOKEN` | *(auto-filled)* | ✅        | Shared secret for agent join — auto-read from server by Ansible |
 
 > `K3S_NODE_TOKEN` is automatically read from the server by the Ansible `site.yml` playbook and passed to agents. You do not need to set it manually.
 
 ### Helm chart versions
 
-| Variable                | Default   | Description                     |
-| ----------------------- | --------- | ------------------------------- |
-| `TRAEFIK_CHART_VERSION` | `34.4.0`  | Traefik Helm chart version      |
-| `CERT_MANAGER_VERSION`  | `v1.17.1` | cert-manager Helm chart version |
-| `GRAFANA_VERSION`       | `10.5.15` | Grafana Helm chart version      |
-| `LOKI_VERSION`          | `6.35.1`  | Loki Helm chart version         |
-| `PROMTAIL_VERSION`      | `6.17.1`  | Promtail Helm chart version     |
+**Chart versions are not configured here.** They are pinned in
+`charts/*/Chart.yaml` under `dependencies:`, which is the only place that
+decides what gets installed:
 
-Helm chart versions are pinned and managed by [Renovate](https://docs.renovatebot.com/) via the shared preset in `renovate.json`.
+```bash
+grep -A2 '^dependencies:' charts/*/Chart.yaml
+```
+
+Until 2026-08-06 this section listed `TRAEFIK_CHART_VERSION`,
+`CERT_MANAGER_VERSION`, `GRAFANA_VERSION`, `LOKI_VERSION` and
+`PROMTAIL_VERSION` as if setting them changed something. They were read by no
+taskfile, no script and no chart — only by the copy-paste `helm install`
+snippets in `docs/stack/`. Every value shown had also gone stale (Traefik was
+listed at `34.4.0` against a real pin of `41.1.0`, Loki `6.35.1` against
+`7.0.0`), so following this page produced a cluster two majors behind the repo.
+They have been dropped from `.env.example` rather than refreshed, because
+refreshing them only resets the clock on the same drift.
+
+> Earlier revisions of this page claimed these versions were "managed by
+> Renovate via the shared preset in `renovate.json`". There is no `renovate.json`
+> in this repo and there never was. Dependency automation is
+> [`.github/dependabot.yml`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/.github/dependabot.yml), added 2026-08-06, and it
+> covers GitHub Actions only — chart pins are bumped by hand and guarded by
+> `scripts/check-deployed-pins.sh` and `scripts/check-umbrella-pins.sh`.
+
+The one exception is `ARGOCD_VERSION`, which really is read — by
+`taskfiles/argocd.yml`, the Helm bootstrap that installs ArgoCD before ArgoCD
+can manage anything itself:
+
+| Variable         | Default  | Required | Description                                       |
+| ---------------- | -------- | -------- | ------------------------------------------------- |
+| `ARGOCD_VERSION` | `9.5.17` | —        | `argo/argo-cd` chart version used by `task argocd:install` |
+
+Keep it equal to the `argo-cd` dependency in
+[`charts/platform-argocd/Chart.yaml`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-argocd/Chart.yaml).
+Because ArgoCD is bootstrapped by Helm rather than by its own ApplicationSet,
+this is the one component `scripts/check-deployed-pins.sh` structurally cannot
+see — which is how the cluster reached `platform-argocd 0.9.2` against a
+published `0.18.3` (audit finding 3). When you bump one, bump both.
 
 ### Application
 
@@ -105,7 +135,7 @@ SSH_USER=debian
 SSH_KEY=~/.ssh/id_ed25519
 
 # k3s
-K3S_VERSION=v1.32.2+k3s1
+K3S_VERSION=v1.32.13+k3s1
 
 # Application
 DOMAIN=example.com

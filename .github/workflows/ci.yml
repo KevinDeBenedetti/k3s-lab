@@ -144,6 +144,29 @@ jobs:
       - name: Verify that the rendered Traefik image matches the expected version
         run: ./scripts/check-traefik-image.sh
 
+  # ─── Rendered image pins (every other chart) ──────────────────────────────
+  # The generalisation of `traefik-image` to the charts that pin an image with a
+  # `repository:` + `tag:` pair — today platform-vault and platform-vault-seeder.
+  #
+  # Audit finding 8: charts/platform-vault pinned hashicorp/vault 1.21.2 while
+  # the cluster's StatefulSet declared 1.21.4, and nothing in CI compared the
+  # pin to anything at all. Helm lint, kubeconform and the resource-limits check
+  # are all satisfied by a pin merely existing, which is how a pin can stop
+  # meaning anything without a single job going red.
+  #
+  # This asserts the narrower, offline half: the pin reaches the render. Cluster
+  # drift is a separate question owned by check-deployed-charts.sh, which needs
+  # access this PR-time job deliberately does not have.
+  rendered-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.17.0
+      - name: Verify that every image pin reaches the rendered manifests
+        run: ./scripts/check-rendered-images.sh
+
   # ─── Traefik advisory check ───────────────────────────────────────────────
   # The daily `traefik-advisories` workflow catches a version that *goes* stale.
   # It cannot catch a version that is already vulnerable the moment it is

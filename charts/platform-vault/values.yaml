@@ -8,8 +8,23 @@ vault:
   server:
     image:
       repository: hashicorp/vault
-      tag: "1.21.2"
+      # Bumped 1.21.2 → 1.21.4 on 2026-08-06. This pin is the *umbrella/standalone*
+      # default only: the infra `platform-vault` Application is multi-source and
+      # layers `$values/platform/vault/values.yaml` over this file, which sets the
+      # tag itself. Leaving it at 1.21.2 meant the chart advertised a version it
+      # does not deploy — see the `ha` note below for the same problem.
+      #
+      # scripts/check-rendered-images.sh now asserts this pin reaches the render,
+      # so it can no longer go decorative. It does NOT compare against the
+      # cluster: check-deployed-charts.sh owns that, and needs access this repo's
+      # PR-time CI does not have.
+      tag: "1.21.4"
       pullPolicy: IfNotPresent
+    # ⚠️ Overridden to `true` by infra. The running Vault uses the `raft` storage
+    # backend (vault-config ConfigMap on the cluster), which the upstream chart
+    # only emits when `ha.enabled` is true — so this `false` describes no cluster
+    # this repo actually operates. It is kept as the standalone default because a
+    # single-node `helm install` of the umbrella wants `file` storage, not raft.
     ha:
       enabled: false
     dataStorage:
