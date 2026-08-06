@@ -18,8 +18,8 @@ description: |
 
   Each subchart can be enabled/disabled independently via values.
 type: application
-version: 0.18.4
-appVersion: 0.18.4
+version: 0.19.0
+appVersion: 0.19.0
 dependencies:
   - name: platform-argocd
     version: 0.18.3
@@ -49,15 +49,6 @@ dependencies:
     version: 0.18.3
     repository: oci://ghcr.io/kevindebenedetti/charts
     condition: platform-security.enabled
-# No `email:` on purpose. This block is published to GHCR with every release and
-# is the first contact a downstream consumer reads, so it has to resolve to a
-# channel that is actually monitored — until 2026-08-06 it read
-# `kevin@example.com`, a placeholder that resolves to nothing.
-#
-# SECURITY.md already makes the deliberate choice not to publish an address: it
-# routes reporters to a private GitHub Security Advisory first, and to the email
-# on the owner's GitHub profile second. `url:` points at that same profile, so
-# there is one contact path to keep current instead of two.
 maintainers:
   - name: Kevin De Benedetti
     url: https://github.com/KevinDeBenedetti
