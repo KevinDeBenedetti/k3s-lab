@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # =============================================================================
-# check-rendered-images.sh — Verify that every `repository:` + `tag:` image pin
-# declared in a chart's values.yaml actually reaches the rendered manifests.
+# check-rendered-images.sh — Verify that every image pin declared in a chart's
+# values.yaml actually reaches the rendered manifests.
+#
+# Two pin shapes are recognised:
+#   * `repository:` + `tag:` siblings — the common form, matched exactly.
+#   * a bare `tag:` directly under an `image:` mapping, with no `repository:`
+#     sibling (`traefik.image.tag`). Generalised on 2026-08-15.
 #
 # Generalised from check-traefik-image.sh on 2026-08-06 (audit finding 8). That
 # script proves one thing for one chart: the image Helm really emits agrees with
@@ -24,10 +29,12 @@
 # deliberately does not want. Keep the two apart: this one must stay offline so
 # it can run on every PR.
 #
-# Traefik keeps its own script rather than folding in here. Its pin is a bare
-# `image.tag` with no `repository:`, and its expected value falls back to the
-# vendored subchart's appVersion when the pin is absent — Traefik-specific logic
-# that would only dilute this check.
+# Traefik keeps its own script rather than folding in here, even though the bare
+# `image.tag` shape is now understood. check-traefik-image.sh answers a question
+# this one cannot: what the *expected* tag is when no pin exists at all, which it
+# resolves from the vendored subchart's appVersion. That fallback is the reason
+# it stays separate. The overlap is deliberate — this script now also asserts
+# traefik's pin reaches the render, which is the half that generalises.
 #
 # Usage:
 #   scripts/check-rendered-images.sh                    # all charts
@@ -53,7 +60,10 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --no-update) UPDATE_DEPS=0; shift ;;
     --charts-dir) CHARTS_DIR="$2"; shift 2 ;;
-    -h|--help) sed -n '2,36p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    # Bounded by the closing `# ===` rule rather than a line number: the header
+    # grows every time this script learns a new pin shape, and a hardcoded range
+    # silently starts truncating the help instead of failing.
+    -h|--help) awk 'NR > 1 { if (/^# ={10,}/) { if (++rule == 2) exit; next } sub(/^# ?/, ""); print }' "${BASH_SOURCE[0]}"; exit 0 ;;
     -*) log_error "Unknown option: $1"; exit 2 ;;
     *) CHARTS+=("$1"); shift ;;
   esac
@@ -67,10 +77,26 @@ if [ "${#CHARTS[@]}" -eq 0 ]; then
 fi
 
 # ─── Pin extraction ─────────────────────────────────────────────────────────
-# Emits "repository<TAB>tag" for each adjacent repository/tag pair in a
-# values.yaml. Indentation is compared so that a `repository:` in one block
+# Emits one TAB-separated record per pin: "subject<TAB>tag<TAB>kind".
+#
+#   kind=repo     subject is the pinned repository (`repository:` + `tag:` pair)
+#   kind=tagonly  subject is a comma-separated list of ancestor keys used as a
+#                 hint, because the pin names no repository to anchor on
+#
+# For repo pins, indentation is compared so that a `repository:` in one block
 # never pairs with a `tag:` from the next one — the two keys must sit at the
 # same depth, which is what an `image:` mapping guarantees.
+#
+# Tag-only pins are emitted ONLY when the tag's immediate parent key is `image`.
+# That restriction is the whole reason this stays useful rather than noisy: a
+# bare `tag:` is an ordinary word that shows up under `nodeSelector`, chart
+# metadata and label blocks, and treating each one as an image pin would invent
+# constraints the chart never declared and then fail on them.
+#
+# The hint is every ancestor key except `image` itself, which carries no
+# information. `traefik.image.tag` hints "traefik"; `vault.server.image.tag`
+# hints "vault,server", and matching any one of them is enough — subcharts name
+# their image after the component about as often as after the chart.
 #
 # Comments are stripped and quotes removed, because `tag: "1.32"` and
 # `tag: 1.32` mean the same thing to Helm and must compare equal here.
@@ -82,15 +108,56 @@ chart_image_pins() {
       gsub(/^[[:space:]]*["'"'"']?|["'"'"']?[[:space:]]*$/, "", v)
       return v
     }
+    # Deepest tracked key strictly shallower than ind — the parent of that line.
+    function parent_key(ind,   i, best) {
+      best = -1
+      for (i in stack) if (i + 0 < ind && i + 0 > best) best = i + 0
+      return best < 0 ? "" : stack[best]
+    }
+    # Every tracked ancestor of ind except `image`, outermost first.
+    function ancestors(ind,   i, n, idx, j, tmp, out) {
+      n = 0
+      for (i in stack) if (i + 0 < ind) idx[++n] = i + 0
+      for (i = 2; i <= n; i++) {          # insertion sort: ancestors are few
+        tmp = idx[i]
+        for (j = i - 1; j >= 1 && idx[j] > tmp; j--) idx[j + 1] = idx[j]
+        idx[j + 1] = tmp
+      }
+      out = ""
+      for (i = 1; i <= n; i++)
+        if (stack[idx[i]] != "image")
+          out = (out == "" ? stack[idx[i]] : out "," stack[idx[i]])
+      return out
+    }
+
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*$/ { next }
+
+    # Maintain the enclosing-key stack. Runs before the rules below and does not
+    # consume the line, so a `tag:` line still reaches its own rule.
+    /^[[:space:]]*[A-Za-z_][A-Za-z0-9_.\/-]*:/ {
+      ind = indent($0)
+      key = $0; sub(/^[[:space:]]*/, "", key); sub(/:.*$/, "", key)
+      for (i in stack) if (i + 0 >= ind) delete stack[i]
+      stack[ind] = key
+    }
+
     /^[[:space:]]*repository:[[:space:]]*[^[:space:]#]/ {
       split($0, kv, /repository:/)
       repo = clean(kv[2]); repo_indent = indent($0); next
     }
     /^[[:space:]]*tag:[[:space:]]*[^[:space:]#]/ {
-      if (repo != "" && indent($0) == repo_indent) {
-        split($0, kv, /tag:/)
-        print repo "\t" clean(kv[2])
+      ti = indent($0)
+      split($0, kv, /tag:/)
+      tag = clean(kv[2])
+      if (repo != "" && ti == repo_indent) {
+        print repo "\t" tag "\trepo"
         repo = ""
+        next
+      }
+      if (parent_key(ti) == "image") {
+        hints = ancestors(ti)
+        if (hints != "") print hints "\t" tag "\ttagonly"
       }
       next
     }
@@ -158,21 +225,48 @@ for chart in "${CHARTS[@]}"; do
     continue
   fi
 
+  # Every image reference in the render, once. Both pin kinds filter this list.
+  mapfile -t rendered_images < <(
+    printf '%s\n' "$rendered" |
+      sed -n 's|.*image:[[:space:]]*"\{0,1\}\([^"[:space:]]*\)"\{0,1\}[[:space:]]*$|\1|p' |
+      sort -u
+  )
+
   for pin in "${pins[@]}"; do
-    IFS=$'\t' read -r repo tag <<<"$pin"
+    IFS=$'\t' read -r subject tag kind <<<"$pin"
     checked=$((checked + 1))
 
-    # Match the repository as a whole image reference: `<repo>:<tag>`, optionally
-    # quoted and optionally registry-qualified. Anchoring on the repository (not
-    # a bare tag grep) keeps `hashicorp/vault` from matching `hashicorp/vault-k8s`.
-    mapfile -t found < <(
-      printf '%s\n' "$rendered" |
-        sed -n 's|.*image:[[:space:]]*"\{0,1\}\([^"[:space:]]*\)"\{0,1\}[[:space:]]*$|\1|p' |
-        grep -E "(^|/)${repo}:" || true
-    )
+    if [ "$kind" = "repo" ]; then
+      # Match the repository as a whole image reference: `<repo>:<tag>`, optionally
+      # quoted and optionally registry-qualified. Anchoring on the repository (not
+      # a bare tag grep) keeps `hashicorp/vault` from matching `hashicorp/vault-k8s`.
+      mapfile -t found < <(
+        printf '%s\n' "${rendered_images[@]}" | grep -E "(^|/)${subject}:" || true
+      )
+      label="$subject:$tag"
+    else
+      # No repository to anchor on, so anchor on the hint keys instead: keep the
+      # rendered images whose LAST path component contains one of them. Comparing
+      # only the last component is what keeps a `traefik` hint off
+      # `ghcr.io/traefik-labs/other/thing` while still matching `docker.io/traefik`.
+      mapfile -t found < <(
+        printf '%s\n' "${rendered_images[@]}" |
+          awk -v hints="$subject" '
+            BEGIN { n = split(tolower(hints), h, /,/) }
+            {
+              ref = $0
+              sub(/:[^:\/]*$/, "", ref)          # strip the tag
+              sub(/.*\//, "", ref)               # keep the last path component
+              ref = tolower(ref)
+              for (i = 1; i <= n; i++) if (index(ref, h[i]) > 0) { print; next }
+            }
+          '
+      )
+      label="${subject//,/ or }:$tag (tag-only pin)"
+    fi
 
     if [ "${#found[@]}" -eq 0 ]; then
-      log_error "  $repo:$tag — pinned in values.yaml but absent from the render"
+      log_error "  $label — pinned in values.yaml but absent from the render"
       log_error "      A pin that reaches no manifest is decorative: the subchart"
       log_error "      most likely renamed the key. Find the new path with:"
       log_error "        helm template $chart charts/$chart | grep -n 'image:'"
@@ -180,18 +274,40 @@ for chart in "${CHARTS[@]}"; do
       continue
     fi
 
-    mismatched=0
-    for image in $(printf '%s\n' "${found[@]}" | sort -u); do
-      if [ "${image##*:}" != "$tag" ]; then
-        log_error "  $image — values.yaml pins tag $tag"
-        mismatched=$((mismatched + 1))
+    if [ "$kind" = "repo" ]; then
+      # A repository pin names exactly one image, so EVERY match must carry the tag.
+      mismatched=0
+      for image in "${found[@]}"; do
+        if [ "${image##*:}" != "$tag" ]; then
+          log_error "  $image — values.yaml pins tag $tag"
+          mismatched=$((mismatched + 1))
+        fi
+      done
+      if [ "$mismatched" -gt 0 ]; then
+        errors=$((errors + mismatched))
+      else
+        log_ok "  $label"
       fi
-    done
-
-    if [ "$mismatched" -gt 0 ]; then
-      errors=$((errors + mismatched))
     else
-      log_ok "  $repo:$tag"
+      # A hint can legitimately match several unrelated images (a chart named
+      # `traefik` shipping both `traefik` and a `traefik`-prefixed sidecar), so
+      # this asserts only that AT LEAST ONE of them carries the pinned tag. That
+      # is deliberately weaker than the repository case — it still catches the
+      # failure that matters, a pin whose value reaches nothing — and the
+      # alternative, demanding all of them, fails on charts that are correct.
+      hit=0
+      for image in "${found[@]}"; do
+        [ "${image##*:}" = "$tag" ] && hit=1
+      done
+      if [ "$hit" -eq 1 ]; then
+        log_ok "  $label"
+      else
+        log_error "  $label — no rendered image carries this tag. Candidates:"
+        for image in "${found[@]}"; do
+          log_error "        $image"
+        done
+        errors=$((errors + 1))
+      fi
     fi
   done
 done
@@ -205,7 +321,7 @@ if [ "$errors" -gt 0 ]; then
 fi
 
 if [ "$checked" -eq 0 ]; then
-  log_warn "No repository+tag image pin found in any chart."
+  log_warn "No image pin (repository+tag, or a bare tag under image:) found in any chart."
   log_warn "That is suspicious rather than clean — this check has nothing to assert."
   exit 1
 fi

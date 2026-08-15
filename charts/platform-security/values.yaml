@@ -159,4 +159,16 @@ kyvernoPolicies:
   # (`kubectl get polr -A`), fix or exclude what violates, then move to `Enforce`.
   # It is a per-policy decision, so override it per install rather than assuming
   # the whole set graduates together.
-  validationFailureAction: Audit
+  #
+  # Renamed from `validationFailureAction` on 2026-08-14 to match the field it
+  # renders into: Kyverno 3.8 deprecated `spec.validationFailureAction` for the
+  # per-rule `spec.rules[].validate.failureAction`, and the chart now emits the
+  # latter. The old key is still read as a deprecated alias so that infra, which
+  # sets it, does not silently fall back to the default.
+  #
+  # Deliberately left unset: `Audit` here would be indistinguishable from an
+  # operator setting it and would therefore always beat the deprecated alias.
+  # Precedence (failureAction > validationFailureAction > Audit) and the
+  # effective default both live in `platform-security.failureAction`
+  # (templates/_helpers.tpl).
+  failureAction: null

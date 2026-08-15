@@ -45,7 +45,7 @@ its first install only, and its `NOTES.txt` says so every time.
 > [!IMPORTANT]
 > **The six Kyverno policies default to `Audit`, not `Enforce`.** They record
 > violations in a PolicyReport and let the pod through. Nothing is rejected at
-> admission until you set `kyvernoPolicies.validationFailureAction: Enforce`.
+> admission until you set `kyvernoPolicies.failureAction: Enforce`.
 >
 > This was the reverse until 2026-08-05, when an audit found the policies had
 > shipped hardcoded to `Enforce` while being installed on no cluster at all — so
@@ -61,8 +61,29 @@ for the reason above. Their failure action comes from a single value:
 
 ```yaml
 kyvernoPolicies:
-  validationFailureAction: Audit   # or Enforce
+  failureAction: Audit   # or Enforce
 ```
+
+It renders into each rule's `validate.failureAction`, not the chart-level
+`spec.validationFailureAction` that Kyverno 3.8 deprecated. The old value key
+`kyvernoPolicies.validationFailureAction` is still accepted as a deprecated
+alias so existing overrides do not silently fall back to the default.
+
+### Checking the policies actually landed
+
+```bash
+scripts/check-kyverno-crds.sh              # CRDs + the policies really exist
+scripts/check-kyverno-crds.sh --crds-only  # installability only
+```
+
+Rendering six policies is not the same as having six policies. The chart can be
+correct, the render valid, and the cluster still hold none of them — either
+because the Kyverno CRDs are not installed yet (the first-install order below),
+or because something upstream refused the kind. The second is not theoretical:
+in August 2026 the ArgoCD AppProject did not whitelist `kyverno.io/ClusterPolicy`
+and rejected all six for 32 hours, with the Application reporting
+`OutOfSync`/`Healthy` throughout. This script is the only check here that looks
+at a cluster, so it is the only one that can tell the difference.
 
 ### Going from Audit to Enforce
 
@@ -78,8 +99,8 @@ Fix or exclude each violation, then flip to `Enforce`. Treat it as a per-policy
 decision rather than one switch for the whole set — `require-ro-rootfs` and
 `require-non-root` are the two that most workloads fail first, and they can stay
 on `Audit` long after the other four are enforced. Per-policy overrides go
-through Kyverno's own `validationFailureActionOverrides` on the individual
-`ClusterPolicy`.
+through Kyverno's own `failureActionOverrides`, alongside `failureAction` on
+the rule's `validate` block.
 
 Every policy carries its **own** exclusion list — they are not uniform, and the
 differences are deliberate: each one exempts exactly the platform namespaces
@@ -142,7 +163,7 @@ readable.
 | `trivy-operator.nodeCollector.enabled` | `false` | workloads only |
 | `kyverno.enabled` | `true` | the admission engine; `false` also drops the policies |
 | `kyvernoPolicies.enabled` | `true` | the six policies; needs the CRDs to already exist |
-| `kyvernoPolicies.validationFailureAction` | `Audit` | `Enforce` rejects non-compliant pods at admission |
+| `kyvernoPolicies.failureAction` | `Audit` | `Enforce` rejects non-compliant pods at admission; `validationFailureAction` still accepted as a deprecated alias |
 | `kyverno.metrics.serviceMonitor.enabled` | `true` | `release: prometheus` |
 | `kyverno.generateSuccessEvents` | `false` | failures only |
 

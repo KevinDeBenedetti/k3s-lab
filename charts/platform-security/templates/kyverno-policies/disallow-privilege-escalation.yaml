@@ -13,7 +13,6 @@ metadata:
       Privilege escalation allows processes to gain more privileges than their parent.
       This policy requires allowPrivilegeEscalation to be set to false.
 spec:
-  validationFailureAction: {{ .Values.kyvernoPolicies.validationFailureAction }}
   background: true
   rules:
     - name: disallow-privilege-escalation
@@ -30,6 +29,7 @@ spec:
                 - kyverno
                 - vault
       validate:
+        failureAction: {{ include "platform-security.failureAction" . }}
         message: "Privilege escalation is not allowed (securityContext.allowPrivilegeEscalation: false)."
         pattern:
           spec:

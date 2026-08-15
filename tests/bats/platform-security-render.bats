@@ -2,7 +2,7 @@
 # tests/bats/platform-security-render.bats — Render contract for charts/platform-security
 #
 # Why this file exists: until 2026-08-05 this chart shipped six Kyverno
-# ClusterPolicies hardcoded to `validationFailureAction: Enforce` and was
+# ClusterPolicies hardcoded to `Enforce` and was
 # installed on no cluster at all (audit finding 1), so the single most
 # consequential value in it — whether a violating pod is *recorded* or
 # *rejected* — had never been exercised by anything. The rollout that fixed the
@@ -35,6 +35,13 @@ POLICIES=(
   disallow-latest-tag
   require-pod-resources
 )
+
+# Six policies, seven rules: `disallow-latest-tag` carries two
+# (require-image-tag + require-tag-or-digest). Since 2026-08-14 the failure
+# action is set per rule rather than once per policy, so every action assertion
+# counts RULES, not policies — a 6 here would pass while one rule silently lost
+# its action.
+RULE_COUNT=7
 
 setup() {
   CHART="${BATS_TEST_TMPDIR}/chart"
@@ -87,16 +94,56 @@ policy_count() {
   # The whole point of the 2026-08-05 rollout.
   local out
   out="$(render | policy_docs)"
-  [ "$(grep -c 'validationFailureAction: Audit' <<<"$out")" -eq 6 ]
-  [ "$(grep -c 'validationFailureAction: Enforce' <<<"$out")" -eq 0 ]
+  [ "$(grep -c 'failureAction: Audit' <<<"$out")" -eq "$RULE_COUNT" ]
+  [ "$(grep -c 'failureAction: Enforce' <<<"$out")" -eq 0 ]
 }
 
-@test "validationFailureAction is overridable to Enforce" {
+@test "failureAction is overridable to Enforce" {
   # Audit is the default, not a ceiling — promoting a clean cluster must work.
   local out
+  out="$(render --set kyvernoPolicies.failureAction=Enforce | policy_docs)"
+  [ "$(grep -c 'failureAction: Enforce' <<<"$out")" -eq "$RULE_COUNT" ]
+  [ "$(grep -c 'failureAction: Audit' <<<"$out")" -eq 0 ]
+}
+
+@test "the deprecated validationFailureAction value key still overrides" {
+  # infra pins this chart and sets the old key (platform/security/values.yaml).
+  # Helm ignores unknown value keys silently, so dropping the alias would not
+  # error — it would quietly revert that install to the chart default. This test
+  # is what makes removing the alias a visible decision rather than an accident.
+  local out
   out="$(render --set kyvernoPolicies.validationFailureAction=Enforce | policy_docs)"
-  [ "$(grep -c 'validationFailureAction: Enforce' <<<"$out")" -eq 6 ]
-  [ "$(grep -c 'validationFailureAction: Audit' <<<"$out")" -eq 0 ]
+  [ "$(grep -c 'failureAction: Enforce' <<<"$out")" -eq "$RULE_COUNT" ]
+  [ "$(grep -c 'failureAction: Audit' <<<"$out")" -eq 0 ]
+}
+
+@test "the new key wins over the deprecated alias" {
+  local out
+  out="$(render \
+    --set kyvernoPolicies.failureAction=Enforce \
+    --set kyvernoPolicies.validationFailureAction=Audit | policy_docs)"
+  [ "$(grep -c 'failureAction: Enforce' <<<"$out")" -eq "$RULE_COUNT" ]
+}
+
+@test "the action is set per rule, not with the deprecated spec-level field" {
+  # Kyverno 3.8 marks spec.validationFailureAction "Deprecated, use
+  # validationFailureAction under the validate rule instead" in the ClusterPolicy
+  # CRD. It still works, so nothing in the cluster would report a regression —
+  # only this test would.
+  local out
+  out="$(render | policy_docs)"
+  # The spec-level field is a top-level key of spec:, i.e. two-space indented.
+  [ "$(grep -c '^  validationFailureAction:' <<<"$out")" -eq 0 ]
+  # …and every occurrence of the new one sits inside a validate: block.
+  [ "$(grep -c '^        failureAction:' <<<"$out")" -eq "$RULE_COUNT" ]
+}
+
+@test "an invalid failure action fails the render" {
+  # An empty or bogus action is accepted by the API server and silently defaults,
+  # so the helper calls `fail`. Without this, a typo would reach the cluster.
+  run render --set kyvernoPolicies.failureAction=audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"must be Audit or Enforce"* ]]
 }
 
 @test "kyvernoPolicies.enabled=false removes the policies" {
@@ -124,7 +171,7 @@ policy_count() {
   local out
   out="$(render | policy_docs)"
   [ "$(grep -c '^kind: ClusterPolicy$' <<<"$out")" -eq 6 ]
-  [ "$(grep -c 'validationFailureAction:[[:space:]]*$' <<<"$out")" -eq 0 ]
+  [ "$(grep -c 'failureAction:[[:space:]]*$' <<<"$out")" -eq 0 ]
 }
 
 @test "trivy-operator is off by default and its subchart is condition-gated" {

@@ -13,7 +13,6 @@ metadata:
       Using :latest tag makes deployments unpredictable and difficult to roll back.
       This policy requires all images to use a specific tag or digest.
 spec:
-  validationFailureAction: {{ .Values.kyvernoPolicies.validationFailureAction }}
   background: true
   rules:
     - name: require-image-tag
@@ -29,6 +28,7 @@ spec:
                 - kube-system
                 - kyverno
       validate:
+        failureAction: {{ include "platform-security.failureAction" . }}
         message: "Using :latest or no tag is not allowed. Specify a valid image tag."
         pattern:
           spec:
@@ -47,6 +47,7 @@ spec:
                 - kube-system
                 - kyverno
       validate:
+        failureAction: {{ include "platform-security.failureAction" . }}
         message: "Images must have a tag or digest specified (e.g., nginx:1.21 or nginx@sha256:...)."
         pattern:
           spec:

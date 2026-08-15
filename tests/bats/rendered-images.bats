@@ -118,6 +118,10 @@ run_check() {
 @test "a repository and a tag at different depths are not paired" {
   # `repository:` under one block and `tag:` under the next is not a pin. Pairing
   # them would invent a constraint the chart never declared and fail on it.
+  #
+  # The `extra.tag` must ALSO not be read as a tag-only pin: tag-only extraction
+  # only fires when the parent key is `image:`, which is exactly what keeps that
+  # shape from turning every bare `tag:` in a values file into a constraint.
   cat > "${CHARTS}/demo/values.yaml" <<'EOF'
 app:
   image:
@@ -128,7 +132,7 @@ EOF
   template 'acme/api:1.4.2'
   run_check
   [ "$status" -eq 1 ]
-  [[ "$output" == *"No repository+tag image pin"* ]]
+  [[ "$output" == *"No image pin"* ]]
 }
 
 @test "finding no pin anywhere is a failure, not a vacuous pass" {
@@ -163,6 +167,105 @@ EOF
   run_check
   [ "$status" -eq 1 ]
   [[ "$output" == *"helm template failed"* ]]
+}
+
+# ─── Tag-only pins (the traefik shape) ──────────────────────────────────────
+# `traefik.image.tag` with no `repository:` sibling. Until 2026-08-15 this
+# script saw nothing at all in such a chart and reported it as "declares no
+# pins" — a clean run over a file that does pin an image is the same vacuous
+# pass finding 8 was made of.
+
+# tag_only_values TAG — a bare tag under an image: mapping, no repository.
+tag_only_values() {
+  cat > "${CHARTS}/demo/values.yaml" <<EOF
+traefik:
+  image:
+    tag: "$1"
+    pullPolicy: IfNotPresent
+EOF
+}
+
+@test "a bare image.tag pin is checked, not ignored" {
+  tag_only_values v3.7.10
+  template 'docker.io/traefik:v3.7.10'
+  run_check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tag-only pin"* ]]
+  [[ "$output" == *"All 1 image pin(s) reach the render"* ]]
+}
+
+@test "a bare image.tag pin fails when the render carries a different tag" {
+  # The finding-8 shape for a chart that names no repository.
+  tag_only_values v3.7.10
+  template 'docker.io/traefik:v3.0.0'
+  run_check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"no rendered image carries this tag"* ]]
+  [[ "$output" == *"docker.io/traefik:v3.0.0"* ]]
+}
+
+@test "a bare image.tag pin fails when no image matches the hint at all" {
+  tag_only_values v3.7.10
+  template 'acme/unrelated:v3.7.10'
+  run_check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"absent from the render"* ]]
+  [[ "$output" == *"decorative"* ]]
+}
+
+@test "the hint matches the last path component, not the registry" {
+  # A `traefik` hint must not be satisfied by a registry or org that happens to
+  # contain the word while the image itself is something else entirely.
+  tag_only_values v3.7.10
+  template 'traefik.io/some/other:v3.7.10'
+  run_check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"absent from the render"* ]]
+}
+
+@test "one matching image is enough when the hint matches several" {
+  # A chart named traefik shipping both the proxy and a traefik-prefixed sidecar:
+  # requiring every hint match to carry the pinned tag would fail a correct chart.
+  tag_only_values v3.7.10
+  cat > "${CHARTS}/demo/templates/deploy.yaml" <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo
+spec:
+  containers:
+    - name: proxy
+      image: docker.io/traefik:v3.7.10
+    - name: sidecar
+      image: acme/traefik-helper:0.1.0
+EOF
+  run_check
+  [ "$status" -eq 0 ]
+}
+
+@test "a nested component key is usable as a hint too" {
+  # `vault.server.image.tag` — the image is named after the chart, not the
+  # component, so every ancestor is offered as a hint rather than just the parent.
+  cat > "${CHARTS}/demo/values.yaml" <<'EOF'
+vault:
+  server:
+    image:
+      tag: "1.21.4"
+EOF
+  template 'hashicorp/vault:1.21.4'
+  run_check
+  [ "$status" -eq 0 ]
+}
+
+@test "an image: mapping with both repository and tag is not double-counted" {
+  # The repo branch must consume the tag, or every ordinary pin would also
+  # register as a tag-only pin and be checked twice.
+  values acme/api 1.4.2
+  template '{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}'
+  run_check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"All 1 image pin(s) reach the render"* ]]
+  [[ "$output" != *"tag-only pin"* ]]
 }
 
 @test "checks every chart under the directory, not just the first" {

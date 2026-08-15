@@ -14,7 +14,6 @@ metadata:
       dropping ALL capabilities and only allows adding NET_BIND_SERVICE if needed.
       Aligns with Pod Security Standards restricted profile.
 spec:
-  validationFailureAction: {{ .Values.kyvernoPolicies.validationFailureAction }}
   background: true
   rules:
     - name: drop-all-capabilities
@@ -35,6 +34,7 @@ spec:
                 - cert-manager
                 - monitoring
       validate:
+        failureAction: {{ include "platform-security.failureAction" . }}
         message: "Containers must drop ALL capabilities and may only add NET_BIND_SERVICE."
         pattern:
           spec:
