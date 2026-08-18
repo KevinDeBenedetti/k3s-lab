@@ -1,0 +1,10 @@
+---
+# ufw_enable role defaults
+#
+# Single repo-wide switch, redeclared here for the same reason as in the other
+# roles: role defaults are only in scope while their own role runs, and the
+# playbooks apply this role in a play of its own.
+# See roles/common/defaults/main.yml.
+k3s_lab_ufw_enabled: "{{ common_ufw_enabled | default(true) }}"
+k3s_lab_ufw_retries: 5
+k3s_lab_ufw_delay: 3

@@ -51,7 +51,15 @@ k3s_extra_server_args: >-
   --kube-apiserver-arg=audit-log-maxsize=100
   --protect-kernel-defaults
 
-# Firewall: ports to open for agent communication
+# Firewall. k3s_lab_ufw_enabled is the single switch for every UFW task in the
+# repo; it is redeclared here (same default as the common role) because role
+# defaults are only in scope while their own role runs, and site.yml applies
+# common and k3s_server in separate plays. See roles/common/defaults/main.yml.
+k3s_lab_ufw_enabled: "{{ common_ufw_enabled | default(true) }}"
+k3s_lab_ufw_retries: 5
+k3s_lab_ufw_delay: 3
+
+# Ports to open for agent communication
 k3s_ufw_allow_from: "10.0.0.0/16"
 
 # Extra CIDRs (besides k3s_ufw_allow_from) allowed to reach the API server on

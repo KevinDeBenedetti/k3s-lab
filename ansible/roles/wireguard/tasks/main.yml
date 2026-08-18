@@ -58,9 +58,14 @@
       register: wg_private_key_file
       no_log: true
 
+    # pipefail + an explicit bash: /bin/sh is dash on Debian and has no pipefail,
+    # so a failure of `wg pubkey` on the right of the pipe would otherwise be
+    # reported through echo's exit status and the play would carry on with an
+    # empty public key — which lands in wg0.conf and silently breaks the tunnel.
     - name: Derive server public key
       ansible.builtin.shell:
-        cmd: echo "{{ wg_private_key_file.content | b64decode | trim }}" | wg pubkey
+        cmd: set -o pipefail && echo "{{ wg_private_key_file.content | b64decode | trim }}" | wg pubkey
+        executable: /bin/bash
       register: wg_public_key
       changed_when: false
       no_log: true
@@ -76,7 +81,12 @@
         rule: allow
         port: "{{ wireguard_port }}"
         proto: udp
-      notify: Reload UFW
+      when: k3s_lab_ufw_enabled | bool
+      register: wireguard_ufw_port
+      until: wireguard_ufw_port is succeeded
+      retries: "{{ k3s_lab_ufw_retries }}"
+      delay: "{{ k3s_lab_ufw_delay }}"
+      notify: Reload UFW (wireguard)
 
     - name: Deploy WireGuard configuration
       ansible.builtin.template:

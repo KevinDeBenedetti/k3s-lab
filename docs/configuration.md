@@ -111,6 +111,45 @@ published `0.18.3` (audit finding 3). When you bump one, bump both.
 | `KUBECONFIG_CONTEXT` | `k3s-lab` | ✅        | kubectl context name created by `task kubeconfig:fetch` |
 
 
+## Ansible role variables (not `.env`)
+
+A few settings are **Ansible variables, not `.env` variables**. They are read by
+the roles during provisioning, so putting them in `.env` has no effect — set them
+in `ansible/inventory/group_vars/all.yml`, or pass them at call time with
+`-e <name>=<value>`.
+
+### Firewall
+
+| Variable                | Default | Description                                                    |
+| ----------------------- | ------- | -------------------------------------------------------------- |
+| `k3s_lab_ufw_enabled`   | `true`  | Single switch for **every** UFW task in the repo               |
+| `k3s_lab_ufw_retries`   | `5`     | Retries per UFW task (they race k3s rewriting nf_tables)       |
+| `k3s_lab_ufw_delay`     | `3`     | Seconds between those retries                                  |
+
+`k3s_lab_ufw_enabled: false` disables firewall management everywhere at once —
+the rules in `common`, `k3s_server`, `k3s_agent` and `wireguard`, *and* the final
+`ufw_enable` role that turns UFW on. Use it when the firewall is managed outside
+this repo (a cloud provider's security groups, for instance). It does **not**
+disable an already-active UFW; it only stops Ansible from touching it.
+
+> Each of those five roles redeclares these three variables with the same
+> default. That is deliberate, not duplication to tidy up: role defaults are only
+> in scope while their own role runs, and `site.yml` applies `common` and
+> `k3s_server` in **separate plays**, so a single declaration in `common` would
+> read as undefined everywhere else. Setting the variable once in
+> `group_vars/all.yml` overrides all five, which is the point.
+
+The predecessor name `common_ufw_enabled` is still honoured as a fallback, so an
+existing inventory keeps working, but it only ever guarded the `common` role.
+Prefer `k3s_lab_ufw_enabled`.
+
+> ⚠️ UFW is enabled by the `ufw_enable` role, which the playbooks apply as their
+> **last play** — after every rule is in place. Do not move it earlier: a run
+> interrupted between `common` and the end would otherwise leave the node behind
+> an active default-deny firewall holding only the rules reached so far, with no
+> API port and possibly no WireGuard. The trade is that a first provisioning run
+> has no firewall until it completes.
+
 ## Variable precedence
 
 Variables are loaded with **no-overwrite semantics**: a value already set in the shell environment takes precedence over the `.env` file.

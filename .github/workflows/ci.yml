@@ -10,6 +10,7 @@
 #   security    — Gitleaks secret scanning
 #   helm-lint   — Helm chart linting
 #   resource-limits — Verify all charts define resource limits
+#   ansible     — Playbook syntax-check + ansible-lint (both blocking)
 #
 # Every `uses:` here is pinned to a 40-character commit SHA with the version in
 # a trailing comment. Do not "tidy" them back into tags: until 2026-08-06 the
@@ -20,11 +21,16 @@
 # commit. The SHAs chosen were the exact commits `@main` and `@v5`/`@v2` already
 # resolved to, so pinning changed nothing about what executes.
 #
-# ⚠️ Nothing bumps these automatically. This repo has no dependabot.yml and no
-# renovate.json (docs/configuration.md claims otherwise — it is wrong), so a
-# pinned SHA stays pinned until someone edits it. That is the trade pinning
-# makes: immutable, and therefore silently stale. Until an updater is
-# configured, re-resolve them by hand when a CVE lands in one of these actions.
+# They are re-resolved automatically by .github/dependabot.yml (github-actions
+# ecosystem, weekly, grouped into a single PR). Dependabot rewrites the SHA *and*
+# the trailing `# vX.Y.Z` comment, which is why that comment format is
+# load-bearing — keep it when editing a pin by hand.
+#
+# ⚠️ This paragraph asserted the exact opposite until 2026-08-18 ("Nothing bumps
+# these automatically. This repo has no dependabot.yml [...] docs/configuration.md
+# claims otherwise — it is wrong"). It was itself the stale one, and the docs it
+# accused were right: dependabot.yml landed 2026-08-06, the same day these SHAs
+# were pinned, and has been opening grouped bump PRs since (2161d07, 285115b).
 # =============================================================================
 name: CI
 
@@ -203,6 +209,61 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/check-umbrella-pins.sh
 
+  # ─── Ansible playbook validation ──────────────────────────────────────────
+  # Nothing in CI read the `ansible/` tree until 2026-08-17, so the provisioning
+  # half of this repo had no automated check of any kind while every chart and
+  # script had several. The failure mode that motivated this job is specific:
+  # role wiring and variable *scope* errors are invisible to YAML linting and
+  # only surface when a playbook is run against a real node — i.e. during a
+  # provisioning, which is exactly when you least want to discover them. A role
+  # renamed but not added to `roles:`, or a default declared in one role and read
+  # from a play that never applies it, both parse as perfectly valid YAML.
+  #
+  # `--syntax-check` resolves the role graph, so it catches precisely that class.
+  # It needs an inventory to expand `hosts:`; `-i localhost,` supplies a throwaway
+  # one, and the resulting "Could not match supplied host pattern" warnings are
+  # expected — the real inventory holds node IPs and is gitignored.
+  ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install ansible-core and the pinned collections
+        run: |
+          python3 -m pip install --quiet 'ansible-core==2.21.3'
+          ansible-galaxy collection install -r ansible/requirements.yml
+
+      - name: Syntax-check every playbook
+        working-directory: ansible
+        run: |
+          status=0
+          for playbook in playbooks/*.yml; do
+            echo "::group::$playbook"
+            ansible-playbook --syntax-check -i localhost, "$playbook" || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
+
+      # Blocking since 2026-08-18. It was advisory for one day, only because the
+      # sandbox it was written in could not install ansible-lint and so could not
+      # measure the existing debt; gating on an unmeasured finding count would
+      # have turned every unrelated PR red. Measured, the tree is clean under one
+      # disabled rule — see .ansible-lint for which and why.
+      #
+      # Runs from `ansible/` so that ansible.cfg applies. From the repo root
+      # `roles_path = roles` does not resolve and every playbook reports a bogus
+      # `syntax-check[specific]: The role 'common' was not found`.
+      #
+      # The collections installed above are load-bearing here: the `syntax-check`
+      # rules resolve every module, and they are tagged `unskippable`, so a failed
+      # collection install surfaces as a wall of "couldn't resolve module/action
+      # community.general.ufw" rather than as the dependency problem it is.
+      - name: Lint the roles and playbooks
+        working-directory: ansible
+        run: |
+          python3 -m pip install --quiet 'ansible-lint==26.8.0'
+          ansible-lint .
+
   # ─── Docs dispatch (push to main only) ───────────────────────────────────
   # cd-docs.yml now authenticates via GitHub App (client-id + APP_PRIVATE_KEY);
   # passing an undeclared secret (the old PAT_TOKEN) startup-fails the whole run.
@@ -214,7 +275,7 @@ jobs:
   # normal window between a release and its follow-up pin commit, also silently
   # freezes the docs site.
   docs:
-    needs: [shell-ci, kubernetes, security, helm-lint, resource-limits, traefik-image]
+    needs: [shell-ci, kubernetes, security, helm-lint, resource-limits, traefik-image, ansible]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     uses: KevinDeBenedetti/github-workflows/.github/workflows/cd-docs.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
     with:

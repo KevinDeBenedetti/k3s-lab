@@ -1,0 +1,19 @@
+---
+# ufw_enable — turn the firewall ON, and nothing else.
+#
+# This role exists purely to be applied LAST, in a play of its own, after
+# common / k3s_server / k3s_agent / wireguard have added every rule they own.
+# Enabling UFW from inside the `common` role (as this repo used to) means a
+# playbook interrupted anywhere between `common` and the end of the run leaves
+# the node behind an active default-deny firewall that has only the rules
+# `common` had reached — no API port, no ingress, possibly no WireGuard. The
+# machine is then reachable only through the provider's rescue console.
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+  when: k3s_lab_ufw_enabled | bool
+  register: ufw_enable_result
+  until: ufw_enable_result is succeeded
+  retries: "{{ k3s_lab_ufw_retries }}"
+  delay: "{{ k3s_lab_ufw_delay }}"
+  tags: [ufw]

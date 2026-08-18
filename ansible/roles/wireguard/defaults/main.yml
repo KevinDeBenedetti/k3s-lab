@@ -3,6 +3,12 @@
 
 wireguard_enabled: false
 
+# Firewall. Single repo-wide switch, redeclared here for the same reason as in
+# the k3s_server role. See roles/common/defaults/main.yml.
+k3s_lab_ufw_enabled: "{{ common_ufw_enabled | default(true) }}"
+k3s_lab_ufw_retries: 5
+k3s_lab_ufw_delay: 3
+
 wireguard_port: 51820
 wireguard_interface: wg0
 wireguard_server_ip: "10.8.0.1/24"

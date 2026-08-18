@@ -28,9 +28,14 @@ common_sysctl:
   net.ipv4.conf.default.rp_filter: 1
   # SYN flood protection
   net.ipv4.tcp_syncookies: 1
-  # Log suspicious packets (martians)
-  net.ipv4.conf.all.log_martians: 1
-  net.ipv4.conf.default.log_martians: 1
+  # Martian logging stays OFF on k3s nodes. Pod-to-pod traffic crossing the
+  # flannel/CNI bridges is routinely "martian" from the host's point of view, so
+  # this logs continuously and floods the kernel ring buffer — it makes the
+  # provider's rescue console unreadable at the exact moment it is the only way
+  # in. Set explicitly to 0 (rather than dropped from the dict) so nodes already
+  # provisioned with it enabled get it turned back off.
+  net.ipv4.conf.all.log_martians: 0
+  net.ipv4.conf.default.log_martians: 0
   # Disable ICMP redirects (prevent MITM)
   net.ipv4.conf.all.send_redirects: 0
   net.ipv4.conf.default.send_redirects: 0
@@ -51,7 +56,19 @@ common_disable_swap: true
 common_motd_enabled: true
 
 # UFW defaults
-common_ufw_enabled: true
+#
+# k3s_lab_ufw_enabled is the SINGLE switch for every UFW task in this repo
+# (common, k3s_server, k3s_agent, wireguard, ufw_enable). It is redeclared with
+# the same default in each of those roles, because role defaults are only in
+# scope while that role runs — site.yml applies them across separate plays.
+# Override it once in group_vars/all to turn firewall management off wholesale.
+# `common_ufw_enabled` is the former, common-only name, still honoured.
+k3s_lab_ufw_enabled: "{{ common_ufw_enabled | default(true) }}"
+# `ufw` shells out to iptables/nft, which races k3s rewriting the same nf_tables
+# ruleset (it reconciles on its own schedule). A losing call fails with a lock
+# or "resource busy" error; retrying clears it. Same defaults in every role.
+k3s_lab_ufw_retries: 5
+k3s_lab_ufw_delay: 3
 common_ufw_default_policy: deny
 common_ufw_allow_ssh: true
 common_ssh_port: 22

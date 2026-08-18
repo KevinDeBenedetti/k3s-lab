@@ -5,7 +5,13 @@
     state: restarted
     daemon_reload: true
 
-- name: Reload UFW
+# Role-qualified on 2026-08-18. `Reload UFW` was defined under that exact name by
+# k3s_server, k3s_agent AND wireguard, and k3s_server + wireguard are applied in
+# the SAME play (site.yml, k3s-server.yml). Ansible does not merge same-named
+# handlers, so one definition silently shadowed the other; it happened to be
+# harmless only because the three bodies were byte-identical. Qualifying the name
+# makes each role notify its own handler by construction rather than by luck.
+- name: Reload UFW (k3s_server)
   community.general.ufw:
     state: reloaded
 

@@ -28,9 +28,11 @@
     not k3s_binary.stat.exists or
     k3s_version not in (k3s_installed_version.stdout | default(''))
 
+# See the k3s_server role: `bash <script>` so a `noexec` /tmp (CIS) does not
+# break the install.
 - name: Install k3s agent
   ansible.builtin.command:
-    cmd: /tmp/k3s-install.sh
+    cmd: bash /tmp/k3s-install.sh
   no_log: true
   environment:
     INSTALL_K3S_VERSION: "{{ k3s_version }}"
@@ -61,7 +63,12 @@
   loop:
     - { port: "8472", proto: udp }
     - { port: "10250", proto: tcp }
-  notify: Reload UFW
+  when: k3s_lab_ufw_enabled | bool
+  register: k3s_agent_ufw_cluster_ports
+  until: k3s_agent_ufw_cluster_ports is succeeded
+  retries: "{{ k3s_lab_ufw_retries }}"
+  delay: "{{ k3s_lab_ufw_delay }}"
+  notify: Reload UFW (k3s_agent)
 
 - name: Open ingress ports (HTTP/HTTPS) with rate limiting
   community.general.ufw:
@@ -71,4 +78,9 @@
   loop:
     - "80"
     - "443"
-  notify: Reload UFW
+  when: k3s_lab_ufw_enabled | bool
+  register: k3s_agent_ufw_ingress_ports
+  until: k3s_agent_ufw_ingress_ports is succeeded
+  retries: "{{ k3s_lab_ufw_retries }}"
+  delay: "{{ k3s_lab_ufw_delay }}"
+  notify: Reload UFW (k3s_agent)

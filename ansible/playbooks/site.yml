@@ -34,3 +34,11 @@
         mode: "0600"
       delegate_to: localhost
       become: false
+
+# Must stay the LAST play: the firewall comes up only once every role has
+# registered its rules. See roles/ufw_enable/tasks/main.yml.
+- name: Enable the firewall on all nodes
+  hosts: all
+  become: true
+  roles:
+    - ufw_enable

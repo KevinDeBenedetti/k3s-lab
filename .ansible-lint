@@ -1,0 +1,37 @@
+---
+# =============================================================================
+# ansible-lint configuration
+#
+# The `ansible` job in .github/workflows/ci.yml runs this as a BLOCKING check.
+# It was advisory when introduced on 2026-08-17, only because the sandbox it was
+# written in could not install ansible-lint and so could not measure how much
+# existing debt a first pass would report. That measurement has since been done
+# (2026-08-18): the tree is clean apart from the single rule disabled below, so
+# there was nothing to triage away and no reason to keep the check decorative.
+# =============================================================================
+
+exclude_paths:
+  # Holds node IPs and secrets; gitignored, so it does not exist on CI anyway.
+  - inventory/
+
+skip_list:
+  # var-naming[no-role-prefix] — "variables in a role must start with <role>_".
+  #
+  # Disabled deliberately: this repo shares variables across roles ON PURPOSE,
+  # and every one of the 40 findings this rule produced was an instance of that
+  # design rather than an accident.
+  #
+  #   * `k3s_version` and `k3s_installer_checksum` are read by BOTH k3s_server
+  #     and k3s_agent, which is the point — the two must install the same k3s.
+  #     Renaming them to `k3s_server_version` / `k3s_agent_version` would create
+  #     exactly the skew the shared name prevents.
+  #   * `k3s_lab_ufw_enabled` / `_retries` / `_delay` are the single firewall
+  #     switch, redeclared with the same default in all five roles precisely so
+  #     that one entry in group_vars/all.yml governs the lot. A per-role prefix
+  #     would give five independent switches and put back the bug fixed on
+  #     2026-08-17, where `common_ufw_enabled` guarded only the common role.
+  #   * `kine_vacuum_*` name the kine-vacuum unit they configure, not the role
+  #     that happens to install it.
+  #
+  # See docs/configuration.md, "Ansible role variables (not `.env`)".
+  - var-naming[no-role-prefix]

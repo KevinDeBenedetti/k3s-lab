@@ -21,9 +21,13 @@
     not k3s_binary.stat.exists or
     k3s_version not in (k3s_installed_version.stdout | default(''))
 
+# Invoked through `bash <script>` rather than executed directly: CIS-hardened
+# hosts mount /tmp with `noexec`, which makes the 0700 bit useless and fails the
+# install with "Permission denied". The interpreter reads the file, it does not
+# exec it, so noexec no longer applies.
 - name: Install k3s server
   ansible.builtin.command:
-    cmd: /tmp/k3s-install.sh
+    cmd: bash /tmp/k3s-install.sh
   environment:
     INSTALL_K3S_VERSION: "{{ k3s_version }}"
     INSTALL_K3S_EXEC: >-
@@ -92,7 +96,12 @@
     - { port: "6443", proto: tcp }
     - { port: "8472", proto: udp }
     - { port: "10250", proto: tcp }
-  notify: Reload UFW
+  when: k3s_lab_ufw_enabled | bool
+  register: k3s_ufw_agent_ports
+  until: k3s_ufw_agent_ports is succeeded
+  retries: "{{ k3s_lab_ufw_retries }}"
+  delay: "{{ k3s_lab_ufw_delay }}"
+  notify: Reload UFW (k3s_server)
 
 - name: Open API port (6443) for extra allowed CIDRs
   community.general.ufw:
@@ -101,7 +110,12 @@
     proto: tcp
     from_ip: "{{ item }}"
   loop: "{{ k3s_api_extra_allow_from }}"
-  notify: Reload UFW
+  when: k3s_lab_ufw_enabled | bool
+  register: k3s_ufw_api_extra
+  until: k3s_ufw_api_extra is succeeded
+  retries: "{{ k3s_lab_ufw_retries }}"
+  delay: "{{ k3s_lab_ufw_delay }}"
+  notify: Reload UFW (k3s_server)
   tags: [api-access]
 
 - name: Open ingress ports (HTTP/HTTPS) with rate limiting
@@ -112,7 +126,12 @@
   loop:
     - "80"
     - "443"
-  notify: Reload UFW
+  when: k3s_lab_ufw_enabled | bool
+  register: k3s_ufw_ingress_ports
+  until: k3s_ufw_ingress_ports is succeeded
+  retries: "{{ k3s_lab_ufw_retries }}"
+  delay: "{{ k3s_lab_ufw_delay }}"
+  notify: Reload UFW (k3s_server)
 
 - name: Fetch kubeconfig
   ansible.builtin.slurp:

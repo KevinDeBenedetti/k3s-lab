@@ -45,13 +45,21 @@
         regexp: '\sswap\s'
         state: absent
 
-- name: Configure UFW
-  when: common_ufw_enabled
+# Rules only — UFW is *enabled* at the very end of the run by the `ufw_enable`
+# role, once k3s_server/k3s_agent/wireguard have added theirs. Enabling here
+# would mean an interrupted playbook leaves the node behind an active firewall
+# that allows nothing but SSH (and, on a bad day, not even that).
+- name: Configure UFW rules
+  when: k3s_lab_ufw_enabled | bool
   block:
     - name: Set UFW default incoming policy
       community.general.ufw:
         default: "{{ common_ufw_default_policy }}"
         direction: incoming
+      register: common_ufw_default
+      until: common_ufw_default is succeeded
+      retries: "{{ k3s_lab_ufw_retries }}"
+      delay: "{{ k3s_lab_ufw_delay }}"
 
     - name: Allow SSH through UFW
       community.general.ufw:
@@ -59,10 +67,10 @@
         port: "{{ common_ssh_port }}"
         proto: tcp
       when: common_ufw_allow_ssh
-
-    - name: Enable UFW
-      community.general.ufw:
-        state: enabled
+      register: common_ufw_ssh
+      until: common_ufw_ssh is succeeded
+      retries: "{{ k3s_lab_ufw_retries }}"
+      delay: "{{ k3s_lab_ufw_delay }}"
 
 - name: Configure login MOTD (server overview on SSH login)
   when: common_motd_enabled

@@ -28,5 +28,11 @@ k3s_node_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
 # Extra args for the agent
 k3s_extra_agent_args: ""
 
-# Firewall: allow traffic from private network
+# Firewall. Single repo-wide switch, redeclared here for the same reason as in
+# the k3s_server role. See roles/common/defaults/main.yml.
+k3s_lab_ufw_enabled: "{{ common_ufw_enabled | default(true) }}"
+k3s_lab_ufw_retries: 5
+k3s_lab_ufw_delay: 3
+
+# Allow traffic from private network
 k3s_ufw_allow_from: "10.0.0.0/16"

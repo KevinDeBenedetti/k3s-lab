@@ -1,0 +1,197 @@
+# =============================================================================
+# Kyverno CRDs — confront the rendered policies with what the cluster accepts
+#
+# scripts/check-kyverno-crds.sh existed since the 2026-08-13 incident but nothing
+# triggered it, so it could only ever catch the *next* outage if someone thought
+# to run it by hand — which is the same failure mode it was written to close.
+# This workflow is what triggers it.
+#
+# It asks two questions no offline check can answer, because both are about the
+# cluster and not about the repository:
+#   1. Is the CRD backing `kyverno.io/v1 ClusterPolicy` present and still serving
+#      v1? If not, the Application does not degrade — it fails to sync outright.
+#   2. Do the six rendered policies actually EXIST in the cluster? On 2026-08-13
+#      they did not: the ArgoCD AppProject `platform` omitted
+#      `kyverno.io/ClusterPolicy` from its clusterResourceWhitelist and all six
+#      were refused at sync for 32h, while the Application sat OutOfSync/Healthy
+#      — green enough to miss.
+#
+# ⚠️ REQUIRES CLUSTER ACCESS, WHICH THIS REPOSITORY DOES NOT YET HAVE.
+# No other workflow here talks to a cluster; they are all offline. Two things
+# must be set up before this job can pass, and both are deliberate decisions:
+#
+#   a) secret KUBECONFIG — a base64 kubeconfig for a **read-only** principal.
+#      The script only ever runs `kubectl get crd` and `kubectl get clusterpolicy`,
+#      so a ServiceAccount bound to a role with `get`/`list` on those two
+#      resources is enough. Do not put a cluster-admin kubeconfig in a secret.
+#
+#   b) reachability — the k3s API on 6443 is firewalled by the ansible roles to
+#      `k3s_ufw_allow_from` (10.0.0.0/16) plus `k3s_api_extra_allow_from`, which
+#      is empty by default. A GitHub-hosted runner has a dynamic public IP and is
+#      therefore blocked. Opening 6443 to GitHub's published ranges widens the
+#      cluster's exposure appreciably; a self-hosted runner inside the cluster, or
+#      one on the WireGuard subnet, keeps the API private and is the better trade.
+#      That choice is not made here.
+#
+# Until both exist the job fails loudly rather than skipping in silence — the
+# same convention as INFRA_READ_TOKEN in traefik-advisories.yml, and for the same
+# reason: the check that answers "what is actually in production" is the one that
+# must never be skippable without anyone noticing.
+# =============================================================================
+name: Kyverno CRDs
+
+on:
+  # ⚠️ THE DAILY SCHEDULE IS INTENTIONALLY COMMENTED OUT — uncomment it, in the
+  # same commit as the KUBECONFIG secret, to finish wiring this check.
+  #
+  # Left off because the job cannot pass yet (see the header: no secret, and no
+  # route from a GitHub-hosted runner to 6443). Enabling it now would fail every
+  # morning AND open a tracking issue on the first run, for a cause that is not a
+  # Kyverno problem at all — which is how a red check becomes one nobody reads,
+  # the exact habit this workflow exists to break.
+  #
+  # Until then `workflow_dispatch` makes it runnable on demand, which is strictly
+  # better than the script having no trigger at all, but is NOT the end state:
+  # the point of the check is to notice a policy silently missing from the
+  # cluster without anyone thinking to look.
+  #
+  # schedule:
+  #   # Daily, offset from the top of the hour (GitHub saturates :00), and on a
+  #   # different minute than traefik-advisories so the two do not queue together.
+  #   - cron: "37 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: kyverno-crds
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  ISSUE_TITLE: "🔒 Kyverno: the rendered policies do not match the cluster"
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.17.0
+
+      - name: Confront the rendered Kyverno policies with the cluster
+        id: check
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG }}
+        run: |
+          set +e
+
+          if [ -z "${KUBECONFIG_B64:-}" ]; then
+            # A failure, not a warning — see the header. A skipped cluster check
+            # is indistinguishable from a passing one on the Actions home page,
+            # and this script exists precisely because nobody was looking.
+            echo "::error::KUBECONFIG is not set — the cluster was NOT checked. \
+          This job cannot answer whether the Kyverno policies are installable or \
+          present. Set the secret (and give the runner a route to 6443), or \
+          delete this workflow: what it must not do is keep reporting green."
+            printf 'FAILED — KUBECONFIG secret not set, the cluster was NOT checked.\n' \
+              > /tmp/kyverno.log
+            echo "status=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
+            chmod 600 /tmp/kubeconfig
+            export KUBECONFIG=/tmp/kubeconfig
+
+            ./scripts/check-kyverno-crds.sh 2>&1 | tee /tmp/kyverno.log
+            echo "status=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+            rm -f /tmp/kubeconfig
+          fi
+
+          set -e
+
+          {
+            echo "## Kyverno policies vs. cluster"
+            echo ""
+            echo '```'
+            cat /tmp/kyverno.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit 0
+
+      - name: Open or update the tracking issue
+        if: steps.check.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          body_file=/tmp/issue-body.md
+          {
+            echo "The Kyverno policies rendered by \`charts/platform-security\` disagree with"
+            echo "the cluster, or the cluster could not be read at all."
+            echo ""
+            echo '```'
+            cat /tmp/kyverno.log
+            echo '```'
+            echo ""
+            echo "### What to do"
+            echo ""
+            echo "**\"no CRD for it in this cluster\"** — the Kyverno engine is not installed, or"
+            echo "not at a version serving that apiVersion. Enable it first"
+            echo "(\`kyverno.enabled=true\`, \`kyvernoPolicies.enabled=false\` for the first pass),"
+            echo "then turn the policies on."
+            echo ""
+            echo "**\"renders, is installable, and is NOT in the cluster\"** — the policy is being"
+            echo "refused upstream rather than being broken. This is the 2026-08-13 failure:"
+            echo "check the ArgoCD AppProject's \`clusterResourceWhitelist\` for"
+            echo "\`kyverno.io/ClusterPolicy\`, then the Application's sync conditions. The"
+            echo "Application can sit \`OutOfSync\`/\`Healthy\` throughout, so it will not alert."
+            echo ""
+            echo "**\"KUBECONFIG secret not set\"** — nothing is wrong with the policies; this"
+            echo "workflow has never had cluster access. See the header of"
+            echo "\`.github/workflows/kyverno-crds.yml\` for what setting it up entails,"
+            echo "including why opening 6443 to GitHub-hosted runners is the worse option."
+            echo ""
+            echo "Reproduce locally, where the kubeconfig already exists:"
+            echo "\`./scripts/check-kyverno-crds.sh\`."
+            echo ""
+            echo "---"
+            echo "_Updated by [\`kyverno-crds\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) on $(date -u '+%Y-%m-%d %H:%M UTC')._"
+          } > "$body_file"
+
+          existing=$(gh issue list --state open --search "$ISSUE_TITLE in:title" \
+            --json number --jq '.[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file "$body_file"
+            echo "♻️  Issue #$existing updated"
+          else
+            gh issue create --title "$ISSUE_TITLE" --body-file "$body_file" \
+              --label security
+            echo "🆕 Tracking issue created"
+          fi
+
+      - name: Close the tracking issue when the cluster agrees again
+        if: steps.check.outputs.status == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh issue list --state open --search "$ISSUE_TITLE in:title" \
+            --json number --jq '.[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" \
+              --comment "The rendered Kyverno policies are installable and present in the cluster — closed automatically."
+            echo "✅ Issue #$existing closed"
+          else
+            echo "✅ Cluster agrees with the render, no open issue"
+          fi
+
+      - name: Fail when the policies disagree with the cluster or it is unreadable
+        if: steps.check.outputs.status != '0'
+        run: |
+          echo "::error::Kyverno CRD watch failed — a policy is not installable, not present in the cluster, or the cluster could not be read. See the job summary and the tracking issue."
+          exit 1
