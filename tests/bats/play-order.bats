@@ -6,7 +6,12 @@
 # shell-ci job, where ansible is not installed. The stub prints a canned listing
 # per playbook, in ansible's real `--list-tasks` format.
 #
-# The invariant under test is the one that costs a rescue-console session when it
+# Two invariants are under test, and they fail independently: the enabler must
+# run LAST, and it must run on EVERY host that received a rule. A final play
+# reading `hosts: k3s_servers` satisfies the first and breaks the second, leaving
+# the agents with rules behind a firewall nothing ever enables.
+#
+# The first invariant is the one that costs a rescue-console session when it
 # breaks: UFW is enabled by the `ufw_enable` role in the final play, after every
 # other role has registered its rules. Both ways of breaking it are covered —
 # scheduling something after the enabler, and dropping the enabler altogether —
@@ -53,6 +58,7 @@ EOF
   run_check
   [ "$status" -eq 0 ]
   [[ "$output" == *"enables the firewall last"* ]]
+  [[ "$output" == *"covering: all"* ]]
 }
 
 @test "fails when a role is scheduled after ufw_enable" {
@@ -160,4 +166,70 @@ EOF
 @test "a missing playbook directory is a usage error" {
   run "$SCRIPT" --playbooks "${BATS_TEST_TMPDIR}/nope"
   [ "$status" -eq 2 ]
+}
+
+@test "fails when the enabler runs on fewer hosts than the rules did" {
+  playbook site.yml <<'EOF'
+  play #1 (all): Base setup	TAGS: []
+    tasks:
+      common : Set UFW default incoming policy	TAGS: []
+  play #2 (k3s_agents): Agents	TAGS: []
+    tasks:
+      k3s_agent : Open firewall ports for cluster communication	TAGS: []
+  play #3 (k3s_servers): Enable the firewall	TAGS: []
+    tasks:
+      ufw_enable : Enable UFW	TAGS: [ufw]
+EOF
+  run_check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"does not cover every host"* ]]
+  [[ "$output" == *"not covered:"* ]]
+  [[ "$output" == *"k3s_agents"* ]]
+}
+
+@test "an enabler on 'all' covers every pattern" {
+  playbook site.yml <<'EOF'
+  play #1 (k3s_servers): Servers	TAGS: []
+    tasks:
+      k3s_server : Open firewall ports for agents	TAGS: []
+  play #2 (k3s_agents): Agents	TAGS: []
+    tasks:
+      k3s_agent : Open ingress ports (HTTP/HTTPS) with rate limiting	TAGS: []
+  play #3 (all): Enable the firewall	TAGS: []
+    tasks:
+      ufw_enable : Enable UFW	TAGS: [ufw]
+EOF
+  run_check
+  [ "$status" -eq 0 ]
+}
+
+@test "an exact host match on a single group is accepted" {
+  playbook k3s-server.yml <<'EOF'
+  play #1 (k3s_servers): Servers	TAGS: []
+    tasks:
+      common : Allow SSH through UFW	TAGS: []
+      wireguard : Open WireGuard port in UFW	TAGS: []
+  play #2 (k3s_servers): Enable the firewall	TAGS: []
+    tasks:
+      ufw_enable : Enable UFW	TAGS: [ufw]
+EOF
+  run_check
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"covering: k3s_servers"* ]]
+}
+
+@test "a ':' union on the enabler side covers each of its members" {
+  playbook site.yml <<'EOF'
+  play #1 (k3s_servers): Servers	TAGS: []
+    tasks:
+      k3s_server : Open firewall ports for agents	TAGS: []
+  play #2 (k3s_agents): Agents	TAGS: []
+    tasks:
+      k3s_agent : Open ingress ports (HTTP/HTTPS) with rate limiting	TAGS: []
+  play #3 (k3s_servers:k3s_agents): Enable the firewall	TAGS: []
+    tasks:
+      ufw_enable : Enable UFW	TAGS: [ufw]
+EOF
+  run_check
+  [ "$status" -eq 0 ]
 }

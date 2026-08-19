@@ -124,10 +124,23 @@ while IFS=$'\t' read -r chart pinned; do
   # Every published release strictly newer than the pin, oldest first. Counting
   # these rather than diffing version numbers is what makes "3 behind" mean
   # three actual releases: 0.17.0 → 0.18.2 is two, not eleven.
+  # The `if` is load-bearing, and a plain `[ … ] && printf` here is a bug this
+  # script shipped with. That form makes the loop body exit non-zero on every tag
+  # that is NOT newer than the pin; the `while` inherits the last body status,
+  # `pipefail` propagates it through the pipeline, and `set -e` then kills the
+  # whole script on this assignment WITHOUT printing anything — the log simply
+  # stops after the header.
+  #
+  # It only bites once a pin catches up to the newest published release (no tag
+  # is newer, so the last iteration always fails), which is why a check meant to
+  # watch for drift broke exactly when the drift was fixed. It opened issue #76,
+  # whose section 3 is a single header line and no verdict.
   newer="$(
     printf '%s\n' "$tags" | while IFS= read -r t; do
       [[ "$t" =~ ^[vV]?[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
-      [ "$(semver_cmp "$t" "$pinned")" = "1" ] && printf '%s\n' "$t"
+      if [ "$(semver_cmp "$t" "$pinned")" = "1" ]; then
+        printf '%s\n' "$t"
+      fi
     done | sort -t. -k1,1n -k2,2n -k3,3n
   )"
   behind="$(printf '%s' "$newer" | grep -c . || true)"

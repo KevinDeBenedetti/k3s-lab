@@ -186,3 +186,67 @@ policy_count() {
     dep && $1 == "condition:"  { print $2; exit }
   ' "${CHART_SRC}/Chart.yaml" | grep -qx 'trivy-operator.enabled'
 }
+
+# ─── Namespace exclusions ───────────────────────────────────────────────────
+# The six policies carry DIFFERENT exclusion lists (2 to 8 namespaces), tailored
+# to what each one actually has to let through. They are not six copies of one
+# list, and the tempting "let's factor this out" refactor would widen five of
+# them at once — silently, since a wider exclusion never fails a render.
+#
+# `ci` (the ARC runner namespace) was added on 2026-08-19 to exactly the two
+# policies those pods violate, replacing infra's PolicyException. These tests
+# pin both halves: that it IS excluded where it must be, and that it is NOT
+# excluded anywhere else.
+
+# ns_for POLICY <<< render — the namespaces a policy's first rule excludes
+ns_for() {
+  policy_docs | awk -v want="$1" '
+    /^kind: ClusterPolicy$/ { inpol = 0 }
+    $1 == "name:" && $2 == want && !seen { inpol = 1; seen = 1; next }
+    inpol && /namespaces:/ { grab = 1; next }
+    grab && /^[[:space:]]*#/ { next }
+    grab && /^[[:space:]]*$/ { next }
+    grab && /^[[:space:]]*-[[:space:]]/ { gsub(/^[[:space:]]*-[[:space:]]*/, ""); print; next }
+    grab { grab = 0 }
+  '
+}
+
+@test "the ci namespace is excluded from require-ro-rootfs" {
+  run render --set kyverno.enabled=true --set kyvernoPolicies.enabled=true
+  [ "$status" -eq 0 ]
+  ns="$(ns_for require-ro-rootfs <<<"$output")"
+  [[ "$ns" == *"ci"* ]]
+}
+
+@test "the ci namespace is excluded from restrict-capabilities" {
+  run render --set kyverno.enabled=true --set kyvernoPolicies.enabled=true
+  [ "$status" -eq 0 ]
+  ns="$(ns_for restrict-capabilities <<<"$output")"
+  [[ "$ns" == *"ci"* ]]
+}
+
+@test "the ci exemption does NOT leak into the other four policies" {
+  run render --set kyverno.enabled=true --set kyvernoPolicies.enabled=true
+  [ "$status" -eq 0 ]
+  for policy in require-non-root require-pod-resources \
+                disallow-privilege-escalation disallow-latest-tag; do
+    ns="$(ns_for "$policy" <<<"$output")"
+    if grep -qx 'ci' <<<"$ns"; then
+      echo "FAIL: '$policy' excludes ci; only require-ro-rootfs and"
+      echo "      restrict-capabilities should. The ARC runners violate those two"
+      echo "      and nothing else — a wider exemption is a security regression"
+      echo "      that no render will complain about."
+      return 1
+    fi
+  done
+}
+
+@test "the exclusion lists stay distinct, not unified into one" {
+  run render --set kyverno.enabled=true --set kyvernoPolicies.enabled=true
+  [ "$status" -eq 0 ]
+  a="$(ns_for disallow-privilege-escalation <<<"$output" | sort | tr '\n' ' ')"
+  b="$(ns_for require-ro-rootfs <<<"$output" | sort | tr '\n' ' ')"
+  # If these ever become equal, someone factored the lists together and
+  # disallow-privilege-escalation just gained five exemptions it never had.
+  [ "$a" != "$b" ]
+}

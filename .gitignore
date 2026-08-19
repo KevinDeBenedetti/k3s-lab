@@ -17,6 +17,12 @@ kubeconfig*.yaml
 
 # Ansible
 ansible/*.retry
+# Generated inventory — holds the nodes' public AND private IPs, written by
+# scripts/generate-inventory.sh from terraform outputs. Never committed.
+# scripts/check-inventory-ignored.sh asserts these rules stay live: an ignore
+# rule that silently stops matching is the whole failure mode here, since an
+# untracked-but-unignored file is one `git add -A` away from being published.
+ansible/inventory/
 
 # Helm — downloaded chart dependencies (re-fetched by helm dependency update)
 charts/**/charts/*.tgz

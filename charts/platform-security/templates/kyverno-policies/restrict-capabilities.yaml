@@ -33,6 +33,11 @@ spec:
                 - ingress
                 - cert-manager
                 - monitoring
+                # ARC runner pods: the runner writes its work dir and the
+                # Kaniko init container copies its executor. Replaces infra's
+                # PolicyException (2026-08-17). Added here and in require-ro-rootfs
+                # ONLY — the 6 policies keep distinct lists on purpose.
+                - ci
       validate:
         failureAction: {{ include "platform-security.failureAction" . }}
         message: "Containers must drop ALL capabilities and may only add NET_BIND_SERVICE."

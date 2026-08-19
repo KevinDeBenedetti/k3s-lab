@@ -33,6 +33,11 @@ spec:
                 - external-secrets
                 - cert-manager
                 - ingress
+                # ARC runner pods: the runner writes its work dir and the
+                # Kaniko init container copies its executor. Replaces infra's
+                # PolicyException (2026-08-17). Added here and in restrict-capabilities
+                # ONLY — the 6 policies keep distinct lists on purpose.
+                - ci
       validate:
         failureAction: {{ include "platform-security.failureAction" . }}
         message: "Containers must use read-only root filesystem (securityContext.readOnlyRootFilesystem: true)."

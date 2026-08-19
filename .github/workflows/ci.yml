@@ -262,6 +262,13 @@ jobs:
       - name: Assert the firewall is still enabled last
         run: ./scripts/check-play-order.sh
 
+      # The inventory holds the nodes' public and private IPs. Until 2026-08-19
+      # .gitignore's only Ansible entry was `ansible/*.retry`, so the generated
+      # files were untracked but NOT ignored — invisible to every check here and
+      # one `git add -A` from being published.
+      - name: Assert the generated inventory cannot be committed
+        run: ./scripts/check-inventory-ignored.sh
+
       # Blocking since 2026-08-18. It was advisory for one day, only because the
       # sandbox it was written in could not install ansible-lint and so could not
       # measure the existing debt; gating on an unmeasured finding count would
