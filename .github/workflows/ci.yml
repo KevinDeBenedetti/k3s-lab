@@ -233,6 +233,15 @@ jobs:
           python3 -m pip install --quiet 'ansible-core==2.21.3'
           ansible-galaxy collection install -r ansible/requirements.yml
 
+      # Runs BEFORE ansible-lint on purpose. ansible-lint's `syntax-check` rules
+      # are tagged `unskippable`, so a collection that failed to install does not
+      # surface as a dependency problem — it surfaces as
+      # "couldn't resolve module/action 'community.general.ufw'" on every task
+      # that uses it, which reads as a typo in a file nobody touched. This names
+      # the real cause first.
+      - name: Verify the collections match the pins
+        run: ./scripts/check-ansible-collections.sh
+
       - name: Syntax-check every playbook
         working-directory: ansible
         run: |
@@ -243,6 +252,15 @@ jobs:
             echo "::endgroup::"
           done
           exit "$status"
+
+      # `--syntax-check` proves each playbook parses and resolves its roles; it
+      # says nothing about the ORDER they run in. This asserts the one ordering
+      # that is load-bearing: UFW is turned on by the last play, after every rule
+      # is registered. Moving that play earlier, or appending a role after it,
+      # passes lint and syntax-check and only shows up on an interrupted run
+      # against a real node — as a locked-out machine.
+      - name: Assert the firewall is still enabled last
+        run: ./scripts/check-play-order.sh
 
       # Blocking since 2026-08-18. It was advisory for one day, only because the
       # sandbox it was written in could not install ansible-lint and so could not

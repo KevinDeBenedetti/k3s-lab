@@ -16,44 +16,50 @@
 #      were refused at sync for 32h, while the Application sat OutOfSync/Healthy
 #      — green enough to miss.
 #
-# ⚠️ REQUIRES CLUSTER ACCESS, WHICH THIS REPOSITORY DOES NOT YET HAVE.
-# No other workflow here talks to a cluster; they are all offline. Two things
-# must be set up before this job can pass, and both are deliberate decisions:
+# ⚠️ RUNS ON A SELF-HOSTED RUNNER INSIDE THE CLUSTER, WHICH DOES NOT EXIST YET.
 #
-#   a) secret KUBECONFIG — a base64 kubeconfig for a **read-only** principal.
-#      The script only ever runs `kubectl get crd` and `kubectl get clusterpolicy`,
-#      so a ServiceAccount bound to a role with `get`/`list` on those two
-#      resources is enough. Do not put a cluster-admin kubeconfig in a secret.
+# Routing decision, 2026-08-19: the check reaches the API from a GitHub Actions
+# runner running IN the cluster (ARC), not from a GitHub-hosted one. ARC is
+# already deployed in infra — controller in `arc-systems`, scale sets in `ci` —
+# so this needs a fourth scale set registered to THIS repository (a personal
+# account has no org-level runners, hence one scale set per repo).
 #
-#   b) reachability — the k3s API on 6443 is firewalled by the ansible roles to
-#      `k3s_ufw_allow_from` (10.0.0.0/16) plus `k3s_api_extra_allow_from`, which
-#      is empty by default. A GitHub-hosted runner has a dynamic public IP and is
-#      therefore blocked. Opening 6443 to GitHub's published ranges widens the
-#      cluster's exposure appreciably; a self-hosted runner inside the cluster, or
-#      one on the WireGuard subnet, keeps the API private and is the better trade.
-#      That choice is not made here.
+# That inverts the network direction and removes a whole class of setup:
 #
-# Until both exist the job fails loudly rather than skipping in silence — the
-# same convention as INFRA_READ_TOKEN in traefik-advisories.yml, and for the same
-# reason: the check that answers "what is actually in production" is the one that
-# must never be skippable without anyone noticing.
+#   * No KUBECONFIG secret. The runner pod carries a ServiceAccount, so kubectl
+#     authenticates in-cluster. There is no kubeconfig to generate, store in a
+#     GitHub secret, or rotate. The read-only principal is the SA itself,
+#     `kyverno-policy-reader`, bound to a ClusterRole granting `get`/`list` on
+#     customresourcedefinitions and kyverno.io/clusterpolicies — nothing else.
+#
+#   * No firewall change. Nothing reaches in; the runner dials out to GitHub.
+#     The API keeps its current exposure, which since 2026-08-17 is governed by
+#     the Hetzner Cloud firewall (terraform), NOT by UFW — UFW is disabled on the
+#     k3s servers after a `ufw enable` on k3s-mangled netfilter chains cost three
+#     hours of downtime.
+#
+# What is still missing, tracked in infra/TODO.md:
+#   platform/arc/runners-k3s-lab-values.yaml   (scale set, runnerScaleSetName: k3s-lab)
+#   argocd/applications/arc-runners-k3s-lab.yaml
+#   platform/security/manifests/  → SA + ClusterRole + ClusterRoleBinding
+#   secret arc-github-k3s-lab-secret (PAT, scope repo)
+#
 # =============================================================================
 name: Kyverno CRDs
 
 on:
-  # ⚠️ THE DAILY SCHEDULE IS INTENTIONALLY COMMENTED OUT — uncomment it, in the
-  # same commit as the KUBECONFIG secret, to finish wiring this check.
+  # ⚠️ THE DAILY SCHEDULE IS STILL COMMENTED OUT — uncomment it in the same
+  # commit that lands the `k3s-lab` scale set, and not before.
   #
-  # Left off because the job cannot pass yet (see the header: no secret, and no
-  # route from a GitHub-hosted runner to 6443). Enabling it now would fail every
-  # morning AND open a tracking issue on the first run, for a cause that is not a
-  # Kyverno problem at all — which is how a red check becomes one nobody reads,
-  # the exact habit this workflow exists to break.
+  # The reason changed on 2026-08-19 and got sharper. It used to be that a
+  # scheduled run would FAIL for want of a KUBECONFIG. Now that the job targets
+  # `runs-on: k3s-lab`, a run with no such runner registered does not fail at
+  # all — GitHub leaves it QUEUED until the 6-hour default timeout, every single
+  # day. A queued job is even quieter than a red one: nothing goes red, nothing
+  # opens an issue, and the check simply never reports.
   #
-  # Until then `workflow_dispatch` makes it runnable on demand, which is strictly
-  # better than the script having no trigger at all, but is NOT the end state:
-  # the point of the check is to notice a policy silently missing from the
-  # cluster without anyone thinking to look.
+  # Order matters: scale set first, verify once with workflow_dispatch, then arm
+  # the cron.
   #
   # schedule:
   #   # Daily, offset from the top of the hour (GitHub saturates :00), and on a
@@ -74,7 +80,10 @@ env:
 
 jobs:
   watch:
-    runs-on: ubuntu-latest
+    # ARC scale set registered to this repository. Its pod runs the
+    # `kyverno-policy-reader` ServiceAccount, which is what gives kubectl its
+    # (read-only) identity — see the header.
+    runs-on: k3s-lab
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -82,35 +91,52 @@ jobs:
         with:
           version: v3.17.0
 
+      # `ubuntu-latest` ships kubectl; the ARC runner image
+      # (ghcr.io/actions/actions-runner) does NOT — it is a bare runner, not the
+      # GitHub toolcache image. Without this step the job dies on the script's
+      # first `kubectl get crd`, and the tracking issue would blame the cluster.
+      #
+      # Version tracks the cluster's k3s (v1.36.3+k3s1). kubectl supports one
+      # minor of skew either way, so this needs revisiting when k3s is upgraded
+      # by more than that — not on every patch.
+      #
+      # The digest is fetched from the same host that serves the binary, so this
+      # guards against a truncated or corrupted download, not against a
+      # compromised dl.k8s.io. Hardcoding it would be stronger; get the value
+      # with `curl -L https://dl.k8s.io/release/v1.36.3/bin/linux/amd64/kubectl.sha256`.
+      - name: Install kubectl
+        env:
+          KUBECTL_VERSION: v1.36.3
+        run: |
+          set -euo pipefail
+          # Installed into a runner-owned directory and exported via GITHUB_PATH,
+          # NOT into /usr/local/bin: the ARC image runs as the unprivileged
+          # `runner` user with no sudo, and infra's runner values additionally set
+          # `allowPrivilegeEscalation: false`. A `sudo mv` here would fail on the
+          # very runner this job targets, while working fine on ubuntu-latest —
+          # the worst kind of difference to discover in production.
+          bindir="${RUNNER_TEMP}/bin"
+          mkdir -p "$bindir"
+          base="https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64"
+          curl -fsSLo "$bindir/kubectl" "${base}/kubectl"
+          curl -fsSLo "$bindir/kubectl.sha256" "${base}/kubectl.sha256"
+          (cd "$bindir" && echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check --status)
+          rm -f "$bindir/kubectl.sha256"
+          chmod +x "$bindir/kubectl"
+          echo "$bindir" >> "$GITHUB_PATH"
+          "$bindir/kubectl" version --client
+
+      # No `env: KUBECONFIG` and no secret. The runner pod carries the
+      # `kyverno-policy-reader` ServiceAccount, so kubectl picks up in-cluster
+      # credentials from the mounted token automatically. If this job ever moves
+      # back to a GitHub-hosted runner, it will fail here with "Unable to connect
+      # to the server" — which is the correct, loud outcome, not a silent skip.
       - name: Confront the rendered Kyverno policies with the cluster
         id: check
-        env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG }}
         run: |
           set +e
-
-          if [ -z "${KUBECONFIG_B64:-}" ]; then
-            # A failure, not a warning — see the header. A skipped cluster check
-            # is indistinguishable from a passing one on the Actions home page,
-            # and this script exists precisely because nobody was looking.
-            echo "::error::KUBECONFIG is not set — the cluster was NOT checked. \
-          This job cannot answer whether the Kyverno policies are installable or \
-          present. Set the secret (and give the runner a route to 6443), or \
-          delete this workflow: what it must not do is keep reporting green."
-            printf 'FAILED — KUBECONFIG secret not set, the cluster was NOT checked.\n' \
-              > /tmp/kyverno.log
-            echo "status=1" >> "$GITHUB_OUTPUT"
-          else
-            echo "$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
-            chmod 600 /tmp/kubeconfig
-            export KUBECONFIG=/tmp/kubeconfig
-
-            ./scripts/check-kyverno-crds.sh 2>&1 | tee /tmp/kyverno.log
-            echo "status=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
-
-            rm -f /tmp/kubeconfig
-          fi
-
+          ./scripts/check-kyverno-crds.sh 2>&1 | tee /tmp/kyverno.log
+          echo "status=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
           set -e
 
           {
@@ -150,10 +176,10 @@ jobs:
             echo "\`kyverno.io/ClusterPolicy\`, then the Application's sync conditions. The"
             echo "Application can sit \`OutOfSync\`/\`Healthy\` throughout, so it will not alert."
             echo ""
-            echo "**\"KUBECONFIG secret not set\"** — nothing is wrong with the policies; this"
-            echo "workflow has never had cluster access. See the header of"
-            echo "\`.github/workflows/kyverno-crds.yml\` for what setting it up entails,"
-            echo "including why opening 6443 to GitHub-hosted runners is the worse option."
+            echo "**\"Unable to connect to the server\"** — nothing is wrong with the policies."
+            echo "The job did not reach the API at all, so it ran somewhere without in-cluster"
+            echo "credentials: check that it landed on the \`k3s-lab\` ARC runner and that the"
+            echo "pod still carries the \`kyverno-policy-reader\` ServiceAccount."
             echo ""
             echo "Reproduce locally, where the kubeconfig already exists:"
             echo "\`./scripts/check-kyverno-crds.sh\`."

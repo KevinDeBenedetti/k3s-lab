@@ -1,0 +1,18 @@
+# =============================================================================
+# actionlint configuration
+#
+# Declares the self-hosted runner labels this repository targets. Without this,
+# actionlint rejects `runs-on: k3s-lab` as an unknown label — it only knows the
+# GitHub-hosted ones — and the shell-ci job fails.
+#
+# `k3s-lab` is an ARC (actions-runner-controller) runner scale set living in the
+# cluster, namespace `ci`, registered to this repository. Declared in infra:
+# platform/arc/runners-k3s-lab-values.yaml (runnerScaleSetName: k3s-lab).
+#
+# Keep this list minimal: every label added here is one actionlint stops being
+# able to catch as a typo, and a typo'd label does not fail — the job sits
+# queued until it times out.
+# =============================================================================
+self-hosted-runner:
+  labels:
+    - k3s-lab
