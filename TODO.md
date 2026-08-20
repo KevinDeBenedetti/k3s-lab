@@ -14,6 +14,8 @@
 ## 🟢 Idées / backlog
 
 ## 🤖 Claude — recommandations
+- [ ] CHORE: une fois le chart publié et le pin relevé côté infra, retirer `ci` de `infra/platform/security/manifests/policy-exceptions.yaml` — l'exemption est désormais portée par le chart (`require-ro-rootfs` + `restrict-capabilities`) ; garder les deux mécanismes signifie que retirer l'un ne changera rien d'observable, et fera passer la vérification pour concluante
+- [ ] CHORE: ajouter `k3s-lab` à l'installation de la GitHub App ARC — `infra/secrets/ci-secrets.yaml` est *CUTOVER PENDING* et son runbook ne liste que infra / portfolio-next / finance ; un scale set `k3s-lab` enregistré via le PAT actuel cesserait de s'enregistrer le jour de la bascule, en différé et sans rapport apparent avec elle
 - [ ] CHORE: infra épingle `platform-security` à `0.18.4` alors que `0.19.0` est publiée — 1 release de retard, sous le seuil de 3 donc non signalé, mais c'est le seul des 4 charts non aligné et l'écart contient le refactor `failureAction`
 - [ ] TEST: rien n'empêche le retour du piège `[ … ] && cmd` en fin de corps de boucle dans un pipeline capturé — shellcheck ne l'attrape pas, et il a coûté une issue ouverte pour une fausse dérive ; un grep de forme dans les checks CI serait peu coûteux
 
