@@ -61,10 +61,14 @@ on:
   # Order matters: scale set first, verify once with workflow_dispatch, then arm
   # the cron.
   #
-  # schedule:
-  #   # Daily, offset from the top of the hour (GitHub saturates :00), and on a
-  #   # different minute than traefik-advisories so the two do not queue together.
-  #   - cron: "37 6 * * *"
+  # ARMÉ le 2026-08-20, après un dispatch vert de bout en bout
+  # (run 32351877024) : runner ARC `k3s-lab` enregistré, SA
+  # `kyverno-policy-reader` authentifié in-cluster, 6 policies confrontées au
+  # cluster en ~30 s, issue de suivi correctement fermée.
+  schedule:
+    # Daily, offset from the top of the hour (GitHub saturates :00), and on a
+    # different minute than traefik-advisories so the two do not queue together.
+    - cron: "37 6 * * *"
   workflow_dispatch:
 
 concurrency:
