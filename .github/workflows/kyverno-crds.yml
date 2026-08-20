@@ -126,6 +126,51 @@ jobs:
           echo "$bindir" >> "$GITHUB_PATH"
           "$bindir/kubectl" version --client
 
+      # Same gap as kubectl, same cause: the ARC runner image ships a bare
+      # runner, not the GitHub toolcache image, so it has no `gh` either. Both
+      # issue steps below invoke it, and without this they die with
+      # `gh: command not found` — exit 127. Observed on the first dispatch runs
+      # (2026-08-20, runs 32350755174 and 32351119239): the check itself had
+      # already PASSED and the job still went red on the close-the-issue step.
+      #
+      # That failure mode is worth naming: what breaks is the REPORTING channel,
+      # not the check. Had the policies genuinely disagreed, "Open or update the
+      # tracking issue" would have failed identically — the job would go red with
+      # no issue explaining why. The signal survives, the diagnosis does not.
+      #
+      # Same constraints as kubectl: no sudo on this image, so install into a
+      # runner-owned dir and export via GITHUB_PATH. Checksum verified from the
+      # release's own checksums.txt — guards a truncated download, not a
+      # compromised github.com.
+      - name: Install gh
+        env:
+          GH_VERSION: 2.97.0
+        run: |
+          set -euo pipefail
+          bindir="${RUNNER_TEMP}/bin"
+          mkdir -p "$bindir"
+          tarball="gh_${GH_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/cli/cli/releases/download/v${GH_VERSION}"
+          curl -fsSLo "${RUNNER_TEMP}/${tarball}" "${base}/${tarball}"
+          curl -fsSLo "${RUNNER_TEMP}/gh_checksums.txt" "${base}/gh_${GH_VERSION}_checksums.txt"
+          # The checksum file lists every artifact of the release, so a bare
+          # `--check` fails on the ones we did not download and `--ignore-missing`
+          # is the usual answer. But that flag turns "nothing matched" into a
+          # pass on some implementations — a verification that verified nothing,
+          # which is worse than none because it reads as green. Selecting our one
+          # line first makes the assertion explicit: `grep` finds it or the step
+          # fails (set -e + pipefail), and sha256sum then checks exactly it.
+          (cd "${RUNNER_TEMP}" && grep " ${tarball}\$" gh_checksums.txt | sha256sum --check --status -)
+          tar -xzf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}"
+          mv "${RUNNER_TEMP}/gh_${GH_VERSION}_linux_amd64/bin/gh" "$bindir/gh"
+          chmod +x "$bindir/gh"
+          # `:?` on an `rm -rf` path: an unset RUNNER_TEMP would otherwise make
+          # these expand to /gh_… and delete from the filesystem root (SC2115).
+          rm -rf "${RUNNER_TEMP:?}/${tarball}" "${RUNNER_TEMP:?}/gh_checksums.txt" \
+                 "${RUNNER_TEMP:?}/gh_${GH_VERSION}_linux_amd64"
+          echo "$bindir" >> "$GITHUB_PATH"
+          "$bindir/gh" --version
+
       # No `env: KUBECONFIG` and no secret. The runner pod carries the
       # `kyverno-policy-reader` ServiceAccount, so kubectl picks up in-cluster
       # credentials from the mounted token automatically. If this job ever moves
