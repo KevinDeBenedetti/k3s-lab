@@ -237,8 +237,6 @@ jobs:
               echo "The \`${version}\` release published every subchart, so the umbrella's pins can now reference it. Opened automatically by \`release-charts\` right after publishing."
               echo ""
               echo "The \`umbrella-pins\` CI job on this PR is the proof the alignment is correct — merge on green. The commit is a \`chore:\` so merging does **not** trigger a new release; the aligned pins ship with the next one (the umbrella's structural one-release lag, by design)."
-              echo ""
-              echo "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
             } > /tmp/pr-body.md
             gh pr create --head "$branch" \
               --title "chore(charts/platform-deployment): align subchart pins to ${version}" \
