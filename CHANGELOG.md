@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.20.0...v0.21.0) (2026-08-20)
+
+
+### Features
+
+* **ci:** arm the daily kyverno-crds schedule ([8a91d10](https://github.com/KevinDeBenedetti/k3s-lab/commit/8a91d1070c346a206b5ce0224ee9f75c8a7d09c9))
+
 ## [0.20.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.19.0...v0.20.0) (2026-08-19)
 
 

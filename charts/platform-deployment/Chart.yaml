@@ -18,8 +18,8 @@ description: |
 
   Each subchart can be enabled/disabled independently via values.
 type: application
-version: 0.20.0
-appVersion: 0.20.0
+version: 0.21.0
+appVersion: 0.21.0
 dependencies:
   - name: platform-argocd
     version: 0.20.0
