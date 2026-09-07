@@ -3,12 +3,13 @@
 # Override per-cluster in infra/platform/traefik/values.yaml
 # =============================================================================
 traefik:
-  # PIN DROPPED 2026-09-07 — subchart bumped 41.1.0 -> 41.4.0, which ships
-  # appVersion v3.7.12. That patches every advisory that forced the previous
-  # v3.7.10 pin (GHSA-cjr6-pf59-jq29, GHSA-7ghq-v6jf-g56c, GHSA-m6wx-622r-48r9,
-  # GHSA-rf44-j88r-hh8c, GHSA-5w68-77r2-r64c, GHSA-j994-9gqj-9hwq,
-  # GHSA-g55h-rg46-x9c5 — see README.md), so a pin here would only duplicate
-  # upstream's own value and drift.
+  # PIN DROPPED 2026-09-07 — subchart bumped 41.1.0 -> 41.5.0, which ships
+  # appVersion v3.7.13. v3.7.12 (41.4.0, same-day bump) turned out to be
+  # covered by 5 more advisories published later that same day, one CRITICAL
+  # (GHSA-qqjf-53cj-pwvv, HTTP/3 backend NTLM connection reuse), plus
+  # GHSA-v67p-phpq-fc8x, GHSA-8fcf-v89g-xpg6, GHSA-f52w-8j3h-j724,
+  # GHSA-w4v4-9rw7-5326 — all patched in v3.7.13 (see README.md). A pin here
+  # would only duplicate upstream's own value and drift.
   #
   # RE-ADD `image.tag` only if a future advisory lands before upstream ships
   # the fix — never `versionOverride`, see README.md.

@@ -6,8 +6,8 @@ disabled, resource limits sized for a small node.
 
 | | |
 |---|---|
-| Subchart | `traefik` [`41.4.0`](https://traefik.github.io/charts) |
-| Deployed proxy | `docker.io/traefik:v3.7.12` (subchart `appVersion`, no pin — see below) |
+| Subchart | `traefik` [`41.5.0`](https://traefik.github.io/charts) |
+| Deployed proxy | `docker.io/traefik:v3.7.13` (subchart `appVersion`, no pin — see below) |
 | Per-cluster overrides | `infra/platform/traefik/values.yaml` |
 
 > The two versions in that table are copies of `Chart.lock` and of the value
@@ -30,11 +30,11 @@ The upstream Traefik chart declares, **in its `Chart.yaml` annotations**, the
 range of proxy versions it knows how to configure:
 
 ```yaml
-# charts/traefik/Chart.yaml (subchart 41.4.0)
+# charts/traefik/Chart.yaml (subchart 41.5.0)
 annotations:
   traefik.io/proxy-min-version: v3.6.0
-  traefik.io/proxy-max-version: v3.7.12
-appVersion: v3.7.12
+  traefik.io/proxy-max-version: v3.7.13
+appVersion: v3.7.13
 ```
 
 `templates/requirements.yaml` compares the proxy version against that range on
@@ -49,10 +49,10 @@ it does not download dependencies.
 
 1. `versionOverride` if set — **it short-circuits everything else**;
 2. otherwise `image.tag`;
-3. otherwise the subchart's `.Chart.AppVersion` (so `v3.7.12` here).
+3. otherwise the subchart's `.Chart.AppVersion` (so `v3.7.13` here).
 
 Step 3 is where we sit today: no pin is set, so the proxy is whatever the
-subchart's `appVersion` says (`v3.7.12` as of 41.4.0). Step 2 is the escape
+subchart's `appVersion` says (`v3.7.13` as of 41.5.0). Step 2 is the escape
 hatch for when an advisory lands before upstream ships the fix. The pinless
 state is also a trap in the other direction: *forgetting* `image.tag` back
 when it was load-bearing raised no error at all, it just silently downgraded
@@ -159,6 +159,11 @@ July 2026 the upstream chart lagged behind the proxy's own fixes, so
 | `GHSA-cjr6-pf59-jq29` (HIGH) — ingress-nginx `from-to-www-redirect` sibling router serves the auth-protected backend without auth | v3.7.0 – v3.7.11 | v3.7.12 |
 | `GHSA-7ghq-v6jf-g56c` — `respondingTimeouts.readTimeout` not applied to HTTP/3, leaving slow-body uploads unbounded | v3.0.0 – v3.7.11 | v3.7.12 |
 | `GHSA-rf44-j88r-hh8c` — ForwardAuth identity spoofing via dot-form header alias | v3.0.0 – v3.7.11 | v3.7.12 |
+| `GHSA-qqjf-53cj-pwvv` (CRITICAL) — Traefik HTTP/3 backend NTLM connection reuse | v3.0.0 – v3.7.12 | v3.7.13 |
+| `GHSA-v67p-phpq-fc8x` (HIGH) — entrypoint header-name sanitization bypassed via request trailers | v3.2.0 – v3.7.12 | v3.7.13 |
+| `GHSA-f52w-8j3h-j724` (HIGH) — rootless HTTP/1 request-target routes as "/" but is forwarded verbatim, bypassing path-scoped routing, middleware guards and access logging | v3.0.0 – v3.7.12 | v3.7.13 |
+| `GHSA-w4v4-9rw7-5326` (HIGH) — inconsistent interpretation of HTTP requests (request/response smuggling) and incorrect authorization | v3.4.2 – v3.7.12 | v3.7.13 |
+| `GHSA-8fcf-v89g-xpg6` — BasicAuth singleflight coalescing reintroduces an unauthenticated username-enumeration timing oracle | v3.6.11 – v3.7.12 | v3.7.13 |
 
 `GHSA-8rxv-jg7p-wvg3`, which motivated the original pin, **does not concern
 us**: it targets the `kubernetesIngressNGINX` provider, which we do not enable.
@@ -175,10 +180,16 @@ It was dropped again on 2026-09-07: by then seven more advisories had landed
 against `v3.7.10` (one CRITICAL, four HIGH, two medium — see table above),
 patched across v3.7.11 and v3.7.12. Rather than chase the pin forward a
 second time, the subchart was bumped straight to **41.4.0** (2026-08-27),
-which ships appVersion `v3.7.12` and clears every one of them — upstream had
-caught back up, so pinning would have been a duplicate again. Drop this
-pattern's future pin at the first subchart bump whose appVersion catches up
-with it.
+which ships appVersion `v3.7.12` — clearing every one of them, upstream
+having caught back up.
+
+That lasted only hours: five more advisories against `v3.7.12` were
+published later the same day (2026-09-07), one of them CRITICAL
+(`GHSA-qqjf-53cj-pwvv`, HTTP/3 backend NTLM connection reuse — see table
+above), all patched in `v3.7.13`. Chart **41.5.0**, published the same day,
+already ships that appVersion, so the subchart was bumped again rather than
+pinning ahead of it. Drop this pattern's future pin at the first subchart
+bump whose appVersion catches up with it.
 
 > [!WARNING]
 > Dropping the pin removed a redundancy, **not** the risk. The version still
