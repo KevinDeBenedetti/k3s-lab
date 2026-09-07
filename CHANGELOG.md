@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.21.0...v0.22.0) (2026-09-07)
+
+
+### Features
+
+* **ci,charts:** add loop-body trap shape check and finalize deprecation of legacy alias ([e5ad4d4](https://github.com/KevinDeBenedetti/k3s-lab/commit/e5ad4d4762827258e7676e9d042570d11a67a2eb))
+
+
+### Bug Fixes
+
+* **traefik:** bump subchart 41.4.0 -&gt; 41.5.0, v3.7.13 patches 5 same-day advisories ([6452230](https://github.com/KevinDeBenedetti/k3s-lab/commit/6452230db24fc8f6d68d213efe58f2bad1ae5911))
+
 ## [0.21.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.20.0...v0.21.0) (2026-08-20)
 
 
