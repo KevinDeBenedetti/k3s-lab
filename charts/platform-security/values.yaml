@@ -163,12 +163,13 @@ kyvernoPolicies:
   # Renamed from `validationFailureAction` on 2026-08-14 to match the field it
   # renders into: Kyverno 3.8 deprecated `spec.validationFailureAction` for the
   # per-rule `spec.rules[].validate.failureAction`, and the chart now emits the
-  # latter. The old key is still read as a deprecated alias so that infra, which
-  # sets it, does not silently fall back to the default.
+  # latter. The old key was kept as a deprecated alias for infra, which set it;
+  # infra moved to `failureAction` on 2026-08-19 and the alias was removed on
+  # 2026-08-20. Passing it now fails the render on purpose — Helm would ignore
+  # the unknown key in silence and drop the install to the default instead.
   #
-  # Deliberately left unset: `Audit` here would be indistinguishable from an
-  # operator setting it and would therefore always beat the deprecated alias.
-  # Precedence (failureAction > validationFailureAction > Audit) and the
-  # effective default both live in `platform-security.failureAction`
-  # (templates/_helpers.tpl).
+  # Deliberately left unset: the effective default (`Audit`) and the check that
+  # rejects anything other than Audit/Enforce both live in
+  # `platform-security.failureAction` (templates/_helpers.tpl), so every install
+  # goes through one validated path rather than reading a literal from here.
   failureAction: null

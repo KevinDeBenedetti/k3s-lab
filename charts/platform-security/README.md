@@ -66,8 +66,10 @@ kyvernoPolicies:
 
 It renders into each rule's `validate.failureAction`, not the chart-level
 `spec.validationFailureAction` that Kyverno 3.8 deprecated. The old value key
-`kyvernoPolicies.validationFailureAction` is still accepted as a deprecated
-alias so existing overrides do not silently fall back to the default.
+`kyvernoPolicies.validationFailureAction` was a deprecated alias until
+2026-08-20; it is now **rejected** with an explicit error rather than ignored,
+since Helm would otherwise drop the unknown key in silence and revert the
+install to the default.
 
 ### Checking the policies actually landed
 
@@ -163,7 +165,7 @@ readable.
 | `trivy-operator.nodeCollector.enabled` | `false` | workloads only |
 | `kyverno.enabled` | `true` | the admission engine; `false` also drops the policies |
 | `kyvernoPolicies.enabled` | `true` | the six policies; needs the CRDs to already exist |
-| `kyvernoPolicies.failureAction` | `Audit` | `Enforce` rejects non-compliant pods at admission; `validationFailureAction` still accepted as a deprecated alias |
+| `kyvernoPolicies.failureAction` | `Audit` | `Enforce` rejects non-compliant pods at admission; the old `validationFailureAction` key now fails the render |
 | `kyverno.metrics.serviceMonitor.enabled` | `true` | `release: prometheus` |
 | `kyverno.generateSuccessEvents` | `false` | failures only |
 

@@ -6,8 +6,8 @@ disabled, resource limits sized for a small node.
 
 | | |
 |---|---|
-| Subchart | `traefik` [`41.1.0`](https://traefik.github.io/charts) |
-| Deployed proxy | `docker.io/traefik:v3.7.10` (**pinned** via `image.tag` since 2026-08-03, see below) |
+| Subchart | `traefik` [`41.4.0`](https://traefik.github.io/charts) |
+| Deployed proxy | `docker.io/traefik:v3.7.12` (subchart `appVersion`, no pin — see below) |
 | Per-cluster overrides | `infra/platform/traefik/values.yaml` |
 
 > The two versions in that table are copies of `Chart.lock` and of the value
@@ -30,11 +30,11 @@ The upstream Traefik chart declares, **in its `Chart.yaml` annotations**, the
 range of proxy versions it knows how to configure:
 
 ```yaml
-# charts/traefik/Chart.yaml (subchart 41.1.0)
+# charts/traefik/Chart.yaml (subchart 41.4.0)
 annotations:
   traefik.io/proxy-min-version: v3.6.0
-  traefik.io/proxy-max-version: v3.7.9
-appVersion: v3.7.9
+  traefik.io/proxy-max-version: v3.7.12
+appVersion: v3.7.12
 ```
 
 `templates/requirements.yaml` compares the proxy version against that range on
@@ -49,21 +49,21 @@ it does not download dependencies.
 
 1. `versionOverride` if set — **it short-circuits everything else**;
 2. otherwise `image.tag`;
-3. otherwise the subchart's `.Chart.AppVersion` (so `v3.7.9` here).
+3. otherwise the subchart's `.Chart.AppVersion` (so `v3.7.12` here).
 
-Step 2 is where we sit today (`image.tag: v3.7.10`, re-added 2026-08-03 —
-three advisories cover `<= v3.7.9` and no upstream chart ships v3.7.10 yet).
-Step 3 is the resting state whenever upstream is current. The pinless state is
-also a trap in the other direction: *forgetting* `image.tag` back when it was
-load-bearing raised no error at all, it just silently downgraded the proxy.
-`lib/traefik-pin.sh` mirrors steps 2 and 3 so that both checks always speak
-about the version really shipped, whether or not a pin exists.
+Step 3 is where we sit today: no pin is set, so the proxy is whatever the
+subchart's `appVersion` says (`v3.7.12` as of 41.4.0). Step 2 is the escape
+hatch for when an advisory lands before upstream ships the fix. The pinless
+state is also a trap in the other direction: *forgetting* `image.tag` back
+when it was load-bearing raised no error at all, it just silently downgraded
+the proxy. `lib/traefik-pin.sh` mirrors steps 2 and 3 so that both checks
+always speak about the version really shipped, whether or not a pin exists.
 
 | | `traefik.image.tag` set | not set |
 |---|---|---|
 | Version deployed | the pin | subchart appVersion |
 | What the checks compare against | the pin | subchart appVersion |
-| When it applies | an advisory is ahead of upstream (**today**) | upstream is current |
+| When it applies | an advisory is ahead of upstream | upstream is current (**today**) |
 
 ### What fails, and what only warns
 
@@ -152,6 +152,13 @@ July 2026 the upstream chart lagged behind the proxy's own fixes, so
 | `GHSA-fgjj-px3w-67xx` (HIGH) — Gateway API route identity collision, cross-namespace backend hijacking | v3.7.0 – v3.7.9 | v3.7.10 |
 | `GHSA-62fc-8686-hfmq` — `allowCrossNamespace=false` bypass via `@kubernetescrd` TraefikService backendRef | v3.7.0 – v3.7.9 | v3.7.10 |
 | `GHSA-6765-c87h-8mrf` — BasicAuth singleflight key collision, identity spoofing | v3.7.0 – v3.7.9 | v3.7.10 |
+| `GHSA-5w68-77r2-r64c` (CRITICAL) — complete authentication bypass in the `digestAuth` middleware | v3.0.0 – v3.7.10 | v3.7.11 |
+| `GHSA-m6wx-622r-48r9` (HIGH) — Kubernetes Ingress service middleware bypasses `crossProviderNamespaces` | v3.7.1 – v3.7.10 | v3.7.11 |
+| `GHSA-j994-9gqj-9hwq` (HIGH) — same-host Ingress TLS option conflict disables client-certificate authentication | v3.7.0 – v3.7.10 | v3.7.11 |
+| `GHSA-g55h-rg46-x9c5` (HIGH) — TLS option confusion in multi-host routers can bypass mTLS for protected hosts | v3.0.0 – v3.7.10 | v3.7.11 |
+| `GHSA-cjr6-pf59-jq29` (HIGH) — ingress-nginx `from-to-www-redirect` sibling router serves the auth-protected backend without auth | v3.7.0 – v3.7.11 | v3.7.12 |
+| `GHSA-7ghq-v6jf-g56c` — `respondingTimeouts.readTimeout` not applied to HTTP/3, leaving slow-body uploads unbounded | v3.0.0 – v3.7.11 | v3.7.12 |
+| `GHSA-rf44-j88r-hh8c` — ForwardAuth identity spoofing via dot-form header alias | v3.0.0 – v3.7.11 | v3.7.12 |
 
 `GHSA-8rxv-jg7p-wvg3`, which motivated the original pin, **does not concern
 us**: it targets the `kubernetesIngressNGINX` provider, which we do not enable.
@@ -162,8 +169,16 @@ duplicate statement of upstream's own value, and a duplicate that only drifts.
 
 It came **back** on 2026-08-03, when the three v3.7.10 advisories landed with
 no upstream chart shipping the fix (41.1.1 still declares appVersion v3.7.9) —
-the exact scenario the escape hatch exists for. Drop it again at the first
-subchart bump whose appVersion reaches v3.7.10.
+the exact scenario the escape hatch exists for.
+
+It was dropped again on 2026-09-07: by then seven more advisories had landed
+against `v3.7.10` (one CRITICAL, four HIGH, two medium — see table above),
+patched across v3.7.11 and v3.7.12. Rather than chase the pin forward a
+second time, the subchart was bumped straight to **41.4.0** (2026-08-27),
+which ships appVersion `v3.7.12` and clears every one of them — upstream had
+caught back up, so pinning would have been a duplicate again. Drop this
+pattern's future pin at the first subchart bump whose appVersion catches up
+with it.
 
 > [!WARNING]
 > Dropping the pin removed a redundancy, **not** the risk. The version still

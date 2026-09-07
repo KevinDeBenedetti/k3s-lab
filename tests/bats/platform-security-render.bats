@@ -106,23 +106,28 @@ policy_count() {
   [ "$(grep -c 'failureAction: Audit' <<<"$out")" -eq 0 ]
 }
 
-@test "the deprecated validationFailureAction value key still overrides" {
-  # infra pins this chart and sets the old key (platform/security/values.yaml).
-  # Helm ignores unknown value keys silently, so dropping the alias would not
-  # error — it would quietly revert that install to the chart default. This test
-  # is what makes removing the alias a visible decision rather than an accident.
-  local out
-  out="$(render --set kyvernoPolicies.validationFailureAction=Enforce | policy_docs)"
-  [ "$(grep -c 'failureAction: Enforce' <<<"$out")" -eq "$RULE_COUNT" ]
-  [ "$(grep -c 'failureAction: Audit' <<<"$out")" -eq 0 ]
+@test "the removed validationFailureAction value key fails the render" {
+  # The alias was dropped on 2026-08-20, once infra had moved to `failureAction`.
+  # Helm ignores unknown value keys silently, so a plain removal would not error
+  # on a leftover override — it would quietly revert that install to the chart
+  # default, downgrading `Enforce` to `Audit` with nothing to read in the diff.
+  # The helper therefore rejects the old key outright, and this test is what
+  # keeps that rejection from being softened back into a silent fallback.
+  run render --set kyvernoPolicies.validationFailureAction=Enforce
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"validationFailureAction was removed"* ]]
+  [[ "$output" == *"rename it to kyvernoPolicies.failureAction"* ]]
 }
 
-@test "the new key wins over the deprecated alias" {
-  local out
-  out="$(render \
-    --set kyvernoPolicies.failureAction=Enforce \
-    --set kyvernoPolicies.validationFailureAction=Audit | policy_docs)"
-  [ "$(grep -c 'failureAction: Enforce' <<<"$out")" -eq "$RULE_COUNT" ]
+@test "the removed alias fails even when it agrees with the default" {
+  # The dangerous case is not the loud one. `validationFailureAction: Audit`
+  # renders exactly what the chart would render anyway, so a silent fallback
+  # here looks correct — and the same stale key set to `Enforce` on another
+  # install would be silently downgraded. The key is rejected on its own,
+  # not on the value it carries.
+  run render --set kyvernoPolicies.validationFailureAction=Audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"validationFailureAction was removed"* ]]
 }
 
 @test "the action is set per rule, not with the deprecated spec-level field" {
