@@ -18,13 +18,27 @@
 # something upstream refused it. On 2026-08-13 the ArgoCD AppProject `platform`
 # did not list `kyverno.io/ClusterPolicy` in its clusterResourceWhitelist, so all
 # six were rejected at sync for 32h while the Application sat `OutOfSync`/
-# `Healthy` — green enough to miss. `--crds-only` skips that half when you only
-# want the installability question.
+# `Healthy` — green enough to miss. `--crds-only` skips both halves below when
+# you only want the installability question.
+#
+# And a third, added 2026-09-07: a policy PRESENT in the cluster can still be
+# enforcing the wrong thing — an out-of-sync Application, a `kubectl edit`, or
+# the 2026-08-20 `validationFailureAction` alias removal that motivated this
+# very check. That removal was precisely undetectable if it had gone wrong: a
+# consumer left on the dead alias would silently fall back to the chart default
+# (`Audit`), and on any install that was already `Audit` the render, the CRD,
+# and "does the object exist" all stay green — nothing before this checked what
+# the live object actually enforces. This reads `spec.rules[].validate.
+# failureAction` off each policy already confirmed to exist and compares it,
+# rule by rule, against what the render says it should be.
 #
 # What is asserted comes from the RENDER, not from re-reading the values gates:
 # if no policy renders (kyverno.enabled=false, or kyvernoPolicies.enabled=false)
 # there is nothing to install and nothing to check, and saying so is the honest
-# answer rather than a hardcoded skip that drifts from the chart.
+# answer rather than a hardcoded skip that drifts from the chart. Same reasoning
+# for the failureAction comparison: the expected value comes from parsing what
+# `helm template` actually emitted, not from re-reading `kyvernoPolicies.
+# failureAction` a second time.
 #
 # ⚠️ Needs cluster access, so it is NOT part of the offline PR checks — same
 # split as check-deployed-charts.sh. scripts/check-rendered-images.sh and
@@ -116,6 +130,30 @@ if [ "$source_lines" -gt 0 ] && [ "${#policies[@]}" -eq 0 ]; then
   exit 2
 fi
 
+# "policy<TAB>rule<TAB>expected failureAction" for every rule of every policy
+# this chart owns. What "the expected action" was rendered with is the render
+# itself, not a second read of kyvernoPolicies.failureAction: this is the same
+# reasoning check-loop-trap-shape.sh's header gives for asserting on real
+# behaviour rather than re-deriving it — a second read can drift from what the
+# template actually emitted, and drifting silently is exactly the failure mode
+# this check exists to close (audit finding: the alias removal was
+# indistinguishable from a working install where the value was already Audit).
+mapfile -t expected_actions < <(
+  printf '%s\n' "$rendered" | awk '
+    /^# Source: .*\/templates\/kyverno-policies\// { keep = 1; next }
+    /^# Source: /                                  { keep = 0; next }
+    keep && /^  name:/                  { pname = $2 }
+    keep && $1 == "-" && $2 == "name:"  { rname = $3 }
+    keep && /^        failureAction:/   { print pname "\t" rname "\t" $2 }
+  '
+)
+
+if [ "${#policies[@]}" -gt 0 ] && [ "${#expected_actions[@]}" -eq 0 ]; then
+  log_error "${#policies[@]} polic(y|ies) rendered but no rule's failureAction could be parsed."
+  log_error "That is a bug in this script, not a clean cluster — refusing to report success."
+  exit 2
+fi
+
 if [ "${#policies[@]}" -eq 0 ]; then
   log_info "The chart renders no Kyverno policy — nothing to install, nothing to check."
   log_info "(kyverno.enabled or kyvernoPolicies.enabled is false in the values used.)"
@@ -178,12 +216,39 @@ while IFS=$'\t' read -r apiversion kind; do
   # ─── Second half: did the policies actually land? ─────────────────────────
   while IFS=$'\t' read -r av k name; do
     [ "$av" = "$apiversion" ] && [ "$k" = "$kind" ] || continue
-    if "$KUBECTL" get "$plural.$group" "$name" >/dev/null 2>&1; then
-      log_ok "    $name"
-    else
+    if ! "$KUBECTL" get "$plural.$group" "$name" >/dev/null 2>&1; then
       log_error "    $name — renders, is installable, and is NOT in the cluster"
       errors=$((errors + 1))
+      continue
     fi
+    log_ok "    $name"
+
+    # ─── Third half: does the live object enforce what was rendered? ────────
+    # Existing is not sufficient: a sync can leave a policy installed with a
+    # STALE failureAction — ArgoCD out of sync, a manual `kubectl edit`, or the
+    # 2026-08-20 alias removal this check was written for, where a silent
+    # fallback to the chart default was precisely undetectable because the
+    # value in play (Audit) already matched. Read from the live object, not
+    # re-derived, for the same reason `expected_actions` reads the render.
+    live_actions="$("$KUBECTL" get "$plural.$group" "$name" \
+      -o jsonpath='{range .spec.rules[*]}{.name}{"="}{.validate.failureAction}{"\n"}{end}' 2>&1)"
+    if [ -z "$live_actions" ]; then
+      log_error "      could not read spec.rules[].validate.failureAction from the live object"
+      errors=$((errors + 1))
+      continue
+    fi
+    while IFS=$'\t' read -r ep er expected; do
+      [ "$ep" = "$name" ] || continue
+      live="$(printf '%s\n' "$live_actions" | awk -F= -v r="$er" '$1 == r { print $2; exit }')"
+      if [ -z "$live" ]; then
+        log_error "      rule '$er' — not found on the live object (rule renamed or removed?)"
+        errors=$((errors + 1))
+      elif [ "$live" != "$expected" ]; then
+        log_error "      rule '$er' — cluster has failureAction=$live, chart renders $expected"
+        log_error "          Application likely OutOfSync, or edited by hand — check ArgoCD."
+        errors=$((errors + 1))
+      fi
+    done < <(printf '%s\n' "${expected_actions[@]}")
   done < <(printf '%s\n' "${policies[@]}")
 
 done < <(printf '%s\n' "${policies[@]}" | cut -f1,2 | sort -u)
@@ -203,5 +268,6 @@ fi
 if [ "$CRDS_ONLY" -eq 1 ]; then
   log_ok "All $checked Kyverno CRD(s) required by the render are present and serving."
 else
-  log_ok "All $checked Kyverno CRD(s) present, and all ${#policies[@]} rendered policy(ies) exist in the cluster."
+  log_ok "All $checked Kyverno CRD(s) present, all ${#policies[@]} rendered policy(ies) exist in the"
+  log_ok "cluster, and every rule enforces the failureAction the chart rendered."
 fi

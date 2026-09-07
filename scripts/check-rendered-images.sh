@@ -297,7 +297,9 @@ for chart in "${CHARTS[@]}"; do
       # alternative, demanding all of them, fails on charts that are correct.
       hit=0
       for image in "${found[@]}"; do
-        [ "${image##*:}" = "$tag" ] && hit=1
+        if [ "${image##*:}" = "$tag" ]; then
+          hit=1
+        fi
       done
       if [ "$hit" -eq 1 ]; then
         log_ok "  $label"

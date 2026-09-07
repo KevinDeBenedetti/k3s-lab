@@ -109,9 +109,14 @@ done
 for s in ${seen[@]+"${seen[@]}"}; do
   found=0
   for dep in "${expected[@]}"; do
-    [ "$s" = "$dep" ] && found=1 && break
+    if [ "$s" = "$dep" ]; then
+      found=1
+      break
+    fi
   done
-  [ "$found" -eq 0 ] && log_warn "$s rendered but is not declared in Chart.yaml"
+  if [ "$found" -eq 0 ]; then
+    log_warn "$s rendered but is not declared in Chart.yaml"
+  fi
 done
 
 echo ""

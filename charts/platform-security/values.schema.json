@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "platform-security values",
+  "type": "object",
+  "properties": {
+    "kyvernoPolicies": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Only these two keys are read (templates/_helpers.tpl, templates/kyverno-policies/*.yaml). additionalProperties: false so an unrecognised key — a typo like `faliureAction`, or the removed `validationFailureAction` alias — fails the render instead of being dropped in silence and falling back to the Audit default. `failureAction`'s VALUE is still validated by the `fail` in platform-security.failureAction, which gives a friendlier message than a schema error; this only guards the KEY.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Renders the six Kyverno ClusterPolicies. Needs kyverno.enabled for the CRDs/engine."
+        },
+        "failureAction": {
+          "type": ["string", "null"],
+          "description": "Audit or Enforce — validated by platform-security.failureAction, not here. null (the values.yaml default) defers to that helper's own Audit default."
+        }
+      }
+    }
+  }
+}

@@ -188,7 +188,9 @@ for playbook in "${playbooks[@]}"; do
   # `all` on the enabler side short-circuits: it covers every pattern.
   covers_everything=0
   for h in $enabler_hosts; do
-    [ "$h" = "all" ] && covers_everything=1
+    if [ "$h" = "all" ]; then
+      covers_everything=1
+    fi
   done
 
   uncovered=""
@@ -199,11 +201,15 @@ for playbook in "${playbooks[@]}"; do
         # split ':' unions on both sides
         for hp in $(printf '%s\n' "$h" | tr ':' ' '); do
           for np in $(printf '%s\n' "$needed" | tr ':' ' '); do
-            [ "$hp" = "$np" ] && found=1
+            if [ "$hp" = "$np" ]; then
+              found=1
+            fi
           done
         done
       done
-      [ "$found" -eq 0 ] && uncovered="$uncovered $needed"
+      if [ "$found" -eq 0 ]; then
+        uncovered="$uncovered $needed"
+      fi
     done
   fi
 

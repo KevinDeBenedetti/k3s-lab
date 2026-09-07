@@ -9,8 +9,10 @@
 #
 # What is worth testing here is the shape of the failures, not the happy path:
 # a missing CRD, a CRD that exists but no longer serves the rendered apiVersion,
-# and a policy that is installable yet absent — the last being the one that sat
-# undetected for 32h behind an OutOfSync/Healthy Application.
+# a policy that is installable yet absent — the last being the one that sat
+# undetected for 32h behind an OutOfSync/Healthy Application — and a policy that
+# is present but enforcing the wrong failureAction, which is what stayed
+# unverified before 2026-09-07.
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
 SCRIPT="${REPO_ROOT}/scripts/check-kyverno-crds.sh"
@@ -29,6 +31,9 @@ kyverno:
 kyvernoPolicies:
   enabled: true
 EOF
+  # One rule each, `check`, so the failureAction extractor has something real
+  # to parse — a bare `rules: []` (the pre-2026-09-07 fixture) can never
+  # exercise that half at all.
   cat > "${CHART}/templates/kyverno-policies/policies.yaml" <<'EOF'
 {{- if and .Values.kyverno.enabled .Values.kyvernoPolicies.enabled }}
 {{- range $name := list "require-non-root" "disallow-latest-tag" }}
@@ -38,29 +43,43 @@ kind: ClusterPolicy
 metadata:
   name: {{ $name }}
 spec:
-  rules: []
+  rules:
+    - name: check
+      validate:
+        failureAction: Audit
 {{- end }}
 {{- end }}
 EOF
 
-  # The cluster, as two files the stub reads.
+  # The cluster, as three files the stub reads.
   CRD_TABLE="${BATS_TEST_TMPDIR}/crds.tsv"
   OBJECTS="${BATS_TEST_TMPDIR}/objects.txt"
+  RULE_ACTIONS="${BATS_TEST_TMPDIR}/rule-actions.tsv"
   printf 'kyverno.io\tClusterPolicy\tclusterpolicies\tv1,\n' > "$CRD_TABLE"
   printf 'clusterpolicies.kyverno.io/require-non-root\nclusterpolicies.kyverno.io/disallow-latest-tag\n' > "$OBJECTS"
+  # object<TAB>rule<TAB>live failureAction — matches the fixture chart by
+  # default, so the happy path stays happy unless a test overrides this.
+  printf 'clusterpolicies.kyverno.io/require-non-root\tcheck\tAudit\n' > "$RULE_ACTIONS"
+  printf 'clusterpolicies.kyverno.io/disallow-latest-tag\tcheck\tAudit\n' >> "$RULE_ACTIONS"
 
   STUB="${BATS_TEST_TMPDIR}/kubectl"
   cat > "$STUB" <<'EOF'
 #!/usr/bin/env bash
-# $1 = get; $2 = crd -> emit the table. Otherwise: `get <plural.group> <name>`.
+# $1 = get; $2 = crd -> emit the table.
+# $1 = get; $2 = <plural.group>; $3 = <name>; then either nothing (existence
+# check, exit via grep) or `-o jsonpath=...` (live rule/action lookup).
 if [ "$2" = "crd" ]; then
   cat "$CRD_TABLE"
+  exit 0
+fi
+if [ "$4" = "-o" ]; then
+  awk -F'\t' -v obj="$2/$3" '$1 == obj { print $2 "=" $3 }' "$RULE_ACTIONS"
   exit 0
 fi
 grep -qx "$2/$3" "$OBJECTS"
 EOF
   chmod +x "$STUB"
-  export CRD_TABLE OBJECTS
+  export CRD_TABLE OBJECTS RULE_ACTIONS
 }
 
 run_check() {
@@ -72,6 +91,70 @@ run_check() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"CRD present and serving v1"* ]]
   [[ "$output" == *"all 2 rendered policy(ies) exist"* ]]
+  [[ "$output" == *"every rule enforces the failureAction the chart rendered"* ]]
+}
+
+@test "fails when the live failureAction does not match what the chart renders" {
+  # The 2026-08-20 case this half was written for: an Application can be
+  # OutOfSync, or hand-edited, and stay green on every check before this one —
+  # the render is right, the CRD is right, the object exists. Only reading the
+  # live rule catches a stale action.
+  printf 'clusterpolicies.kyverno.io/require-non-root\tcheck\tEnforce\n' > "$RULE_ACTIONS"
+  printf 'clusterpolicies.kyverno.io/disallow-latest-tag\tcheck\tAudit\n' >> "$RULE_ACTIONS"
+  run_check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"require-non-root"* ]]
+  [[ "$output" == *"rule 'check' — cluster has failureAction=Enforce, chart renders Audit"* ]]
+  [[ "$output" == *"1 problem(s)"* ]]
+}
+
+@test "fails when the rendered rule cannot be found on the live object" {
+  # A rule renamed or removed live (or by a Kyverno mutation) is not the same
+  # failure as a wrong value, and gets its own message rather than silently
+  # comparing against an empty string.
+  printf 'clusterpolicies.kyverno.io/require-non-root\tsome-other-rule\tAudit\n' > "$RULE_ACTIONS"
+  printf 'clusterpolicies.kyverno.io/disallow-latest-tag\tcheck\tAudit\n' >> "$RULE_ACTIONS"
+  run_check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"rule 'check' — not found on the live object"* ]]
+}
+
+@test "fails when the live object's rules cannot be read at all" {
+  : > "$RULE_ACTIONS"
+  run_check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"could not read spec.rules[].validate.failureAction"* ]]
+}
+
+@test "--crds-only skips the failureAction comparison too" {
+  printf 'clusterpolicies.kyverno.io/require-non-root\tcheck\tEnforce\n' > "$RULE_ACTIONS"
+  printf 'clusterpolicies.kyverno.io/disallow-latest-tag\tcheck\tAudit\n' >> "$RULE_ACTIONS"
+  run_check --crds-only
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"failureAction"* ]]
+}
+
+@test "a rule-action parse failure is refused rather than reported as nothing to check" {
+  # The guard on the second extractor. A policy with a name (so `policies` is
+  # non-empty) but no parseable validate.failureAction is a bug in this script,
+  # not a cluster with nothing to compare — mirrors the existing guard for the
+  # apiVersion/kind/name extractor below.
+  cat > "${CHART}/templates/kyverno-policies/policies.yaml" <<'EOF'
+{{- if .Values.kyverno.enabled }}
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-non-root
+spec:
+  rules:
+    - name: check
+      validate: {}
+{{- end }}
+EOF
+  run_check
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"no rule's failureAction could be parsed"* ]]
 }
 
 @test "fails when the CRD backing a rendered policy does not exist" {

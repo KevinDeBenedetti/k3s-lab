@@ -33,16 +33,19 @@ The action comes from `kyvernoPolicies.failureAction`, which matches the CRD
 field, and falls back to `Audit`, the chart default.
 
 `kyvernoPolicies.validationFailureAction` was a deprecated alias for it from
-2026-08-14 to 2026-08-20. It existed for a single consumer — infra pinned this
-chart and set the old key — and this helper said the alias could go once infra
-set `failureAction`, which it did on 2026-08-19.
+2026-08-14 to 2026-08-20 — a single consumer (infra) pinned this chart and set
+the old key, until it moved to `failureAction` on 2026-08-19. For the day after
+that, a dedicated `fail` lived here rejecting the stale key by name: Helm
+otherwise ignores an unknown value key in silence, which would have quietly
+dropped an `Enforce` install back to `Audit` with nothing to read in the diff.
 
-The alias is now *rejected*, not merely gone. Helm ignores an unknown value key
-in silence, so an install still passing the old key would not error: it would
-quietly drop to the chart default, turning an `Enforce` install into an `Audit`
-one with nothing to read in the diff. `fail` is what makes that impossible —
-the same reasoning as the bogus-value check below, applied to a stale key
-instead of a stale value.
+That dedicated `fail` is gone as of 2026-09-07: `values.schema.json` now sets
+`additionalProperties: false` on the whole `kyvernoPolicies` object, so ANY
+unrecognised key — `validationFailureAction` included, or a typo like
+`faliureAction` the alias-specific check never covered — fails the render
+before this template even runs. Schema validation happens first, so the old
+`fail` had become unreachable dead code the moment the schema landed; kept
+this comment's history rather than the branch itself.
 
 The default lives here and NOT in values.yaml: `failureAction: null` there keeps
 values.yaml from asserting an action it does not own, and routes every install
@@ -54,9 +57,6 @@ silently defaults, so a typo must break the render, not the cluster.
 */}}
 {{- define "platform-security.failureAction" -}}
 {{- $p := .Values.kyvernoPolicies -}}
-{{- if $p.validationFailureAction -}}
-{{- fail (printf "kyvernoPolicies.validationFailureAction was removed on 2026-08-20; rename it to kyvernoPolicies.failureAction (got %q)" ($p.validationFailureAction | toString)) -}}
-{{- end -}}
 {{- $action := $p.failureAction | default "Audit" -}}
 {{- if not (has $action (list "Audit" "Enforce")) -}}
 {{- fail (printf "kyvernoPolicies.failureAction must be Audit or Enforce, got %q" ($action | toString)) -}}

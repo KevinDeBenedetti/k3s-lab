@@ -131,6 +131,23 @@ jobs:
       - name: Check resource limits in chart values
         run: ./scripts/check-resource-limits.sh
 
+  # ─── Loop-body trap shape check ───────────────────────────────────────────
+  # `[ … ] && cmd` as the last statement of a for/while body silently kills the
+  # whole script under `set -e` the day the last iteration's condition happens
+  # to be false — the loop inherits that command's exit status as its own.
+  # shellcheck does not reason about this. It has shipped for real more than
+  # once here: check-deployed-pins.sh (fixed 08f555b, opened issue #76 — a
+  # header with no verdict) and, found while adding this check, the same shape
+  # in check-inventory-ignored.sh, check-play-order.sh, check-rendered-images.sh
+  # and check-umbrella-render.sh (all fixed 2026-09-07). See
+  # scripts/check-loop-trap-shape.sh for the exact shape this catches.
+  loop-trap-shape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check for the [ … ] && cmd loop-body trap
+        run: ./scripts/check-loop-trap-shape.sh
+
   # ─── Traefik image check ──────────────────────────────────────────────────
   # helm-lint above renders the chart and proves it is *renderable*; it does not
   # say which image comes out. The proxy version is a security decision

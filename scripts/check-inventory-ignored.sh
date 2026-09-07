@@ -84,7 +84,10 @@ if [ -f "$generator" ]; then
   for path in "${written[@]}"; do
     covered=0
     for guarded in "${GUARDED[@]}"; do
-      [ "$path" = "$guarded" ] && covered=1 && break
+      if [ "$path" = "$guarded" ]; then
+        covered=1
+        break
+      fi
     done
     if [ "$covered" -eq 0 ]; then
       log_error "  generate-inventory.sh writes '$path', which this check does not guard"

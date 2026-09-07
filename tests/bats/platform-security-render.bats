@@ -111,23 +111,35 @@ policy_count() {
   # Helm ignores unknown value keys silently, so a plain removal would not error
   # on a leftover override — it would quietly revert that install to the chart
   # default, downgrading `Enforce` to `Audit` with nothing to read in the diff.
-  # The helper therefore rejects the old key outright, and this test is what
-  # keeps that rejection from being softened back into a silent fallback.
+  # Rejected since 2026-09-07 by values.schema.json's additionalProperties:
+  # false on kyvernoPolicies (a dedicated `fail` did this from 2026-08-20 to
+  # 2026-09-07; the schema supersedes it for every unrecognised key, this one
+  # included, not just this specific alias) — this test is what keeps that
+  # rejection from being softened back into a silent fallback.
   run render --set kyvernoPolicies.validationFailureAction=Enforce
   [ "$status" -ne 0 ]
-  [[ "$output" == *"validationFailureAction was removed"* ]]
-  [[ "$output" == *"rename it to kyvernoPolicies.failureAction"* ]]
+  [[ "$output" == *"additional properties 'validationFailureAction' not allowed"* ]]
 }
 
 @test "the removed alias fails even when it agrees with the default" {
   # The dangerous case is not the loud one. `validationFailureAction: Audit`
   # renders exactly what the chart would render anyway, so a silent fallback
   # here looks correct — and the same stale key set to `Enforce` on another
-  # install would be silently downgraded. The key is rejected on its own,
-  # not on the value it carries.
+  # install would be silently downgraded. The schema rejects the key itself,
+  # not the value it carries, so this must fail regardless of the value.
   run render --set kyvernoPolicies.validationFailureAction=Audit
   [ "$status" -ne 0 ]
-  [[ "$output" == *"validationFailureAction was removed"* ]]
+  [[ "$output" == *"additional properties 'validationFailureAction' not allowed"* ]]
+}
+
+@test "any other unrecognised kyvernoPolicies key fails the render too" {
+  # The whole point of the schema over the old alias-specific `fail`: it is not
+  # just this one dead key that is caught. A typo like `faliureAction` used to
+  # be accepted by Helm in silence and fall back to the Audit default with
+  # nothing to read in the diff — exactly the class of bug this schema closes.
+  run render --set kyvernoPolicies.faliureAction=Enforce
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"additional properties 'faliureAction' not allowed"* ]]
 }
 
 @test "the action is set per rule, not with the deprecated spec-level field" {
