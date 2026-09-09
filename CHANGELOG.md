@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.23.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.22.0...v0.23.0) (2026-09-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **platform-vault-seeder:** The secret path for GitHub Container Registry tokens has been renamed from `secret/ghcr/pull` to `secret/ghcr`. The seeder now uses `kv patch` instead of `kv put` to avoid overwriting the `push-token` key, which is managed separately by infrastructure CI cutover procedures.
+
+### Bug Fixes
+
+* **platform-vault-seeder:** rename GHCR secret path and update seeder logic ([f50ed88](https://github.com/KevinDeBenedetti/k3s-lab/commit/f50ed8846bb6c9ed1c6eecc37e6f60ae6d749f70))
+
 ## [0.22.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.21.0...v0.22.0) (2026-09-07)
 
 
