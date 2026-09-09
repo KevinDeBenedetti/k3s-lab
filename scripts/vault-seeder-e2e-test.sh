@@ -202,7 +202,7 @@ if helm install vault-seeder ./charts/platform-vault-seeder \
   --set secrets.oidcClientId="$(kubectl get secret -n argocd $SECRET_NAME -o jsonpath='{.data.oidc-client-id}' 2>/dev/null | base64 -d || echo '')" \
   --set secrets.oidcClientSecret="$(kubectl get secret -n argocd $SECRET_NAME -o jsonpath='{.data.oidc-client-secret}' 2>/dev/null | base64 -d || echo '')" \
   --set secrets.grafanaPassword="$(kubectl get secret -n argocd $SECRET_NAME -o jsonpath='{.data.grafana-password}' 2>/dev/null | base64 -d || echo '')" \
-  --set secrets.ghcrPat="$(kubectl get secret -n argocd $SECRET_NAME -o jsonpath='{.data.ghcr-pat}' 2>/dev/null | base64 -d || echo '')" \
+  --set secrets.ghcrPullToken="$(kubectl get secret -n argocd $SECRET_NAME -o jsonpath='{.data.ghcr-pull-token}' 2>/dev/null | base64 -d || echo '')" \
   --set secrets.rrAuthSecret="$(kubectl get secret -n argocd $SECRET_NAME -o jsonpath='{.data.rr-auth-secret}' 2>/dev/null | base64 -d || echo '')" \
   2>/dev/null; then
   log_ok "Chart deployed successfully"
@@ -374,7 +374,7 @@ SECRETS_TO_CHECK=(
   "secret/argocd/oidc"
   "secret/grafana/admin"
   "secret/grafana/oauth"
-  "secret/ghcr/pull"
+  "secret/ghcr"
   "secret/reactive-resume/prod"
 )
 

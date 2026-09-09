@@ -83,7 +83,10 @@ secrets:
   grafanaPassword: ""
 
   # --- GHCR (for private images) ---
-  ghcrPat: ""
+  # Pull-only — seeds secret/ghcr's pull-token key via kv patch, leaving any
+  # push-token (Kaniko, seeded separately by infra) untouched. Renamed from
+  # ghcrPat on 2026-09-08.
+  ghcrPullToken: ""
   githubUser: "KevinDeBenedetti"
 
   # --- Reactive Resume ---

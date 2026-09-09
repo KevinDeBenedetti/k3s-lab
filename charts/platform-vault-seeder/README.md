@@ -18,7 +18,7 @@ Runs **vault-configure** logic via `kubectl exec vault-0`:
 Runs **vault-seed-apps** logic via `kubectl exec vault-0` (waits for Job 1):
 - Seeds `secret/argocd/oidc`
 - Seeds `secret/grafana/admin` + `secret/grafana/oauth`
-- Seeds `secret/ghcr/pull`
+- Seeds `secret/ghcr` (pull-token key only — push-token is seeded separately by infra's CI cutover)
 - Seeds `secret/reactive-resume/prod`
 
 **Dependency Orchestration**: Job 2 includes an initContainer that polls Job 1 status and waits for successful completion before starting.
@@ -58,7 +58,7 @@ secrets:
   grafanaPassword: "admin-password"
 
   # GHCR
-  ghcrPat: "ghcr_xxxxxxxxxxxx"
+  ghcrPullToken: "ghcr_xxxxxxxxxxxx"
 
   # Reactive Resume
   rrAuthSecret: "my-auth-secret"
@@ -132,7 +132,7 @@ spec:
 - `secrets.grafanaPassword`
 
 **GHCR** (private image pull):
-- `secrets.ghcrPat` (GitHub Container Registry PAT)
+- `secrets.ghcrPullToken` (GitHub Container Registry PAT, read:packages)
 
 **Reactive Resume**:
 - `secrets.rrAuthSecret`
@@ -200,7 +200,7 @@ After `vault-seeder-apps` completes:
 export VAULT_TOKEN="hvs.xxxxxxxxxxxx"
 kubectl exec -n vault vault-0 -- vault kv get secret/argocd/oidc
 kubectl exec -n vault vault-0 -- vault kv get secret/grafana/admin
-kubectl exec -n vault vault-0 -- vault kv get secret/ghcr/pull
+kubectl exec -n vault vault-0 -- vault kv get secret/ghcr
 kubectl exec -n vault vault-0 -- vault kv get secret/reactive-resume/prod
 ```
 

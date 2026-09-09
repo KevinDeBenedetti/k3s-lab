@@ -60,7 +60,7 @@ secrets:
   # argocdServerSecretKey   (random string)
   # homepageArgocdToken     (optional)
   # grafanaPassword
-  # ghcrPat                 (GitHub PAT with read:packages)
+  # ghcrPullToken           (GitHub PAT with read:packages)
   # rrAuthSecret, rrDbPassword, rrBrowserlessToken,
   # rrDatabaseUrl, rrPrinterEndpoint, rrS3AccessKeyId, rrS3SecretAccessKey
 
@@ -74,7 +74,7 @@ secrets:
 #     oidcClientSecret: "secret..."
 #     argocdServerSecretKey: "random-key..."
 #     grafanaPassword: "admin-pw..."
-#     ghcrPat: "ghcr_xxx..."
+#     ghcrPullToken: "ghcr_xxx..."
 #     rrAuthSecret: "rrauth-xxx..."
 #   # etc.
 #   EOF

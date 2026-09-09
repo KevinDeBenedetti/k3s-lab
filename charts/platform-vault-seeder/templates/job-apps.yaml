@@ -116,11 +116,11 @@ spec:
               name: vault-seeder-secrets
               key: grafana-password
               optional: true
-        - name: GHCR_PAT
+        - name: GHCR_PULL_TOKEN
           valueFrom:
             secretKeyRef:
               name: vault-seeder-secrets
-              key: ghcr-pat
+              key: ghcr-pull-token
               optional: true
         - name: GITHUB_USER
           value: "{{ .Values.secrets.githubUser }}"

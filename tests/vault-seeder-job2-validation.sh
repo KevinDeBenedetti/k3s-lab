@@ -136,8 +136,8 @@ test_assert "HOMEPAGE_ARGOCD_TOKEN from secret (optional)" \
 test_assert "GRAFANA_PASSWORD from secret (optional)" \
   "grep -q 'GRAFANA_PASSWORD' '$JOB2_TEMPLATE' && grep -q 'optional: true' '$JOB2_TEMPLATE'"
 
-test_assert "GHCR_PAT from secret (optional)" \
-  "grep -q 'GHCR_PAT' '$JOB2_TEMPLATE' && grep -q 'optional: true' '$JOB2_TEMPLATE'"
+test_assert "GHCR_PULL_TOKEN from secret (optional)" \
+  "grep -q 'GHCR_PULL_TOKEN' '$JOB2_TEMPLATE' && grep -q 'optional: true' '$JOB2_TEMPLATE'"
 
 test_assert "GITHUB_USER from values" \
   "grep -q 'GITHUB_USER' '$JOB2_TEMPLATE' && grep -q '.Values.secrets.githubUser' '$JOB2_TEMPLATE'"
@@ -260,14 +260,17 @@ test_assert "secret/grafana/oauth includes GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET" 
 test_assert "secret/grafana/oauth seeds ONLY secret keys (no ENABLED/AUTH_URL/TOKEN_URL/…)" \
   "! grep -qE 'GF_AUTH_GENERIC_OAUTH_(ENABLED|NAME|SCOPES|AUTH_URL|TOKEN_URL|API_URL|ALLOW_SIGN_UP)=\"' '$CONFIGMAP2_TEMPLATE'"
 
-test_assert "Seeds secret/ghcr/pull" \
-  "grep -q 'secret/ghcr/pull' '$CONFIGMAP2_TEMPLATE'"
+test_assert "Seeds secret/ghcr" \
+  "grep -q '_seed_patch \"secret/ghcr\"' '$CONFIGMAP2_TEMPLATE'"
 
-test_assert "secret/ghcr/pull includes username (GITHUB_USER)" \
-  "grep -A 3 'secret/ghcr/pull' '$CONFIGMAP2_TEMPLATE' | grep -q 'username'"
+test_assert "secret/ghcr includes username (GITHUB_USER)" \
+  "grep -A 3 '_seed_patch \"secret/ghcr\"' '$CONFIGMAP2_TEMPLATE' | grep -q 'username'"
 
-test_assert "secret/ghcr/pull includes password (GHCR_PAT)" \
-  "grep -A 3 'secret/ghcr/pull' '$CONFIGMAP2_TEMPLATE' | grep -q 'password'"
+test_assert "secret/ghcr includes pull-token (GHCR_PULL_TOKEN)" \
+  "grep -A 3 '_seed_patch \"secret/ghcr\"' '$CONFIGMAP2_TEMPLATE' | grep -q 'pull-token'"
+
+test_assert "secret/ghcr is seeded with kv patch, not kv put — push-token lives at the same path" \
+  "grep -q '_seed_patch' '$CONFIGMAP2_TEMPLATE'"
 
 test_assert "Seeds secret/reactive-resume/prod" \
   "grep -q 'secret/reactive-resume/prod' '$CONFIGMAP2_TEMPLATE'"
@@ -300,8 +303,8 @@ test_assert "secret/grafana/admin conditional on grafanaPassword" \
 test_assert "secret/grafana/oauth conditional on oidcClientId" \
   "grep -B 2 'secret/grafana/oauth' '$CONFIGMAP2_TEMPLATE' | grep -q '{{- if'"
 
-test_assert "secret/ghcr/pull conditional on ghcrPat" \
-  "grep -B 2 'secret/ghcr/pull' '$CONFIGMAP2_TEMPLATE' | grep -q '{{- if'"
+test_assert "secret/ghcr conditional on ghcrPullToken" \
+  "grep -B 2 '_seed_patch \"secret/ghcr\"' '$CONFIGMAP2_TEMPLATE' | grep -q '{{- if'"
 
 test_assert "secret/reactive-resume/prod conditional on rrAuthSecret" \
   "grep '.Values.secrets.rrAuthSecret' '$CONFIGMAP2_TEMPLATE'"

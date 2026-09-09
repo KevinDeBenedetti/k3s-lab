@@ -63,6 +63,17 @@ data:
       (( _seeded++ )) || true
     }
 
+    # `kv patch`, not `kv put`: for a path this seeder does not own exclusively.
+    # `kv put` REPLACES the whole secret, so seeding here would silently wipe
+    # any key another consumer wrote at the same path — see secret/ghcr below,
+    # which also holds `push-token`, seeded separately by infra's CI cutover.
+    _seed_patch() {
+      local path="$1"; shift
+      vault_exec kv patch "${path}" "$@"
+      log "  ✓ ${path} (patched)"
+      (( _seeded++ )) || true
+    }
+
     _skip() {
       log "  - skipped ${1} (${2} not set)"
       (( _skipped++ )) || true
@@ -119,17 +130,23 @@ data:
     log "  - skipped secret/grafana/oauth (OIDC_CLIENT_ID not set)"
     {{- end }}
 
-    # ── secret/ghcr/pull ─────────────────────────────────────────────────────
-    {{- if .Values.secrets.ghcrPat }}
-    if [[ -n "${GHCR_PAT:-}" ]]; then
-      _seed "secret/ghcr/pull" \
+    # ── secret/ghcr ───────────────────────────────────────────────────────────
+    # Renamed from secret/ghcr/pull on 2026-09-08: infra unified the pull and
+    # push (Kaniko) GHCR tokens onto one path (secrets/ghcr-pull-secret.yaml,
+    # secrets/ci-secrets.yaml). This seeder still owns only pull-token — the
+    # push-token is CI plumbing, seeded through infra's own cutover procedure,
+    # not through general app-secret bootstrap. _seed_patch (not _seed) is what
+    # keeps that push-token intact across reseeds of this pull-token.
+    {{- if .Values.secrets.ghcrPullToken }}
+    if [[ -n "${GHCR_PULL_TOKEN:-}" ]]; then
+      _seed_patch "secret/ghcr" \
         username="${GITHUB_USER:-KevinDeBenedetti}" \
-        password="${GHCR_PAT}"
+        pull-token="${GHCR_PULL_TOKEN}"
     else
-      _skip "secret/ghcr/pull" "GHCR_PAT"
+      _skip "secret/ghcr" "GHCR_PULL_TOKEN"
     fi
     {{- else }}
-    log "  - skipped secret/ghcr/pull (GHCR_PAT not set)"
+    log "  - skipped secret/ghcr (GHCR_PULL_TOKEN not set)"
     {{- end }}
 
     # ── secret/reactive-resume/prod ──────────────────────────────────────────
