@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.23.0...v0.23.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* **ci:** remove dependency on private infra repo for Traefik advisories ([87e7cfc](https://github.com/KevinDeBenedetti/k3s-lab/commit/87e7cfce367843a6a5f29aa25d4459d7f97c2638))
+
 ## [0.23.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.22.0...v0.23.0) (2026-09-09)
 
 
