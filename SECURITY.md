@@ -44,7 +44,14 @@ that is in scope and we want to know.
 ## How this repository watches its own components
 
 A daily workflow (`.github/workflows/traefik-advisories.yml`) confronts the
-component versions the charts ship — and, where visible, the versions actually
-deployed — with the upstream GitHub security advisories, and opens a tracking
-issue when one is covered. Reports that beat the watch to it are exactly what
-this policy is for.
+component versions the charts ship with the upstream GitHub security
+advisories, and opens a tracking issue when one is covered. Reports that beat
+the watch to it are exactly what this policy is for.
+
+That watch deliberately stops at what this repository *publishes*, and needs no
+credentials to do it. Which versions a cluster actually **runs** is a different
+question: it depends on which published chart that cluster pins, which this
+repository cannot see and which can lag it by any number of releases. Answering
+it is the deployment repository's job — `scripts/check-deployed-charts.sh` and
+`scripts/check-deployed-pins.sh` live here and are meant to be run from there,
+against its own ApplicationSet.
