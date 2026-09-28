@@ -57,7 +57,7 @@ jobs:
 
   # ─── Shell linting ─────────────────────────────────────────────────────────
   shell-ci:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@902f2a169a8f1dbec41ccf7a6aa3ad831e607339 # v0.24.0
     with:
       run-shellcheck: true
       shellcheck-severity: warning
@@ -71,7 +71,7 @@ jobs:
 
   # ─── Kubernetes validation + .env.example check ──────────────────────────
   kubernetes:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-kubernetes.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-kubernetes.yml@902f2a169a8f1dbec41ccf7a6aa3ad831e607339 # v0.24.0
     with:
       run-kubeconform: true
       kubeconform-paths: kubernetes/
@@ -86,7 +86,7 @@ jobs:
 
   # ─── Secret scanning ──────────────────────────────────────────────────────
   security:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/security.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/security.yml@902f2a169a8f1dbec41ccf7a6aa3ad831e607339 # v0.24.0
     permissions:
       security-events: write
       actions: read
@@ -101,7 +101,7 @@ jobs:
 
   # ─── Helm chart linting ─────────────────────────────────────────────────────
   helm-lint:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-helm.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-helm.yml@902f2a169a8f1dbec41ccf7a6aa3ad831e607339 # v0.24.0
     with:
       run-lint: true
       # `helm lint` alone does not download dependencies, so the subchart guards
@@ -319,7 +319,7 @@ jobs:
   docs:
     needs: [shell-ci, kubernetes, security, helm-lint, resource-limits, traefik-image, ansible]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/cd-docs.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/cd-docs.yml@902f2a169a8f1dbec41ccf7a6aa3ad831e607339 # v0.24.0
     with:
       client-id: ${{ vars.DOCS_APP_CLIENT_ID }}
     secrets:
