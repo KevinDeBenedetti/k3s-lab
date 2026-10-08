@@ -16,7 +16,7 @@
 # a trailing comment. Do not "tidy" them back into tags: until 2026-08-06 the
 # four reusable workflows below came from `@main`, so any push to
 # github-workflows changed what ran here — with this repo's secrets
-# (DOCS_APP_PRIVATE_KEY) and `security-events: write` — without a PR, a review
+# (formerly DOCS_APP_PRIVATE_KEY) and `security-events: write` — without a PR, a review
 # or a signal. Tags are no better: they are mutable and can be repointed at any
 # commit. The SHAs chosen were the exact commits `@main` and `@v5`/`@v2` already
 # resolved to, so pinning changed nothing about what executes.
@@ -305,22 +305,3 @@ jobs:
         run: |
           python3 -m pip install --quiet 'ansible-lint==26.8.0'
           ansible-lint .
-
-  # ─── Docs dispatch (push to main only) ───────────────────────────────────
-  # cd-docs.yml now authenticates via GitHub App (client-id + APP_PRIVATE_KEY);
-  # passing an undeclared secret (the old PAT_TOKEN) startup-fails the whole run.
-  # `traefik-advisories` and `umbrella-pins` are deliberately NOT in `needs`:
-  # both judge external state (the advisory API, the GHCR registry) that moves
-  # without a commit, so either can go red on a tree that has not changed. They
-  # already fail the CI run, which is the signal we want; blocking publication
-  # of the documentation on them would mean a new upstream advisory, or the
-  # normal window between a release and its follow-up pin commit, also silently
-  # freezes the docs site.
-  docs:
-    needs: [shell-ci, kubernetes, security, helm-lint, resource-limits, traefik-image, ansible]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/cd-docs.yml@5b3c602d225fda837a771c92f432c7de50950f96 # v0.23.0
-    with:
-      client-id: ${{ vars.DOCS_APP_CLIENT_ID }}
-    secrets:
-      APP_PRIVATE_KEY: ${{ secrets.DOCS_APP_PRIVATE_KEY }}
