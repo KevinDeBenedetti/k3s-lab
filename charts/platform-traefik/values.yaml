@@ -11,8 +11,16 @@ traefik:
   # GHSA-w4v4-9rw7-5326 — all patched in v3.7.13 (see README.md). A pin here
   # would only duplicate upstream's own value and drift.
   #
-  # RE-ADD `image.tag` only if a future advisory lands before upstream ships
-  # the fix — never `versionOverride`, see README.md.
+  # PIN RE-ADDED 2026-10-08 — 8 advisories (7 high, 1 medium) published
+  # 2026-10-07 against v3.7.13, all patched in v3.7.14 (GHSA-fh26-gfpp-7xxx,
+  # GHSA-qvj7-gq9c-hp7q, GHSA-53qr-784g-cj35, GHSA-rv2h-qh7j-xrjw,
+  # GHSA-qm9f-w54v-q2qh, GHSA-mwrr-6hp4-pxr6, GHSA-mhjw-hmjv-p99x,
+  # GHSA-cw35-4q88-3rmp). Chart 41.7.0 ships v3.7.14 upstream but is not yet
+  # published (latest is 41.6.1 -> v3.7.13). DROP this pin at the first
+  # published subchart whose appVersion is >= v3.7.14.
+  # Never `versionOverride`, see README.md.
+  image:
+    tag: v3.7.14
 
   ingressRoute:
     dashboard:

@@ -7,7 +7,7 @@ disabled, resource limits sized for a small node.
 | | |
 |---|---|
 | Subchart | `traefik` [`41.5.0`](https://traefik.github.io/charts) |
-| Deployed proxy | `docker.io/traefik:v3.7.13` (subchart `appVersion`, no pin — see below) |
+| Deployed proxy | `docker.io/traefik:v3.7.14` (pinned via `traefik.image.tag` — subchart `appVersion` is still v3.7.13, see below) |
 | Per-cluster overrides | `infra/platform/traefik/values.yaml` |
 
 > The two versions in that table are copies of `Chart.lock` and of the value
@@ -49,11 +49,11 @@ it does not download dependencies.
 
 1. `versionOverride` if set — **it short-circuits everything else**;
 2. otherwise `image.tag`;
-3. otherwise the subchart's `.Chart.AppVersion` (so `v3.7.13` here).
+3. otherwise the subchart's `.Chart.AppVersion` (`v3.7.13` with 41.5.0).
 
-Step 3 is where we sit today: no pin is set, so the proxy is whatever the
-subchart's `appVersion` says (`v3.7.13` as of 41.5.0). Step 2 is the escape
-hatch for when an advisory lands before upstream ships the fix. The pinless
+Since 2026-10-08 we sit on step 2: `traefik.image.tag` pins `v3.7.14` because
+an advisory landed before upstream published the fix. Drop the pin when a
+published subchart's `appVersion` catches up (step 3). The pinless
 state is also a trap in the other direction: *forgetting* `image.tag` back
 when it was load-bearing raised no error at all, it just silently downgraded
 the proxy. `lib/traefik-pin.sh` mirrors steps 2 and 3 so that both checks
@@ -63,7 +63,7 @@ always speak about the version really shipped, whether or not a pin exists.
 |---|---|---|
 | Version deployed | the pin | subchart appVersion |
 | What the checks compare against | the pin | subchart appVersion |
-| When it applies | an advisory is ahead of upstream | upstream is current (**today**) |
+| When it applies | an advisory is ahead of upstream (**today**) | upstream is current |
 
 ### What fails, and what only warns
 
@@ -164,6 +164,14 @@ July 2026 the upstream chart lagged behind the proxy's own fixes, so
 | `GHSA-f52w-8j3h-j724` (HIGH) — rootless HTTP/1 request-target routes as "/" but is forwarded verbatim, bypassing path-scoped routing, middleware guards and access logging | v3.0.0 – v3.7.12 | v3.7.13 |
 | `GHSA-w4v4-9rw7-5326` (HIGH) — inconsistent interpretation of HTTP requests (request/response smuggling) and incorrect authorization | v3.4.2 – v3.7.12 | v3.7.13 |
 | `GHSA-8fcf-v89g-xpg6` — BasicAuth singleflight coalescing reintroduces an unauthenticated username-enumeration timing oracle | v3.6.11 – v3.7.12 | v3.7.13 |
+| `GHSA-fh26-gfpp-7xxx` (HIGH) — `snicheck` skips the check when `req.TLS` is nil (HTTP/2 `:scheme http`) | v3.0.0 – v3.7.13 | v3.7.14 |
+| `GHSA-qvj7-gq9c-hp7q` (HIGH) — Ingress NGINX provider: ssl-passthrough sibling HTTP router serves the auth-protected backend without auth | v3.7.13 | v3.7.14 |
+| `GHSA-53qr-784g-cj35` (HIGH) — FastProxy backend connection pool leaks connection-bound NTLM/Negotiate identity to unauthenticated clients | v3.2.0 – v3.7.13 | v3.7.14 |
+| `GHSA-rv2h-qh7j-xrjw` (HIGH) — Ingress-NGINX provider: colliding `auth-tls-secret` names merge two client CAs into one TLS option | v3.7.0 – v3.7.13 | v3.7.14 |
+| `GHSA-qm9f-w54v-q2qh` (HIGH) — preauthenticated Negotiate contaminates the globally shared backend connection pool | v3.0.0 – v3.7.13 | v3.7.14 |
+| `GHSA-mwrr-6hp4-pxr6` (HIGH) — Ingress-NGINX provider forwards forged `Ssl-Client-*` identity headers on its HTTP route | v3.7.0 – v3.7.13 | v3.7.14 |
+| `GHSA-mhjw-hmjv-p99x` (medium) — unsynchronized write to the per-connection sticky round tripper shared by concurrent HTTP/2 streams | v3.0.0 – v3.7.13 | v3.7.14 |
+| `GHSA-cw35-4q88-3rmp` (HIGH) — connection-scoped NTLM/Kerberos sticky round tripper not keyed by service, applying one service's TLS client config to another | v3.0.0 – v3.7.13 | v3.7.14 |
 
 `GHSA-8rxv-jg7p-wvg3`, which motivated the original pin, **does not concern
 us**: it targets the `kubernetesIngressNGINX` provider, which we do not enable.
@@ -190,6 +198,13 @@ above), all patched in `v3.7.13`. Chart **41.5.0**, published the same day,
 already ships that appVersion, so the subchart was bumped again rather than
 pinning ahead of it. Drop this pattern's future pin at the first subchart
 bump whose appVersion catches up with it.
+
+The pin came **back** on 2026-10-08: eight more advisories (seven HIGH, one
+medium — mostly the NTLM/Negotiate backend pool and the Ingress-NGINX
+provider) were published on 2026-10-07 against `v3.7.13`, all patched in
+`v3.7.14`. Chart 41.7.0 ships that appVersion upstream but was not yet
+published to the Helm repo (latest: 41.6.1, still `v3.7.13`), so
+`traefik.image.tag: v3.7.14` was set rather than waiting.
 
 > [!WARNING]
 > Dropping the pin removed a redundancy, **not** the risk. The version still
