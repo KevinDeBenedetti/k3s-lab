@@ -1,3 +1,13 @@
 {
-  ".": "0.23.1"
+  ".": "0.23.1",
+  "charts/platform-argocd": "0.23.1",
+  "charts/platform-base": "0.23.1",
+  "charts/platform-cert-manager": "0.23.1",
+  "charts/platform-deployment": "0.23.1",
+  "charts/platform-external-secrets": "0.23.1",
+  "charts/platform-monitoring": "0.23.1",
+  "charts/platform-security": "0.23.1",
+  "charts/platform-traefik": "0.23.1",
+  "charts/platform-vault": "0.23.1",
+  "charts/platform-vault-seeder": "0.23.1"
 }

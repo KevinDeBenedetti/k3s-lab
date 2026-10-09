@@ -42,7 +42,7 @@ helm install platform oci://ghcr.io/kevindebenedetti/charts/platform-deployment 
   --version 0.18.1 --namespace platform --create-namespace
 ```
 
-One caveat worth knowing up front: on stock k3s or k3d, **disable the bundled Traefik first** (`--k3s-arg "--disable=traefik@server:0"`), since its CRDs conflict with this chart's — the same thing this repo's Ansible role does on real nodes. The Kyverno ClusterPolicies also come in a second `helm upgrade`, for a Helm ordering reason explained (with the command) in the [chart's README](charts/platform-deployment/README.md), which also carries the full verified-install report. Each component can be switched off independently and configured through nested values. Check the [releases page](https://github.com/KevinDeBenedetti/k3s-lab/releases) for the latest version; the umbrella's sub-chart pins always reference already-published versions, so they lag the latest release by one — by design.
+One caveat worth knowing up front: on stock k3s or k3d, **disable the bundled Traefik first** (`--k3s-arg "--disable=traefik@server:0"`), since its CRDs conflict with this chart's — the same thing this repo's Ansible role does on real nodes. The Kyverno ClusterPolicies also come in a second `helm upgrade`, for a Helm ordering reason explained (with the command) in the [chart's README](charts/platform-deployment/README.md), which also carries the full verified-install report. Each component can be switched off independently and configured through nested values. Check the [releases page](https://github.com/KevinDeBenedetti/k3s-lab/releases) (`platform-deployment-v*` tags) for the latest version; the umbrella's sub-chart pins always reference already-published versions, and are realigned by an automated PR after each subchart release.
 
 ### Provision a cluster from scratch (Ansible)
 
@@ -97,13 +97,18 @@ k3s-lab/
 
 ## Release Workflow
 
-Releases are fully automated with [release-please](https://github.com/googleapis/release-please); versions follow a deliberate **0.x line** and every chart shares the repository version:
+Releases are fully automated with [release-please](https://github.com/googleapis/release-please); versions follow a deliberate **0.x line**, and **each chart is versioned independently** — a Traefik fix releases `platform-traefik` and nothing else:
 
-1. Merge a change to `main` (conventional commits: `feat:`, `fix:`, …)
-2. release-please opens/updates a release PR — changelog + version bump across all `Chart.yaml`
-3. Merging the release PR creates the GitHub release and tag
-4. `release-charts` publishes every chart at the new version to GHCR (skipping versions that already exist)
-5. Consumers bump their pins to the new version — CI's `umbrella-pins` job catches the umbrella's own pins when they lag
+| Component | Path | Tag | Changelog |
+| --- | --- | --- | --- |
+| each chart | `charts/<chart>/` | `<chart>-vX.Y.Z` (e.g. `platform-security-v0.24.0`) | `charts/<chart>/CHANGELOG.md` |
+| toolkit (scripts, `lib/`, Ansible, taskfiles) | everything outside `charts/` | `vX.Y.Z` | `CHANGELOG.md` |
+
+1. Merge a change to `main` (conventional commits: `feat:`, `fix:`, …) — only the components whose files it touches are affected
+2. release-please opens one release PR **per affected component** — changelog + version bump of that chart's `Chart.yaml`
+3. Merging a release PR creates that component's GitHub release and tag
+4. `release-charts` publishes every chart whose version is not on GHCR yet, then opens a PR aligning the umbrella's pins on the latest published subcharts
+5. Consumers bump each chart on its own schedule — pin `ghcr.io/kevindebenedetti/charts/<chart>` (Renovate: `docker` datasource), never the repository tag
 
 ## Documentation
 

@@ -177,20 +177,24 @@ jobs:
           echo "documents=$docs" >> "$GITHUB_OUTPUT"
 
       # ─── Umbrella pin bump (post-publish PR) ────────────────────────────────
-      # The subchart versions just published are, by definition, versions the
-      # umbrella's pins may now reference — this is the one moment where the
-      # "pins may only point at published versions" constraint holds by
-      # construction. Decided on 2026-08-03, when the umbrella became the
-      # repository's public entry point and its once-per-release manual bump
-      # stopped being acceptable as a recurring red CI.
+      # Right after publishing, every version GHCR serves is, by definition, one
+      # the umbrella's pins may reference — the "pins may only point at
+      # published versions" constraint holds by construction. Decided on
+      # 2026-08-03, when the umbrella became the repository's public entry point
+      # and its manual bump stopped being acceptable as a recurring red CI.
+      #
+      # Since 2026-10-08 each chart has its own version (one release-please
+      # component per chart), so each pin is aligned on the latest version of
+      # *its* subchart, read from the registry — not on the umbrella's version.
+      # One rolling branch, force-pushed: a second publish before the PR is
+      # merged updates the same PR instead of opening a competing one.
       #
       # A PR rather than a direct push: check-umbrella-pins.sh stays the
       # watchdog, CI runs on the branch, and a human merges. The commit is a
-      # `chore:` on purpose — a releasing type (fix:/feat:) would trigger
-      # release-please, whose release would republish charts and open the next
-      # bump PR: an infinite release loop. With `chore:` the aligned pins ship
-      # with the *next* release, which is exactly the one-release lag the
-      # umbrella already has by design.
+      # `fix(platform-deployment):` on purpose — changing the pins IS a change
+      # of the umbrella, so merging it releases platform-deployment alone. No
+      # release loop: publishing the umbrella changes none of its own pins, so
+      # the next run finds them aligned and opens nothing.
       #
       # The app token (not GITHUB_TOKEN) matters: PRs opened with the default
       # token do not trigger CI, and an unchecked pin bump defeats the purpose.
@@ -206,26 +210,46 @@ jobs:
         if: steps.publish.outputs.published != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED: ${{ steps.publish.outputs.published }}
         run: |
-          version=$(grep '^version:' charts/platform-deployment/Chart.yaml | awk '{print $2}')
-          branch="chore/umbrella-pins-${version}"
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source lib/log.sh; source lib/semver.sh; source lib/chart-deps.sh; source lib/registry.sh
 
-          ./scripts/bump-umbrella-pins.sh --version "$version"
+          umbrella=charts/platform-deployment/Chart.yaml
+          branch="chore/umbrella-pins"
+
+          # Latest published version of every subchart, straight from GHCR —
+          # the same source and the same semver_latest as check-umbrella-pins.sh.
+          sets=()
+          while IFS=$'\t' read -r name _ repository; do
+            [ -n "$name" ] || continue
+            IFS=$'\t' read -r host path < <(chart_oci_registry "$repository" "$name")
+            latest="$(registry_tags "$host" "$path" | semver_latest)"
+            if [ -z "$latest" ]; then
+              echo "::error::no published version found for $name at $host/$path"
+              exit 1
+            fi
+            sets+=(--set "${name}=${latest}")
+          done < <(chart_oci_deps "$umbrella")
+
+          ./scripts/bump-umbrella-pins.sh "${sets[@]}"
 
           # Ask git, not the script's wording, whether there is anything to
           # commit: `git commit` on an empty index fails the step, and an
           # already-aligned umbrella is a normal outcome, not an error.
-          if git diff --quiet -- charts/platform-deployment/Chart.yaml; then
-            echo "ℹ️  Pins already aligned at $version — no PR needed"
+          if git diff --quiet -- "$umbrella"; then
+            echo "ℹ️  Pins already aligned on the registry — no PR needed"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
-          git add charts/platform-deployment/Chart.yaml
-          git commit -m "chore(charts/platform-deployment): align subchart pins to ${version}" \
-            -m "The ${version} release just published every subchart; the umbrella's pins may now reference it. Opened automatically by release-charts after publishing — see scripts/bump-umbrella-pins.sh."
+          git add "$umbrella"
+          git commit -m "fix(platform-deployment): align subchart pins on the latest published versions" \
+            -m "Opened automatically by release-charts after publishing: ${PUBLISHED}. See scripts/bump-umbrella-pins.sh."
           git push --force \
             "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" \
             "$branch"
@@ -234,12 +258,16 @@ jobs:
             echo "♻️  PR for $branch already open — branch updated"
           else
             {
-              echo "The \`${version}\` release published every subchart, so the umbrella's pins can now reference it. Opened automatically by \`release-charts\` right after publishing."
+              echo "Aligns each \`platform-deployment\` pin on the latest version GHCR serves for that subchart. Opened automatically by \`release-charts\` right after publishing."
               echo ""
-              echo "The \`umbrella-pins\` CI job on this PR is the proof the alignment is correct — merge on green. The commit is a \`chore:\` so merging does **not** trigger a new release; the aligned pins ship with the next one (the umbrella's structural one-release lag, by design)."
+              echo '```diff'
+              git diff HEAD~1 -U0 -- "$umbrella" | grep -E '^[-+] +version:' || true
+              echo '```'
+              echo ""
+              echo "The \`umbrella-pins\` CI job on this PR is the proof the alignment is correct — merge on green. The commit is a \`fix(platform-deployment):\`, so merging releases the umbrella, and only it."
             } > /tmp/pr-body.md
             gh pr create --head "$branch" \
-              --title "chore(charts/platform-deployment): align subchart pins to ${version}" \
+              --title "fix(platform-deployment): align subchart pins on the latest published versions" \
               --body-file /tmp/pr-body.md
           fi
 

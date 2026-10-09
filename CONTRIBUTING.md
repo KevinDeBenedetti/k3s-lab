@@ -29,12 +29,21 @@ Releases are fully automated with release-please, and versions follow a
 deliberate **0.x line**:
 
 - **Never bump `version:` or `appVersion:` in any `charts/*/Chart.yaml`** —
-  release-please owns those fields and bumps every chart at each release.
+  release-please owns those fields. Each chart is its own release-please
+  component (`.github/release/release-please-config.json`): a commit releases
+  exactly the charts whose directory it touches, and the toolkit (`vX.Y.Z`
+  tags) only releases for changes outside `charts/`.
+- **A new chart needs two entries** — one in `release-please-config.json`
+  (`component` + `extra-files` for its `Chart.yaml`) and one in
+  `.release-please-manifest.json` with its current version. Without them its
+  commits silently release nothing.
 - **Never add a `Release-As:` footer** to a commit.
 - Dependency versions (`dependencies[].version`, subchart pins) are the part
   humans — or dedicated automation — edit. The umbrella's pins are aligned by
-  an automated PR after each release; `check-umbrella-pins.sh` in CI catches
-  any drift.
+  an automated PR after each subchart release; `check-umbrella-pins.sh` in CI
+  catches any drift.
+- Prefer one chart per commit: a commit touching three charts lands in three
+  release PRs and three changelogs.
 
 ## Commit messages
 

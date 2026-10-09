@@ -1,24 +1,20 @@
 {
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-v-tag": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false,
+  "separate-pull-requests": true,
+  "bootstrap-sha": "6c6da7f64b31aa64018b74edda715c6a58ee04ca",
+  "git-user-name": "github-actions[bot]",
+  "git-user-email": "github-actions[bot]@users.noreply.github.com",
   "packages": {
     ".": {
-      "release-type": "simple",
+      "component": "k3s-lab",
+      "include-component-in-tag": false,
       "changelog-path": "CHANGELOG.md",
-      "include-v-tag": true,
-      "bump-minor-pre-major": true,
-      "bump-patch-for-minor-pre-major": false,
+      "exclude-paths": ["charts"],
       "extra-files": [
-        { "type": "yaml", "path": "charts/platform-argocd/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "charts/platform-base/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "charts/platform-monitoring/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "charts/platform-security/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "charts/platform-cert-manager/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "charts/platform-deployment/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "charts/platform-deployment/Chart.yaml", "jsonpath": "$.appVersion" },
-        { "type": "yaml", "path": "charts/platform-vault-seeder/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "charts/platform-vault-seeder/Chart.yaml", "jsonpath": "$.appVersion" },
-        { "type": "yaml", "path": "charts/platform-external-secrets/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "charts/platform-traefik/Chart.yaml", "jsonpath": "$.version" },
-        { "type": "yaml", "path": "charts/platform-vault/Chart.yaml", "jsonpath": "$.version" },
         { "type": "generic", "path": "lib/script-init.sh" },
         { "type": "generic", "path": "lib/run-mode.sh" },
         { "type": "generic", "path": "scripts/vault-init.sh" },
@@ -27,12 +23,55 @@
         { "type": "generic", "path": "scripts/uninstall.sh" },
         { "type": "generic", "path": "scripts/generate-inventory.sh" },
         { "type": "generic", "path": "scripts/deploy-grafana-oauth.sh" },
-        { "type": "generic", "path": "scripts/get-kubeconfig.sh" }
+        { "type": "generic", "path": "scripts/get-kubeconfig.sh" },
+        { "type": "generic", "path": "scripts/wg.sh" }
+      ]
+    },
+    "charts/platform-argocd": {
+      "component": "platform-argocd",
+      "extra-files": [{ "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.version" }]
+    },
+    "charts/platform-base": {
+      "component": "platform-base",
+      "extra-files": [{ "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.version" }]
+    },
+    "charts/platform-cert-manager": {
+      "component": "platform-cert-manager",
+      "extra-files": [{ "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.version" }]
+    },
+    "charts/platform-deployment": {
+      "component": "platform-deployment",
+      "extra-files": [
+        { "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.version" },
+        { "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.appVersion" }
+      ]
+    },
+    "charts/platform-external-secrets": {
+      "component": "platform-external-secrets",
+      "extra-files": [{ "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.version" }]
+    },
+    "charts/platform-monitoring": {
+      "component": "platform-monitoring",
+      "extra-files": [{ "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.version" }]
+    },
+    "charts/platform-security": {
+      "component": "platform-security",
+      "extra-files": [{ "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.version" }]
+    },
+    "charts/platform-traefik": {
+      "component": "platform-traefik",
+      "extra-files": [{ "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.version" }]
+    },
+    "charts/platform-vault": {
+      "component": "platform-vault",
+      "extra-files": [{ "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.version" }]
+    },
+    "charts/platform-vault-seeder": {
+      "component": "platform-vault-seeder",
+      "extra-files": [
+        { "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.version" },
+        { "type": "yaml", "path": "Chart.yaml", "jsonpath": "$.appVersion" }
       ]
     }
-  },
-  "git-user-name": "github-actions[bot]",
-  "git-user-email": "github-actions[bot]@users.noreply.github.com",
-  "changelog-path": "CHANGELOG.md",
-  "release-type": "simple"
+  }
 }

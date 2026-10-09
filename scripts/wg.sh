@@ -19,7 +19,7 @@ set -euo pipefail
 
 WG_INTERFACE="${WG_INTERFACE:-wg0}"
 
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.11.1}" # x-release-please-version
+K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.23.1}" # x-release-please-version
 
 # wg.sh takes a positional subcommand and never needs .env — keep the manual
 # preamble (run-mode.sh + log.sh) instead of script-init.sh, which would load .env.

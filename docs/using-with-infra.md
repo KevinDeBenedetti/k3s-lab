@@ -245,13 +245,35 @@ overrides are untouched. Renovate can open these bump PRs automatically.
 ## 6 — Update Helm chart versions
 
 Platform charts are pulled via OCI and pinned in your ArgoCD ApplicationSets /
-`platform/*` values. To upgrade, bump the pinned `targetRevision` and push:
+`platform/*` values. **Each chart has its own version** (tag
+`<chart>-vX.Y.Z`): `platform-security` can move to 0.25.0 while
+`platform-vault` stays on 0.23.1. Bump only the chart you want, read its
+`charts/<chart>/CHANGELOG.md`, and push:
 
 ```bash
-git add -A && git commit -m "chore: bump chart versions" && git push
+git add -A && git commit -m "chore(platform-security): bump chart to 0.25.0" && git push
 ```
 
-ArgoCD detects the change and syncs automatically. Renovate opens these PRs for you.
+ArgoCD detects the change and syncs automatically.
+
+With Renovate, track each chart **through the registry**, not through the
+repository's GitHub releases — those now mix every component, and the bare
+`vX.Y.Z` tags only version the toolkit (scripts, roles):
+
+```json
+{
+  "customType": "regex",
+  "managerFilePatterns": ["/^argocd/.+\\.yaml$/"],
+  "matchStrings": [
+    "chart: (?<depName>platform-[^\\s]+)\\n(?:[^\\n]*\\n){0,10}?\\s+(?:targetRevision|version): \"(?<currentValue>[\\d.]+)\""
+  ],
+  "packageNameTemplate": "ghcr.io/kevindebenedetti/charts/{{{depName}}}",
+  "datasourceTemplate": "docker"
+}
+```
+
+One dependency per chart means one PR per chart: a breaking change in one
+never holds back the others. Do not group them.
 
 ---
 
