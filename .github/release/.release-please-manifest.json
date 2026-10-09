@@ -3,7 +3,7 @@
   "charts/platform-argocd": "0.23.1",
   "charts/platform-base": "0.23.1",
   "charts/platform-cert-manager": "0.23.1",
-  "charts/platform-deployment": "0.23.1",
+  "charts/platform-deployment": "0.23.2",
   "charts/platform-external-secrets": "0.23.1",
   "charts/platform-monitoring": "0.23.1",
   "charts/platform-security": "0.23.1",
