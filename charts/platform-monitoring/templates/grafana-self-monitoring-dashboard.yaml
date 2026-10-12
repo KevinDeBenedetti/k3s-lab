@@ -1,3 +1,4 @@
+{{- if .Values.dashboards.selfMonitoring.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -171,3 +172,4 @@ data:
       "uid": "grafana-self-monitoring",
       "version": 1
     }
+{{- end }}

@@ -8,6 +8,12 @@ dashboards:
     enabled: true
   trivy:
     enabled: true
+  kubernetes:
+    enabled: true
+  logs:
+    enabled: true
+  selfMonitoring:
+    enabled: true
 
 grafana:
   fullnameOverride: monitoring-grafana

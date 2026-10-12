@@ -166,6 +166,10 @@ Configuration (`charts/platform-monitoring/values.yaml` under the `promtail:` ke
 | ------------- | ----------------------------- | --------------------------------- |
 | Logs — Errors | `grafana-logs-dashboard.yaml` | Error-focused log explorer (Loki) |
 
+Each chart dashboard can be switched off with `dashboards.<name>.enabled: false`
+(`kubernetes`, `logs`, `selfMonitoring`, `falco`, `tetragon`, `trivy`) — see the
+[chart README](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-monitoring/README.md#dashboards-and-datasources).
+
 ### Import additional dashboards
 
 Grafana has a large community dashboard library. Import by ID from **Dashboards → Import**:

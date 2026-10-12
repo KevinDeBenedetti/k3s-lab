@@ -41,14 +41,18 @@ This chart owns its templates: Loki and Prometheus datasources, plus dashboards
 for Kubernetes, logs, self-monitoring, Falco, Tetragon and Trivy. They are
 delivered through the Grafana sidecar (`grafana_dashboard` label).
 
-The three security dashboards are gated, because a dashboard for a component you
-did not deploy is worse than no dashboard:
+Every dashboard is gated. The security ones because a dashboard for a component
+you did not deploy is worse than no dashboard; the generic ones so a consumer
+that ships its own dashboards can drop them:
 
 | Toggle | Default | Turn off when |
 |---|---|---|
 | `dashboards.falco.enabled` | `true` | `platform-security` runs without Falco |
 | `dashboards.tetragon.enabled` | `true` | …without Tetragon |
 | `dashboards.trivy.enabled` | `true` | …without Trivy Operator |
+| `dashboards.kubernetes.enabled` | `true` | you ship your own cluster overview |
+| `dashboards.logs.enabled` | `true` | you ship your own logs dashboard |
+| `dashboards.selfMonitoring.enabled` | `true` | you do not want the Prometheus/Grafana self-monitoring view |
 
 ## Retention
 
