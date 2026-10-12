@@ -26,7 +26,7 @@ dependencies:
     repository: oci://ghcr.io/kevindebenedetti/charts
     condition: platform-argocd.enabled
   - name: platform-monitoring
-    version: 0.23.1
+    version: 0.24.0
     repository: oci://ghcr.io/kevindebenedetti/charts
     condition: platform-monitoring.enabled
   - name: platform-external-secrets
