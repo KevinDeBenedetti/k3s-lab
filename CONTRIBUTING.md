@@ -28,22 +28,19 @@ path.
 Releases are fully automated with release-please, and versions follow a
 deliberate **0.x line**:
 
-- **Never bump `version:` or `appVersion:` in any `charts/*/Chart.yaml`** —
-  release-please owns those fields. Each chart is its own release-please
-  component (`.github/release/release-please-config.json`): a commit releases
-  exactly the charts whose directory it touches, and the toolkit (`vX.Y.Z`
-  tags) only releases for changes outside `charts/`.
-- **A new chart needs two entries** — one in `release-please-config.json`
-  (`component` + `extra-files` for its `Chart.yaml`) and one in
-  `.release-please-manifest.json` with its current version. Without them its
-  commits silently release nothing.
+- **Never bump `version:` or `appVersion:` in any `charts/*/Chart.yaml`**, nor
+  the `platform-*` pins of `platform-deployment` — release-please owns them.
+  The whole repository is one release-please component
+  (`.github/release/release-please-config.json`) and shares one version:
+  every chart, the umbrella's pins and the `K3S_LAB_RAW` refs move together,
+  in a single release PR.
+- **A new chart needs one entry** in `release-please-config.json`: an
+  `extra-files` line for its `Chart.yaml` (`$.version`). Without it its version
+  stops moving; `release-please-config.bats` and `check-umbrella-pins.sh`
+  catch that.
 - **Never add a `Release-As:` footer** to a commit.
-- Dependency versions (`dependencies[].version`, subchart pins) are the part
-  humans — or dedicated automation — edit. The umbrella's pins are aligned by
-  an automated PR after each subchart release; `check-umbrella-pins.sh` in CI
-  catches any drift.
-- Prefer one chart per commit: a commit touching three charts lands in three
-  release PRs and three changelogs.
+- Third-party dependency versions (`dependencies[].version` of the non-`platform-*`
+  subcharts) are the part humans — or Renovate — edit.
 
 ## Commit messages
 

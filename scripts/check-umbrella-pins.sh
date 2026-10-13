@@ -1,31 +1,25 @@
 #!/usr/bin/env bash
 # =============================================================================
-# check-umbrella-pins.sh — Report platform-deployment dependency pins that are
-# behind the latest version published on the registry.
+# check-umbrella-pins.sh — Verify that every platform-deployment dependency pin
+# equals the version of the matching subchart in this repository.
 #
-# Why this check exists: the umbrella's 7 pins are edited by hand, once per
-# release. That is a deliberate choice — an alignment script existed and was
-# removed on 2026-07-30, ~250 lines of shell to replace a single file edit. But
-# the umbrella still sat on 0.13.0 for three consecutive releases, and nothing
-# said so: the chart resolves fine, renders fine, and publishes fine while
-# pointing at subcharts one or more releases old. What was missing was never the
-# ability to make the edit, it was noticing it had been skipped.
+# The whole repository shares one version: release-please bumps every
+# charts/*/Chart.yaml and the umbrella's pins in the same release PR. This
+# check is the watchdog for that invariant — a pin that lags (or leads) its
+# subchart means a hand edit, or a chart added without being wired into
+# .github/release/release-please-config.json.
 #
-# So this **detects only, and never writes**. It exits 1 on drift; bringing the
-# pins forward stays a human gesture.
+# It reads the repository only, never the registry. Whether a pin can be
+# resolved is established after publishing, by release-charts, which pushes the
+# umbrella last and renders it. Asking the registry here would fail every
+# release PR (the pins point at versions not published yet) and deadlock the
+# publish behind CI.
 #
-# Reads the registry through the OCI distribution API rather than GitHub's
-# packages API — no token is needed for a public package, and it answers the
-# question that actually matters: which versions can a consumer resolve today.
-# (`gh api /user/packages/...` returned an empty list for a populated package on
-# 2026-07-26 — see .github/workflows/cleanup-packages.yml.)
+# Detects only, never writes.
 #
 # Usage:
 #   scripts/check-umbrella-pins.sh
 #   scripts/check-umbrella-pins.sh --chart charts/platform-deployment
-#
-# Env:
-#   GITHUB_TOKEN  optional — only needed if the packages are private.
 # =============================================================================
 set -euo pipefail
 
@@ -34,27 +28,23 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # shellcheck source=../lib/log.sh
 source "$REPO_ROOT/lib/log.sh"
-# shellcheck source=../lib/semver.sh
-source "$REPO_ROOT/lib/semver.sh"
 # shellcheck source=../lib/chart-deps.sh
 source "$REPO_ROOT/lib/chart-deps.sh"
-# shellcheck source=../lib/registry.sh
-source "$REPO_ROOT/lib/registry.sh"
 
 CHART_DIR="$REPO_ROOT/charts/platform-deployment"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --chart) CHART_DIR="$2"; shift 2 ;;
-    -h|--help) sed -n '3,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) log_error "Unknown option: $1"; exit 2 ;;
   esac
 done
 
-command -v jq >/dev/null || { log_error "jq is required"; exit 2; }
-
 CHART_YAML="$CHART_DIR/Chart.yaml"
 [ -f "$CHART_YAML" ] || { log_error "No Chart.yaml in $CHART_DIR"; exit 2; }
+
+CHARTS_ROOT="$(cd "$CHART_DIR/.." && pwd)"
 
 log_step "Checking dependency pins in $CHART_YAML"
 
@@ -65,62 +55,36 @@ if [ -z "$deps" ]; then
   exit 1
 fi
 
-behind=0
-unresolved=0
+mismatched=0
 checked=0
 
-while IFS=$'\t' read -r name pinned repository; do
+while IFS=$'\t' read -r name pinned _; do
   [ -n "$name" ] || continue
   checked=$((checked + 1))
 
-  IFS=$'\t' read -r host path < <(chart_oci_registry "$repository" "$name")
-
-  tags=""
-  if ! tags="$(registry_tags "$host" "$path" 2>/dev/null)" || [ -z "$tags" ]; then
-    # Not knowing what is published is not the same as being up to date.
-    unresolved=$((unresolved + 1))
-    log_warn "$name — could not list tags at ${host}/${path}"
+  source_yaml="$CHARTS_ROOT/$name/Chart.yaml"
+  if [ ! -f "$source_yaml" ]; then
+    mismatched=$((mismatched + 1))
+    log_error "$name — pinned $pinned but there is no $source_yaml"
     continue
   fi
 
-  latest="$(printf '%s\n' "$tags" | semver_latest)"
-  if [ -z "$latest" ]; then
-    unresolved=$((unresolved + 1))
-    log_warn "$name — no release-shaped tag among: $(printf '%s' "$tags" | tr '\n' ' ')"
-    continue
+  current="$(sed -nE 's/^version:[[:space:]]*"?([^"[:space:]#]+)"?.*/\1/p' "$source_yaml" | head -n 1)"
+  if [ "$pinned" = "$current" ]; then
+    log_ok "$name — $pinned"
+  else
+    mismatched=$((mismatched + 1))
+    log_error "$name — pinned $pinned, repository is at $current"
   fi
-
-  case "$(semver_cmp "$pinned" "$latest")" in
-    -1)
-      behind=$((behind + 1))
-      log_error "$name — pinned $pinned, published $latest"
-      ;;
-    1)
-      # Pinned ahead of the registry: the pin cannot resolve at all. Worse than
-      # lagging, and exactly the 0.13.x situation that froze ArgoCD.
-      behind=$((behind + 1))
-      log_error "$name — pinned $pinned but the registry only has up to $latest (unresolvable)"
-      ;;
-    *)
-      log_ok "$name — $pinned"
-      ;;
-  esac
 done <<<"$deps"
 
 echo ""
 log_info "$checked dependency pin(s) checked against ${CHART_DIR##*/}"
 
-if [ "$behind" -gt 0 ]; then
-  log_error "$behind pin(s) do not match the latest published version."
-  log_error "Update them by hand in $CHART_YAML — this check never writes."
+if [ "$mismatched" -gt 0 ]; then
+  log_error "$mismatched pin(s) differ from the subchart version in this repository."
+  log_error "release-please bumps them together — check the extra-files in .github/release/release-please-config.json."
   exit 1
 fi
 
-if [ "$unresolved" -gt 0 ]; then
-  log_error "$unresolved dependency/ies could not be resolved against the registry."
-  log_error "Treated as a failure on purpose: an unanswered registry says nothing"
-  log_error "about whether the pins are current."
-  exit 1
-fi
-
-log_ok "All $checked pin(s) match the latest published version"
+log_ok "All $checked pin(s) match the repository"

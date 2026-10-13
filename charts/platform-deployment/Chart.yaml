@@ -18,11 +18,11 @@ description: |
 
   Each subchart can be enabled/disabled independently via values.
 type: application
-version: 0.23.3
-appVersion: 0.23.3
+version: 0.24.0
+appVersion: 0.24.0
 dependencies:
   - name: platform-argocd
-    version: 0.23.1
+    version: 0.24.0
     repository: oci://ghcr.io/kevindebenedetti/charts
     condition: platform-argocd.enabled
   - name: platform-monitoring
@@ -30,15 +30,15 @@ dependencies:
     repository: oci://ghcr.io/kevindebenedetti/charts
     condition: platform-monitoring.enabled
   - name: platform-external-secrets
-    version: 0.23.1
+    version: 0.24.0
     repository: oci://ghcr.io/kevindebenedetti/charts
     condition: platform-external-secrets.enabled
   - name: platform-vault
-    version: 0.23.1
+    version: 0.24.0
     repository: oci://ghcr.io/kevindebenedetti/charts
     condition: platform-vault.enabled
   - name: platform-cert-manager
-    version: 0.23.1
+    version: 0.24.0
     repository: oci://ghcr.io/kevindebenedetti/charts
     condition: platform-cert-manager.enabled
   - name: platform-traefik
@@ -46,7 +46,7 @@ dependencies:
     repository: oci://ghcr.io/kevindebenedetti/charts
     condition: platform-traefik.enabled
   - name: platform-security
-    version: 0.23.1
+    version: 0.24.0
     repository: oci://ghcr.io/kevindebenedetti/charts
     condition: platform-security.enabled
 maintainers:

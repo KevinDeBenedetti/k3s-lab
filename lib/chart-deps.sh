@@ -2,14 +2,12 @@
 # lib/chart-deps.sh — Read a chart's dependencies out of its Chart.yaml.
 #
 # Exists for the two umbrella checks:
-#   scripts/check-umbrella-pins.sh    — are the pins the latest published?
+#   scripts/check-umbrella-pins.sh    — do the pins match the subcharts in the repo?
 #   scripts/check-umbrella-render.sh  — did every subchart actually contribute?
 #
-# platform-deployment pins its 7 subcharts by hand, and those pins are what a
-# consumer resolves. The pins stay manual by choice — an alignment tool was
-# written and then removed on 2026-07-30 as more surface than the gesture it
-# replaced. What was missing was never the ability to *edit* the file, it was
-# noticing that the edit had been forgotten, so this file only ever reads.
+# platform-deployment pins its 7 subcharts, and those pins are what a consumer
+# resolves. release-please bumps them together with the charts (one shared
+# version), so this file only ever reads.
 #
 # Source this file, then use:
 #   chart_deps <Chart.yaml>       → one "name<TAB>version<TAB>repository" per line
@@ -37,7 +35,7 @@ chart_deps() {
 
 # chart_oci_deps CHART_YAML — every dependency served from an `oci://` registry.
 # Dependencies from classic HTTP repos are skipped: they are not addressable
-# through the registry API that check-umbrella-pins.sh feeds.
+# through the registry API that check-deployed-pins.sh feeds.
 chart_oci_deps() {
   chart_deps "$1" | awk -F'\t' '$3 ~ /^oci:\/\// { print }'
 }

@@ -79,8 +79,8 @@ deliberately not repeated. To see what this chart actually resolves:
 helm dependency list charts/platform-deployment
 ```
 
-The pins are advanced by hand once per release; the `umbrella-pins` CI job
-fails when they fall behind what is published on GHCR.
+The pins equal the version of the subcharts in this repository: release-please
+bumps them with the charts, and the `umbrella-pins` CI job fails if they drift.
 
 Each subchart can be enabled/disabled independently and customized via values.
 
@@ -344,7 +344,6 @@ helm rollback platform-deployment 1 -n argocd
 - [Helm Umbrella Charts](https://helm.sh/docs/chart_template_guide/subcharts_and_globals/)
 - [platform-traefik](../platform-traefik/README.md) — ingress, and the proxy-version constraint
 - [platform-vault-seeder](../platform-vault-seeder/README.md) — Vault seeding jobs
-- [Helm umbrella guide](../../docs/helm-platform-deployment.md) — architecture and rationale
 - [ArgoCD Helm Integration](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/)
 
 The subcharts without a README of their own are documented by their

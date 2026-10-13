@@ -1,14 +1,12 @@
 #!/usr/bin/env bats
-# tests/bats/release-please-config.bats — Every chart is its own release-please
-# component, and the config says so.
+# tests/bats/release-please-config.bats — The whole repository shares one
+# version, and the config says where it is written.
 #
-# Since 2026-10-08 each chart is versioned independently. The failure this
-# guards against is silent: a chart missing from release-please-config.json is
-# not an error anywhere — its commits fall outside every component (the root
-# excludes charts/), so it never gets a release PR, its version never moves,
-# and release-charts never publishes it again. Likewise a manifest entry that
-# disagrees with Chart.yaml makes release-please compute the next version from
-# the wrong baseline.
+# release-please runs a single component. Every charts/*/Chart.yaml and every
+# pin of the umbrella is an extra-file of that component. The failure this
+# guards against is silent: a chart missing from extra-files is not an error
+# anywhere — its version just stops moving while the rest of the repository
+# advances, and the umbrella ends up pinning a stale subchart.
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
 CONFIG="${REPO_ROOT}/.github/release/release-please-config.json"
@@ -20,40 +18,68 @@ charts() {
   done
 }
 
-@test "every chart is a release-please package with its own component" {
-  missing=""
-  for chart in $(charts); do
-    component="$(jq -r --arg p "charts/$chart" '.packages[$p].component // empty' "$CONFIG")"
-    [ "$component" = "$chart" ] || missing="$missing $chart"
-  done
-  [ -z "$missing" ] || { echo "not a component (or wrong name):$missing"; return 1; }
+chart_version() {
+  awk '/^version:/ { print $2; exit }' "${REPO_ROOT}/charts/$1/Chart.yaml"
 }
 
-@test "every chart package bumps its own Chart.yaml version" {
+@test "there is a single release-please package, the repository root" {
+  [ "$(jq -r '.packages | keys | join(",")' "$CONFIG")" = "." ]
+}
+
+@test "the root keeps bare vX.Y.Z tags" {
+  # infra pins K3S_LAB_REF=vX.Y.Z and curls lib/ at that tag: a component
+  # prefix on the tag would 404 every one of those URLs.
+  [ "$(jq -r '.packages["."]["include-component-in-tag"]' "$CONFIG")" = "false" ]
+}
+
+@test "every chart's Chart.yaml version is an extra-file of the root package" {
   for chart in $(charts); do
-    jq -e --arg p "charts/$chart" \
-      '.packages[$p]["extra-files"][] | select(.path == "Chart.yaml" and .jsonpath == "$.version")' \
+    jq -e --arg p "charts/$chart/Chart.yaml" \
+      '.packages["."]["extra-files"][] | select(.path == $p and .jsonpath == "$.version")' \
       "$CONFIG" >/dev/null || { echo "$chart: no extra-files entry for \$.version"; return 1; }
   done
 }
 
-@test "every chart has a manifest entry equal to its Chart.yaml version" {
+@test "the umbrella's dependency pins are bumped with the release" {
+  jq -e '.packages["."]["extra-files"][]
+    | select(.path == "charts/platform-deployment/Chart.yaml" and .jsonpath == "$.dependencies[*].version")' \
+    "$CONFIG" >/dev/null
+}
+
+@test "no extra-file points at a chart that no longer exists" {
+  for path in $(jq -r '.packages["."]["extra-files"][].path | select(startswith("charts/"))' "$CONFIG" | sort -u); do
+    [ -f "${REPO_ROOT}/$path" ] || { echo "stale extra-file: $path"; return 1; }
+  done
+}
+
+@test "every chart sits at the manifest version" {
+  want="$(jq -r '.["."]' "$MANIFEST")"
   for chart in $(charts); do
-    want="$(awk '/^version:/ { print $2; exit }' "${REPO_ROOT}/charts/$chart/Chart.yaml")"
-    got="$(jq -r --arg p "charts/$chart" '.[$p] // empty' "$MANIFEST")"
-    [ "$got" = "$want" ] || { echo "$chart: manifest '$got' vs Chart.yaml '$want'"; return 1; }
+    got="$(chart_version "$chart")"
+    [ "$got" = "$want" ] || { echo "$chart: Chart.yaml '$got' vs manifest '$want'"; return 1; }
   done
 }
 
-@test "no package points at a chart that no longer exists" {
-  for path in $(jq -r '.packages | keys[] | select(startswith("charts/"))' "$CONFIG"); do
-    [ -f "${REPO_ROOT}/$path/Chart.yaml" ] || { echo "stale package: $path"; return 1; }
-  done
+@test "the manifest tracks the root package only" {
+  [ "$(jq -r 'keys | join(",")' "$MANIFEST")" = "." ]
 }
 
-@test "the toolkit keeps bare vX.Y.Z tags and ignores charts/" {
-  # infra pins K3S_LAB_REF=vX.Y.Z and curls lib/ at that tag: a component
-  # prefix on the root tag would 404 every one of those URLs.
-  [ "$(jq -r '.packages["."]["include-component-in-tag"]' "$CONFIG")" = "false" ]
-  jq -e '.packages["."]["exclude-paths"] | index("charts")' "$CONFIG" >/dev/null
+@test "the umbrella pins every platform-* chart at the shared version" {
+  # '$.dependencies[*].version' rewrites every dependency of the umbrella, so
+  # each one must be a platform-* chart of this repository.
+  want="$(jq -r '.["."]' "$MANIFEST")"
+  umbrella="${REPO_ROOT}/charts/platform-deployment/Chart.yaml"
+  while IFS=$'\t' read -r name version _; do
+    case "$name" in platform-*) ;; *) echo "non-platform dependency: $name"; return 1 ;; esac
+    [ "$version" = "$want" ] || { echo "$name: pin '$version' vs shared '$want'"; return 1; }
+    [ -f "${REPO_ROOT}/charts/$name/Chart.yaml" ] || { echo "$name: no chart in this repo"; return 1; }
+  done < <(source "${REPO_ROOT}/lib/chart-deps.sh"; chart_deps "$umbrella")
+}
+
+@test "the umbrella's own version and appVersion are extra-files too" {
+  for jp in '$.version' '$.appVersion'; do
+    jq -e --arg jp "$jp" '.packages["."]["extra-files"][]
+      | select(.path == "charts/platform-deployment/Chart.yaml" and .jsonpath == $jp)' \
+      "$CONFIG" >/dev/null || { echo "missing $jp"; return 1; }
+  done
 }

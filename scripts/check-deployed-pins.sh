@@ -7,7 +7,7 @@
 # asked this question.
 #   check-traefik-advisories.sh  what the *repo* would deploy, vs advisories
 #   check-deployed-charts.sh     what the *cluster* runs, vs advisories
-#   check-umbrella-pins.sh       the umbrella's pins, vs the registry
+#   check-umbrella-pins.sh       the umbrella's pins, vs the subcharts in the repo
 # Nobody confronted infra's pins with the registry — which is how 0.9.1 stayed
 # pinned for two weeks after being purged from GHCR, freezing the proxy on
 # v3.7.1 (10 vulnerable ranges) while every other check reported green.

@@ -35,7 +35,7 @@ k3s-lab is consumed two ways, each pinned:
 
 | Artifact                          | Mechanism                          | Pinning          |
 | --------------------------------- | ---------------------------------- | ---------------- |
-| Helm charts (platform components) | OCI pull in ArgoCD ApplicationSets | semver per chart |
+| Helm charts (platform components) | OCI pull in ArgoCD ApplicationSets | repository semver (shared by all charts) |
 | Ansible roles, taskfiles, scripts | git submodule `vendor/k3s-lab`     | semver git tag   |
 
 > The submodule is reproducible (the pinned commit appears in `git log`), works
@@ -245,20 +245,18 @@ overrides are untouched. Renovate can open these bump PRs automatically.
 ## 6 — Update Helm chart versions
 
 Platform charts are pulled via OCI and pinned in your ArgoCD ApplicationSets /
-`platform/*` values. **Each chart has its own version** (tag
-`<chart>-vX.Y.Z`): `platform-security` can move to 0.25.0 while
-`platform-vault` stays on 0.23.1. Bump only the chart you want, read its
-`charts/<chart>/CHANGELOG.md`, and push:
+`platform/*` values. **All charts share the repository version** (tag
+`vX.Y.Z`): a release publishes every chart at that version. Bump the charts
+together, read the root `CHANGELOG.md`, and push:
 
 ```bash
-git add -A && git commit -m "chore(platform-security): bump chart to 0.25.0" && git push
+git add -A && git commit -m "chore(platform): bump charts to 0.25.0" && git push
 ```
 
 ArgoCD detects the change and syncs automatically.
 
-With Renovate, track each chart **through the registry**, not through the
-repository's GitHub releases — those now mix every component, and the bare
-`vX.Y.Z` tags only version the toolkit (scripts, roles):
+With Renovate, track each chart **through the registry** (`docker` datasource)
+rather than through the repository's GitHub releases:
 
 ```json
 {
@@ -272,8 +270,8 @@ repository's GitHub releases — those now mix every component, and the bare
 }
 ```
 
-One dependency per chart means one PR per chart: a breaking change in one
-never holds back the others. Do not group them.
+One dependency per chart means one PR per chart, all at the same version.
+Grouping them in a single PR is fine now that they are released together.
 
 ---
 

@@ -211,37 +211,18 @@ jobs:
         run: ./scripts/check-traefik-advisories.sh
 
   # ─── Umbrella pin drift ───────────────────────────────────────────────────
-  # platform-deployment pins its 7 subcharts; the umbrella sat on 0.13.0 for
-  # three consecutive releases while resolving, rendering and publishing
-  # perfectly. This job only reports drift and never writes — release-charts
-  # opens the alignment PR (scripts/bump-umbrella-pins.sh).
-  #
-  # Blocking only where the umbrella is the subject: on push to main, and on
-  # PRs that touch charts/platform-deployment/. Elsewhere it is a warning.
-  # Drift is a state of the registry, not of the PR's diff: between a subchart
-  # release and the merge of its alignment PR, every open PR inherited a red
-  # check it could not fix — PR #233 (an actions bump) was blocked that way on
-  # 2026-10-08. With per-chart versions those windows get more frequent.
+  # platform-deployment pins its 7 subcharts; the umbrella once sat on 0.13.0
+  # for three consecutive releases while resolving, rendering and publishing
+  # perfectly. The whole repository now shares one version and release-please
+  # bumps the pins together with the charts, so this only has to confirm the
+  # invariant. It reads the repository, not the registry: the pins of a release
+  # PR point at versions that are published only after it merges.
   umbrella-pins:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - name: Compare the umbrella pins with what is published on GHCR
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          blocking=true
-          if [ "$EVENT" = "pull_request" ] &&
-             git diff --quiet "$BASE_SHA"...HEAD -- charts/platform-deployment/; then
-            blocking=false
-          fi
-          if ./scripts/check-umbrella-pins.sh; then exit 0; fi
-          if [ "$blocking" = true ]; then exit 1; fi
-          echo "::warning::umbrella pins drift from GHCR — not caused by this PR (it does not touch charts/platform-deployment/). Merge the open 'align subchart pins' PR."
+      - name: Compare the umbrella pins with the subcharts in this repository
+        run: ./scripts/check-umbrella-pins.sh
 
   # ─── Ansible playbook validation ──────────────────────────────────────────
   # Nothing in CI read the `ansible/` tree until 2026-08-17, so the provisioning
