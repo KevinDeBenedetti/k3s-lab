@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.24.0...v0.24.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **platform-deployment:** align subchart pins on the latest published versions ([7c48fc5](https://github.com/KevinDeBenedetti/k3s-lab/commit/7c48fc52b6a6db1b7b7cf5be2f042ab94649ea3e))
+
 ## [0.24.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.23.1...v0.24.0) (2026-10-12)
 
 
