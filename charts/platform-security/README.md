@@ -7,7 +7,7 @@ Kyverno, plus six Kyverno cluster policies this chart owns.
 |---|---|
 | Subcharts | `falco` `9.0.0`, `falcosidekick` `0.13.1`, `tetragon` `1.7.0`, `trivy-operator` `0.32.1`, `kyverno` `3.8.1` |
 | Namespace (convention) | `security` — set at install time; this chart neither creates nor enforces it |
-| Per-cluster overrides | `infra/platform/security/values.yaml` |
+| Per-cluster overrides | `<your-repo>/platform/security/values.yaml` |
 
 ## Installing on a cluster without the Kyverno CRDs
 
@@ -141,9 +141,8 @@ There is no per-policy toggle: either switch set to `false` removes all six —
   24h scan interval and report TTL. The node collector is **off**, so this scans
   workloads rather than the host.
 
-  **Disabled by default since 2026-08-05.** infra installs the upstream
-  `aquasecurity/trivy-operator` chart directly into `trivy-system` via its
-  `platform-vendor` ApplicationSet, and two operators reconciling the same
+  **Disabled by default since 2026-08-05.** Many setups install the upstream
+  `aquasecurity/trivy-operator` chart directly into `trivy-system`, and two operators reconciling the same
   `VulnerabilityReport` CRDs is not a configuration worth having. Set
   `trivy-operator.enabled: true` only on a cluster where nothing else provides
   it.
@@ -161,7 +160,7 @@ readable.
 | `falco.enabled` | `true` | `modern_ebpf` driver |
 | `falcosidekick.enabled` | `false` | needs `config.webhook.address` first |
 | `tetragon.enabled` | `true` | |
-| `trivy-operator.enabled` | `false` | infra deploys it upstream; `ignoreUnfixed: true`, 24h interval when on |
+| `trivy-operator.enabled` | `false` | opt-in, often deployed upstream instead; `ignoreUnfixed: true`, 24h interval when on |
 | `trivy-operator.nodeCollector.enabled` | `false` | workloads only |
 | `kyverno.enabled` | `true` | the admission engine; `false` also drops the policies |
 | `kyvernoPolicies.enabled` | `true` | the six policies; needs the CRDs to already exist |

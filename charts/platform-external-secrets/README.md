@@ -7,7 +7,7 @@ the operator only — no `SecretStore`, no `ExternalSecret`.
 |---|---|
 | Subchart | `external-secrets` [`2.5.0`](https://charts.external-secrets.io) |
 | Namespace (convention) | `external-secrets` — set at install time; this chart neither creates nor enforces it |
-| Per-cluster overrides | `infra/platform/external-secrets/values.yaml` |
+| Per-cluster overrides | `<your-repo>/platform/external-secrets/values.yaml` |
 
 > [!IMPORTANT]
 > The operator is inert until something tells it where secrets live. In this

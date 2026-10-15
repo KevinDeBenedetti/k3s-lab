@@ -7,12 +7,12 @@ for a small node. It deliberately ships **no issuers**.
 |---|---|
 | Subchart | `cert-manager` [`v1.20.3`](https://charts.jetstack.io) |
 | Namespace (convention) | `cert-manager` — set at install time; this chart neither creates nor enforces it |
-| Per-cluster overrides | `infra/platform/cert-manager/values.yaml` |
+| Per-cluster overrides | `<your-repo>/platform/cert-manager/values.yaml` |
 
 > [!IMPORTANT]
 > No `ClusterIssuer` is created here. cert-manager alone issues nothing — an
 > issuer carries an ACME account and a DNS-01 or HTTP-01 solver, both of which
-> are cluster-specific (email, provider, API token). They belong in `infra`.
+> are cluster-specific (email, provider, API token). They belong in your config repo.
 > A `Certificate` with no matching issuer stays `Pending` indefinitely rather
 > than failing loudly, which is what makes this worth stating.
 

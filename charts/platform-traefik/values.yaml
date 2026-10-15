@@ -1,6 +1,6 @@
 # =============================================================================
 # platform-traefik — sensible defaults for single-node k3s
-# Override per-cluster in infra/platform/traefik/values.yaml
+# Override per-cluster in <your-repo>/platform/traefik/values.yaml
 # =============================================================================
 traefik:
   # PIN DROPPED 2026-09-07 — subchart bumped 41.1.0 -> 41.5.0, which ships

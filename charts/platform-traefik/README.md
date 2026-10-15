@@ -8,7 +8,7 @@ disabled, resource limits sized for a small node.
 |---|---|
 | Subchart | `traefik` [`41.5.0`](https://traefik.github.io/charts) |
 | Deployed proxy | `docker.io/traefik:v3.7.14` (pinned via `traefik.image.tag` — subchart `appVersion` is still v3.7.13, see below) |
-| Per-cluster overrides | `infra/platform/traefik/values.yaml` |
+| Per-cluster overrides | `<your-repo>/platform/traefik/values.yaml` |
 
 > The two versions in that table are copies of `Chart.lock` and of the value
 > `lib/traefik-pin.sh` resolves. They are **verified, not generated**:
@@ -119,7 +119,7 @@ subchart (next section); pin only when upstream has nothing newer to offer.
 4. Replay the check with the cluster overlay:
 
    ```bash
-   ./scripts/check-traefik-image.sh -- -f ../infra/platform/traefik/values.yaml
+   ./scripts/check-traefik-image.sh -- -f ../<your-repo>/platform/traefik/values.yaml
    ```
 
 ### Procedure — bumping the subchart
@@ -226,11 +226,11 @@ published to the Helm repo (latest: 41.6.1, still `v3.7.13`), so
 > [!CAUTION]
 > **"What this repo deploys" and "what the cluster runs" are different
 > questions.** The cluster resolves a *published* chart, pinned in
-> `infra/argocd/applicationsets/platform.yaml`, which can lag this source by any
-> number of releases. Between 2026-07-27 and 2026-08-01 the two disagreed: the
-> repository was on v3.7.9 and the daily watch reported clean every morning,
-> while production ran v3.7.8 under `GHSA-3ccp` because infra still pinned the
-> previous chart. Fixing the version here does **not** fix production — it has
+> your config repo's ApplicationSet, which can lag this source by any number of
+> releases. Between 2026-07-27 and 2026-08-01 the two disagreed: this repository
+> was on v3.7.9 and the daily watch reported clean every morning, while a
+> deployment ran v3.7.8 under `GHSA-3ccp` because it still pinned the previous
+> chart. Fixing the version here does **not** fix production — it has
 > to be released *and* pinned. `scripts/check-deployed-traefik.sh` is the check
 > that asks the second question.
 
@@ -238,7 +238,7 @@ published to the Helm repo (latest: 41.6.1, still `v3.7.13`), so
 
 Getting this wrong has already cost us a wrong conclusion recorded for nine
 days: a 404 was read as "that CVE is made up", and the mistaken finding was then
-propagated into a triage comment in `infra`. Two rules.
+propagated into a triage comment elsewhere. Two rules.
 
 **1. To list what affects Traefik, query the repository, not the global
 database.** Only the advisories that were assigned a CVE ID are mirrored

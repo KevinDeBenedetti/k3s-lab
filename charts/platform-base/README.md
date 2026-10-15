@@ -7,7 +7,7 @@ into, and applies the cluster-wide defaults those namespaces inherit.
 |---|---|
 | Subcharts | none — this chart owns all its templates |
 | Creates | 8 namespaces, a `LimitRange` and 2 `NetworkPolicy` per namespace |
-| Per-cluster overrides | `infra/platform/base/values.yaml` |
+| Per-cluster overrides | `<your-repo>/platform/base/values.yaml` |
 
 > [!IMPORTANT]
 > Install this **first**. The other `platform-*` charts assume their namespace

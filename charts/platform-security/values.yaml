@@ -16,7 +16,7 @@ falcosidekick:
   enabled: false
   config:
     webhook:
-      address: ""       # override in infra-private (e.g. Slack, PagerDuty URL)
+      address: ""       # override in your config repo (e.g. Slack, PagerDuty URL)
   resources:
     requests:
       cpu: 10m

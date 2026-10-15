@@ -8,7 +8,7 @@ TLS-enabled, Raft-backed** server for a single node.
 | Subchart | `vault` [`0.32.0`](https://helm.releases.hashicorp.com) |
 | Vault image | `hashicorp/vault:1.21.2` (pinned in `values.yaml`) |
 | Namespace (convention) | `vault` — set at install time; this chart neither creates nor enforces it |
-| Per-cluster overrides | `infra/platform/vault/values.yaml` |
+| Per-cluster overrides | `<your-repo>/platform/vault/values.yaml` |
 
 > [!WARNING]
 > **The `vault-tls` secret must exist before the pod is scheduled.** The
@@ -31,7 +31,7 @@ TLS-enabled, Raft-backed** server for a single node.
   injection — so there is no `vault.hashicorp.com/agent-inject` annotation
   handling in this cluster.
 - **No ingress** (`server.ingress.enabled: false`); the UI is a `ClusterIP`
-  service. Reach it by port-forward, or expose it deliberately from `infra`.
+  service. Reach it by port-forward, or expose it deliberately from your config repo.
 
 ## Operational notes
 
@@ -58,7 +58,7 @@ All values are passed to the subchart under the `vault:` key.
 | `vault.server.auditStorage` | `2Gi`, `local-path` | audit log |
 | `vault.server.volumes` / `volumeMounts` | `vault-tls` secret | **must exist first** |
 | `vault.injector.enabled` | `false` | ESO is used instead |
-| `vault.server.ingress.enabled` | `false` | expose from `infra` if wanted |
+| `vault.server.ingress.enabled` | `false` | expose from your config repo if wanted |
 | `vault.ui.enabled` | `true` | `ClusterIP` |
 | `vault.global.tlsDisable` | `false` | TLS on |
 
