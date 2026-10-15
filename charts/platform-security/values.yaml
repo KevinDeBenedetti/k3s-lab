@@ -36,11 +36,11 @@ tetragon:
       cpu: 100m
       memory: 128Mi
 
-# Deployed upstream, not by this chart. infra's `platform-vendor` ApplicationSet
-# installs the aquasecurity `trivy-operator` chart directly into `trivy-system`
-# (see infra/argocd/applicationsets/platform-vendor.yaml). Enabling it here too
-# would give two operators reconciling the same VulnerabilityReport CRDs.
-# Set back to `true` only on a cluster where infra does not already provide it.
+# Opt-in. trivy-operator scans every image in the cluster, which is heavy on a
+# small homelab node, and many setups install the upstream aquasecurity
+# `trivy-operator` chart on its own (into `trivy-system`). Enabling it here as
+# well would give two operators reconciling the same VulnerabilityReport CRDs.
+# Set to `true` when this chart is the only place trivy-operator comes from.
 trivy-operator:
   enabled: false
   fullnameOverride: trivy-operator

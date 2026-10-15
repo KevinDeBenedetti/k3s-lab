@@ -3,7 +3,7 @@
 #
 # Namespace: argocd
 # Usage (standalone):  task argocd:status
-# Usage (from infra):  includes: argocd: taskfile: ./vendor/k3s-lab/taskfiles/argocd.yml
+# Usage (included):    includes: argocd: taskfile: <path-to-k3s-lab>/taskfiles/argocd.yml
 #
 # Required env (from .env or cluster.env):
 #   KUBECONFIG_CONTEXT
@@ -26,7 +26,7 @@ tasks:
     desc: Deploy ArgoCD via Helm (run once after bootstrap)
     preconditions:
       - sh: test -n "$ARGOCD_DOMAIN"
-        msg: "ARGOCD_DOMAIN is not set — add it to cluster.env"
+        msg: "ARGOCD_DOMAIN is not set — add it to .env"
       - sh: test -f "{{.ARGOCD_VALUES_FILE}}"
         msg: "{{.ARGOCD_VALUES_FILE}} not found"
     cmds:

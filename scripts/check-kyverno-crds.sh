@@ -47,7 +47,7 @@
 # Usage:
 #   scripts/check-kyverno-crds.sh
 #   scripts/check-kyverno-crds.sh --chart charts/platform-security
-#   scripts/check-kyverno-crds.sh --values /path/to/infra/platform/security/values.yaml
+#   scripts/check-kyverno-crds.sh --values /path/to/your/platform/security/values.yaml
 #   scripts/check-kyverno-crds.sh --crds-only
 #
 # Env:

@@ -3,7 +3,7 @@
 #
 # Namespace: status
 # Usage (standalone):  task status:all
-# Usage (from infra):  includes: status: taskfile: ./vendor/k3s-lab/taskfiles/status.yml
+# Usage (included):    includes: status: taskfile: <path-to-k3s-lab>/taskfiles/status.yml
 #
 # Required env:
 #   KUBECONFIG_CONTEXT   kubectl context name

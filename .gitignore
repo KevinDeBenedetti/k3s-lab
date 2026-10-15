@@ -34,3 +34,4 @@ charts/**/charts/*.tgz
 *.swp
 *~
 .claude/
+CLAUDE.md

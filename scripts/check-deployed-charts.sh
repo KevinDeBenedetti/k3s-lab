@@ -18,11 +18,11 @@
 # subchart's appVersion — lib/traefik-pin.sh). The other components carry no
 # pin mechanism: the subchart's appVersion is the answer (lib/subchart.sh).
 #
-# Where to run it: the pins live in `infra`, this script lives in `k3s-lab`.
-# From an infra checkout:
+# Where to run it: against the ApplicationSet of the repo that deploys these
+# charts (e.g. your homelab config repo), from a checkout of this one:
 #
-#   vendor/k3s-lab/scripts/check-deployed-charts.sh \
-#     --applicationset argocd/applicationsets/platform.yaml
+#   scripts/check-deployed-charts.sh \
+#     --applicationset <your-repo>/argocd/applicationsets/platform.yaml
 #
 # Usage:
 #   scripts/check-deployed-charts.sh --applicationset <path>

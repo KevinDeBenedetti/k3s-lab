@@ -3,7 +3,7 @@
 #
 # Namespace: ssh
 # Usage (standalone):  task ssh:server
-# Usage (from infra):  includes: ssh: taskfile: ./vendor/k3s-lab/taskfiles/ssh.yml
+# Usage (included):    includes: ssh: taskfile: <path-to-k3s-lab>/taskfiles/ssh.yml
 #
 # Required env (from .env or cluster.env):
 #   SERVER_IP    public IP of the server node

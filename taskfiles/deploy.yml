@@ -3,7 +3,7 @@
 #
 # Namespace: deploy
 # Usage (standalone):  task deploy:grafana-secret
-# Usage (from infra):  includes: deploy: taskfile: ./vendor/k3s-lab/taskfiles/deploy.yml
+# Usage (included):    includes: deploy: taskfile: <path-to-k3s-lab>/taskfiles/deploy.yml
 #
 # Required env (from .env):
 #   KUBECONFIG_CONTEXT
@@ -61,7 +61,7 @@ tasks:
     desc: Restart Grafana to pick up OAuth secret from Vault
     preconditions:
       - sh: test -n "$GRAFANA_DOMAIN"
-        msg: "GRAFANA_DOMAIN is not set — add it to cluster.env"
+        msg: "GRAFANA_DOMAIN is not set — add it to .env"
     cmds:
       - bash {{.TASKFILE_DIR}}/../scripts/deploy-grafana-oauth.sh
     env:

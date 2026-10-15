@@ -140,9 +140,9 @@ task status:all
 
 ---
 
-## Using from a private infra repo
+## Using the taskfiles from another repo
 
-k3s-lab is consumed from a **private `infra` repo** via a SHA/tag-pinned git
-submodule at `vendor/k3s-lab`. The infra `Taskfile.yml` includes the taskfiles
-from that submodule. See the
-[Using with infra guide](../using-with-infra.md) for the full walkthrough.
+The taskfiles are includable fragments: a config repo of your own can include
+them from a pinned checkout of this repository (`includes: <ns>: taskfile:
+<path>/taskfiles/<ns>.yml`). For the homelab path without Task, see
+[Running a homelab](../homelab.md).

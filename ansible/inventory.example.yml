@@ -1,0 +1,33 @@
+---
+# =============================================================================
+# Example inventory for a homelab (machines on your LAN, no cloud provider).
+#
+#   mkdir -p ansible/inventory
+#   cp ansible/inventory.example.yml ansible/inventory/hosts.yml
+#   # edit the hosts, then:
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/site.yml
+#
+# ansible/inventory/ is gitignored on purpose (it holds your node addresses);
+# scripts/check-inventory-ignored.sh keeps it that way. This example lives
+# outside it so it can be versioned.
+#
+# Every role has defaults (roles/*/defaults/main.yml): k3s version, firewall,
+# WireGuard (off by default) … Override any of them under `vars:` below or in
+# ansible/inventory/group_vars/all.yml. On a LAN-only homelab the usual ones:
+#   k3s_version          the k3s release to install, e.g. "v1.32.13+k3s1"
+#   k3s_ufw_allow_from   CIDRs allowed to reach the node, e.g. your LAN
+#   wireguard_enabled    true only if you want remote access through a tunnel
+# =============================================================================
+all:
+  vars:
+    ansible_user: pi                 # a sudo-capable user that exists on every node
+    # ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+  children:
+    k3s_servers:
+      hosts:
+        homelab-server:
+          ansible_host: 192.168.1.10   # the control-plane node
+    k3s_agents:
+      hosts:
+        homelab-agent-1:
+          ansible_host: 192.168.1.11   # remove the group's hosts for a single-node cluster

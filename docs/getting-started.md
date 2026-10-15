@@ -7,9 +7,9 @@ This guide walks you through provisioning a production-ready k3s cluster from tw
 | Mode                    | When to use                                                                                                               |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **Direct** (this guide) | Evaluate the toolkit, test locally, or you don't need a private config repo                                               |
-| **Infra repo**          | Production use — private repo holds your `.env`, secrets, and custom apps; k3s-lab is consumed via a pinned git submodule |
+| **GitOps**              | Day-to-day operation — a private repo of your own holds values, secrets and apps, and pins the published charts          |
 
-> For the infra repo pattern, see **[Using with a private infra repo](./using-with-infra.md)** once you've read this guide.
+> For the end-to-end homelab path (inventory, provisioning, platform, checks), see **[Running a homelab](./homelab.md)**.
 
 ---
 
@@ -96,7 +96,9 @@ task provision:agents      # Join agent nodes
 task kubeconfig:fetch      # Merge kubeconfig locally
 ```
 
-> Requires Ansible inventory at `ansible/inventory/hosts.yml` — see [Configuration](./configuration).
+> Requires Ansible inventory at `ansible/inventory/hosts.yml` — start from
+> `cp ansible/inventory.example.yml ansible/inventory/hosts.yml` (see
+> [Running a homelab](./homelab.md) and [Configuration](./configuration)).
 
 ---
 

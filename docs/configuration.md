@@ -262,8 +262,9 @@ kubectl rollout restart deployment/kube-prometheus-stack-grafana -n monitoring
 kubectl rollout status deployment/kube-prometheus-stack-grafana -n monitoring --timeout=120s
 ```
 
-### Using with a private infra repo
+### With your own config repo (GitOps)
 
-If you use k3s-lab with a private `infra` repo (see [using-with-infra.md](./using-with-infra.md)),
-add a `deploy:grafana-oauth-secret` task to your `infra/Taskfile.yml` that
-creates the secret from your provider's credentials stored in `.env`.
+If you deploy the charts from a private config repo of your own (see
+[Running a homelab](./homelab.md)), create that secret there — from your
+provider's credentials, through External Secrets or a one-off script — rather
+than from this repo's `.env`.

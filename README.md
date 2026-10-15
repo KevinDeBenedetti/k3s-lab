@@ -15,7 +15,7 @@ There are two ways to use it, and the rest of this page is organized around them
 | Path | You want to | Start with |
 | ---- | ----------- | ---------- |
 | **Try it** | See the whole platform running on a cluster, in one command | The [`platform-deployment`](charts/platform-deployment/) umbrella chart |
-| **Run it** | Operate components individually, pin versions, upgrade one piece at a time | Individual charts + your own private config repo ([guide](docs/using-with-infra.md)) |
+| **Run it** | Operate components individually, pin versions, upgrade one piece at a time | Individual charts + your own private config repo ([homelab guide](docs/homelab.md)) |
 
 ## Features
 
@@ -39,7 +39,7 @@ One command installs the stack — ArgoCD, monitoring, Vault, cert-manager, Trae
 
 ```bash
 helm install platform oci://ghcr.io/kevindebenedetti/charts/platform-deployment \
-  --version 0.18.1 --namespace platform --create-namespace
+  --version 0.24.0 --namespace platform --create-namespace
 ```
 
 One caveat worth knowing up front: on stock k3s or k3d, **disable the bundled Traefik first** (`--k3s-arg "--disable=traefik@server:0"`), since its CRDs conflict with this chart's — the same thing this repo's Ansible role does on real nodes. The Kyverno ClusterPolicies also come in a second `helm upgrade`, for a Helm ordering reason explained (with the command) in the [chart's README](charts/platform-deployment/README.md), which also carries the full verified-install report. Each component can be switched off independently and configured through nested values. Check the [releases page](https://github.com/KevinDeBenedetti/k3s-lab/releases) (`vX.Y.Z` tags) for the latest version; every chart and the umbrella's sub-chart pins share that version.
@@ -55,7 +55,7 @@ ansible-playbook -i <your-inventory> ansible/playbooks/site.yml
 
 The full walkthrough — prerequisites, inventory, verification — is in **[Getting Started](docs/getting-started.md)**.
 
-### Run it in production (private config repo)
+### Run it with GitOps (your own config repo)
 
 For real operation, keep your cluster-specific configuration (inventory, values, pins) in a **private repo** that consumes `k3s-lab`, and deploy the individual charts via ArgoCD — pinned, so that every upgrade is an explicit, reviewable change:
 
@@ -63,10 +63,10 @@ For real operation, keep your cluster-specific configuration (inventory, values,
 # In an ArgoCD ApplicationSet
 - repoURL: ghcr.io/kevindebenedetti/charts
   chart: platform-traefik
-  targetRevision: "0.16.0"   # pin to a published version — never a range
+  targetRevision: "0.24.0"   # pin to a published version — never a range
 ```
 
-This is how the author's own cluster runs. The pattern, including the ApplicationSet layout and how pins are kept honest, is documented in **[Using with a private infra repo](docs/using-with-infra.md)**.
+The full path — inventory, provisioning, kubeconfig, platform install and the checks to keep pins honest — is in **[Running a homelab](docs/homelab.md)**.
 
 ## Repository Structure
 
@@ -113,7 +113,7 @@ Releases are fully automated with [release-please](https://github.com/googleapis
 
 Full documentation: **https://kevindebenedetti.github.io/k3s-lab/**
 
-→ [Getting Started](docs/getting-started.md) · [Configuration](docs/configuration.md) · [Using with Infra](docs/using-with-infra.md)
+→ [Getting Started](docs/getting-started.md) · [Running a homelab](docs/homelab.md) · [Configuration](docs/configuration.md)
 
 ## License
 

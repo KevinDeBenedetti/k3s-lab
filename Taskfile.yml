@@ -3,11 +3,11 @@
 #
 # Usage: task <namespace>:<task>   e.g. task provision:site
 #
-# This file is for using k3s-lab as a standalone repo.
-# For consumption from a private infra repo, use:
+# This file is for using k3s-lab as a standalone repo. Another repo can include
+# the fragments from a pinned checkout of this one:
 #   includes:
 #     provision:
-#       taskfile: ./vendor/k3s-lab/taskfiles/provision.yml
+#       taskfile: <path-to-k3s-lab>/taskfiles/provision.yml
 #
 # Config: copy .env.example to .env and fill in your values.
 # =============================================================================
