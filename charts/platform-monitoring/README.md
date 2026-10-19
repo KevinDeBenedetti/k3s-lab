@@ -1,7 +1,7 @@
 # platform-monitoring
 
 Observability stack — Grafana, Loki, Promtail and Prometheus — assembled from
-four upstream charts and trimmed to fit an 8 GB single-node VPS.
+four upstream charts and trimmed to fit an 8 GB single node.
 
 | | |
 |---|---|

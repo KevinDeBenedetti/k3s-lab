@@ -220,8 +220,8 @@ EOF2
 }
 
 @test "traefik_subchart_appversion reads an expanded subchart directory" {
-  # check-deployed-traefik.sh inspects charts pulled from GHCR, where the
-  # subchart is embedded expanded rather than as a tarball.
+  # A chart pulled from GHCR embeds the subchart expanded rather than as a
+  # tarball.
   fixture_lock "41.0.2"
   fixture_expanded_subchart "41.0.2" "v3.7.6"
   run traefik_subchart_appversion "${FIXTURE}"

@@ -13,34 +13,12 @@
 # upstream chart lagging behind an advisory goes stale just as silently as a
 # frozen pin did, and now nothing in this repo even states the version.
 #
-# ─── Scope, since 2026-09-13 ────────────────────────────────────────────────
+# ─── Scope ──────────────────────────────────────────────────────────────────
 # This workflow answers exactly ONE question: does the chart *this repository
 # publishes* ship a proxy covered by an advisory? It needs no credential, so it
-# works in any clone or fork.
-#
-# It used to answer two more — what the cluster actually runs, and how far
-# those pins trail the registry. Both read infra's ApplicationSet, a PRIVATE
-# repo that this PUBLIC one had to clone with a PAT. That coupling is what
-# broke: INFRA_READ_TOKEN stopped working and the job failed every morning from
-# 2026-09-10, reopening the tracking issue daily while nothing was vulnerable.
-#
-# Those two checks now live in infra, where the ApplicationSet is a LOCAL file
-# and no credential is needed at all — see infra/.github/workflows/
-# platform-advisories.yml. That is also the usage check-deployed-charts.sh
-# documents in its own header. The dependency now points the only way that
-# costs nothing: infra (private) already vendors this public repo as the
-# vendor/k3s-lab submodule, so it reads this repo's scripts for free, while the
-# reverse direction required a secret that had to be rotated forever.
-#
-# Keeping this half credential-free is also what makes the repo reusable: the
-# removed code treated a missing INFRA_READ_TOKEN as a hard failure, so any
-# fork that enabled Actions inherited a permanently red security workflow, and
-# a daily auto-opened issue, that it had no way to fix.
-#
-# Note that a green run here says nothing about production: the cluster
-# resolves a *published* chart, so a fix in this repository only reaches it
-# once released **and** pinned. That gap ran for five days between 2026-07-27
-# and 2026-08-01. The watch that covers it is infra's.
+# works in any clone or fork. What a given cluster actually runs is the
+# deploying repository's question: a fix here only reaches a cluster once it is
+# released **and** its pin is bumped there.
 #
 # Opens (or updates) a tracking issue when the shipped version becomes
 # vulnerable, and closes it again when it is back in the clear.
@@ -92,9 +70,6 @@ jobs:
             echo '```'
             cat /tmp/advisories.log
             echo '```'
-            echo ""
-            echo "_What the cluster actually runs is a different question, watched"
-            echo "from \`infra\` (\`platform-advisories\`)._"
           } >> "$GITHUB_STEP_SUMMARY"
 
           exit 0
@@ -126,17 +101,10 @@ jobs:
             echo "If the subchart's \`traefik.io/proxy-max-version\` ceiling blocks the bump,"
             echo "see the procedure in \`charts/platform-traefik/README.md\`."
             echo ""
-            echo "### This does not cover production"
+            echo "### This does not cover deployed clusters"
             echo ""
-            echo "Fixing this repository does **not** fix the cluster: it resolves a"
-            echo "*published* chart, so the fix only reaches it once released **and** pinned"
-            echo "in \`infra/argocd/applicationsets/platform.yaml\`. That gap ran for five days"
-            echo "between 2026-07-27 and 2026-08-01."
-            echo ""
-            echo "The versions actually running, and how far their pins trail the registry,"
-            echo "are watched from \`infra\` by \`platform-advisories\` — which opens its own"
-            echo "issue there, in a private repo, rather than publishing the cluster's"
-            echo "component versions here."
+            echo "A cluster resolves a *published* chart: the fix only reaches it once"
+            echo "released **and** pinned in the repository that deploys it."
             echo ""
             echo "---"
             echo "_Updated by [\`traefik-advisories\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) on $(date -u '+%Y-%m-%d %H:%M UTC')._"
@@ -149,8 +117,7 @@ jobs:
             gh issue edit "$existing" --body-file "$body_file"
             echo "♻️  Issue #$existing updated"
           else
-            gh issue create --title "$ISSUE_TITLE" --body-file "$body_file" \
-              --label security
+            gh issue create --title "$ISSUE_TITLE" --body-file "$body_file"
             echo "🆕 Tracking issue created"
           fi
 

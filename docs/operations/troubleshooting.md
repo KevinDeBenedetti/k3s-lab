@@ -52,7 +52,7 @@ ssh ubuntu@SERVER_IP "sudo cat /var/lib/rancher/k3s/server/node-token"
 
 ---
 
-### Stale SSH host key (after VPS reformat)
+### Stale SSH host key (after a node reinstall)
 
 ```
 WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!

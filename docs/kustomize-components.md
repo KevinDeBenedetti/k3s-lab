@@ -16,8 +16,8 @@ This guide explains how to use the reusable Kustomize components from k3s-lab to
 ### 1. Create app directory
 
 ```bash
-mkdir -p infra/apps/myapp
-cd infra/apps/myapp
+mkdir -p apps/myapp
+cd apps/myapp
 ```
 
 ### 2. Create `kustomization.yaml`
@@ -30,10 +30,10 @@ namespace: myapp
 
 # Use components to get standard configs
 components:
-  - ../../../../vendor/k3s-lab/kubernetes/components/app-base
-  - ../../../../vendor/k3s-lab/kubernetes/components/traefik-ingress
-  - ../../../../vendor/k3s-lab/kubernetes/components/network-policies
-  - ../../../../vendor/k3s-lab/kubernetes/components/vault-auth  # if using Vault
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/app-base?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/traefik-ingress?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/network-policies?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/vault-auth?ref=vX.Y.Z  # if using Vault
 
 # Your app-specific resources
 resources:
@@ -91,7 +91,7 @@ metadata:
   name: app-https
 spec:
   routes:
-    - match: "Host(`myapp.kevindb.dev`)"
+    - match: "Host(`myapp.example.com`)"
       kind: Rule
       services:
         - name: myapp
@@ -155,11 +155,11 @@ kustomize build .
 ### Minimal App (Dashboard-style)
 
 ```yaml
-# infra/apps/homepage/kustomization.yaml
+# apps/homepage/kustomization.yaml
 components:
-  - ../../../../vendor/k3s-lab/kubernetes/components/app-base
-  - ../../../../vendor/k3s-lab/kubernetes/components/traefik-ingress
-  - ../../../../vendor/k3s-lab/kubernetes/components/network-policies
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/app-base?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/traefik-ingress?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/network-policies?ref=vX.Y.Z
 
 resources:
   - deployment.yaml
@@ -175,12 +175,12 @@ commonLabels:
 ### App with Vault Secrets
 
 ```yaml
-# infra/apps/reactive-resume/kustomization.yaml
+# apps/myapp/kustomization.yaml
 components:
-  - ../../../../vendor/k3s-lab/kubernetes/components/app-base
-  - ../../../../vendor/k3s-lab/kubernetes/components/traefik-ingress
-  - ../../../../vendor/k3s-lab/kubernetes/components/network-policies
-  - ../../../../vendor/k3s-lab/kubernetes/components/vault-auth  # ← Extra: for Vault auth
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/app-base?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/traefik-ingress?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/network-policies?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/vault-auth?ref=vX.Y.Z  # ← Extra: for Vault auth
 
 resources:
   - deployment.yaml
@@ -192,7 +192,7 @@ patchesStrategicMerge:
   - deployment-patch.yaml           # Override for app-specific resources
 
 commonLabels:
-  app.kubernetes.io/name: reactive-resume
+  app.kubernetes.io/name: myapp
 ```
 
 ## Reducing Duplication
@@ -234,7 +234,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: "Host(`myapp.kevindb.dev`)"
+    - match: "Host(`myapp.example.com`)"
       ...
 
 # Every app had its own NetworkPolicy
@@ -253,9 +253,9 @@ spec:
 ```yaml
 # kustomization.yaml—just reference components
 components:
-  - ../../../../vendor/k3s-lab/kubernetes/components/app-base
-  - ../../../../vendor/k3s-lab/kubernetes/components/traefik-ingress
-  - ../../../../vendor/k3s-lab/kubernetes/components/network-policies
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/app-base?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/traefik-ingress?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/network-policies?ref=vX.Y.Z
 
 # App-specific overrides only
 resources:
@@ -286,7 +286,7 @@ Add to `components:` in your `kustomization.yaml`:
 
 ```yaml
 components:
-  - ../../../../vendor/k3s-lab/kubernetes/components/app-base
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/app-base?ref=vX.Y.Z
 ```
 
 The path is relative from your app directory to k3s-lab.
@@ -307,9 +307,9 @@ Yes! Just don't include it in `components:`. For example:
 
 ```yaml
 components:
-  - ../../../../vendor/k3s-lab/kubernetes/components/app-base
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/app-base?ref=vX.Y.Z
   # Skip traefik-ingress if using different ingress controller
-  - ../../../../vendor/k3s-lab/kubernetes/components/network-policies
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/network-policies?ref=vX.Y.Z
 ```
 
 ### Q: How do I add a new app-wide best practice?
@@ -323,5 +323,5 @@ No need to edit 8 individual apps! 🎉
 ## See Also
 
 - [Kustomize Components Documentation](https://kubernetes-sigs.github.io/kustomize/guides/components/)
-- [`vendor/k3s-lab/kubernetes/components/`](https://github.com/KevinDeBenedetti/k3s-lab/tree/main/kubernetes/components)
+- [`kubernetes/components/`](https://github.com/KevinDeBenedetti/k3s-lab/tree/main/kubernetes/components)
 - [DRY Principle in Kubernetes](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)

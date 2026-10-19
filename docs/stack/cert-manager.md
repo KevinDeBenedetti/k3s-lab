@@ -191,12 +191,15 @@ This is why `traefik-values.yaml` has no `redirectTo` on the `web` entrypoint. U
 
 ---
 
-## DNS-01 via Cloudflare (recommended)
+## DNS-01 (recommended for a homelab)
+
+The examples use Cloudflare; cert-manager supports
+[many other DNS providers](https://cert-manager.io/docs/configuration/acme/dns01/#supported-dns01-providers).
 
 Use DNS-01 when:
 - The apex domain (`example.com`) DNS points elsewhere (e.g. Vercel) — HTTP-01 would reach the wrong server
 - You need **wildcard certificates** (`*.example.com`) — Let's Encrypt only issues these via DNS-01
-- The cluster is not publicly reachable on port 80
+- The cluster is not publicly reachable on port 80 — the usual homelab case
 
 ```
 cert-manager → Cloudflare API → creates TXT _acme-challenge.example.com
@@ -210,12 +213,13 @@ Let's Encrypt → DNS lookup → validates TXT → issues certificate
    - Permission: `Zone - Zone - Read`
    - Zone Resources: `Include - All Zones`
 
-2. Store the token in Vault and sync via ESO:
+2. Put the token in the `cert-manager` namespace as `cloudflare-api-token-secret`
+   (key `api-token`) — either directly, or from Vault through an
+   `ExternalSecret` kept in your config repo:
 
 ```bash
-# In your infra repo
-task vault:seed-cloudflare        # seeds secret/cert-manager/cloudflare
-ArgoCD applies the ExternalSecret resources from Git to sync cloudflare-api-token-secret → cert-manager namespace
+kubectl -n cert-manager create secret generic cloudflare-api-token-secret \
+  --from-literal=api-token="$CLOUDFLARE_API_TOKEN"
 ```
 
 3. The `ClusterIssuer` manifests already include a DNS-01 solver for `${DOMAIN}`:

@@ -71,15 +71,16 @@ sources:
 
 Upgrades are then a pin bump in that repo, reviewed like any other change.
 
-## 5 — Keep an eye on it
+## 5 — Check the install
 
-Run from this repo against your own cluster or config:
+```bash
+./scripts/check-kyverno-crds.sh   # Kyverno policies installed and enforcing what the chart renders
+```
 
-| Script | Question it answers |
-| ------ | ------------------- |
-| `scripts/check-kyverno-crds.sh` | Are the Kyverno policies installable, present, and enforcing what the chart renders? (current kube context) |
-| `scripts/check-deployed-pins.sh --applicationset <file>` | How far behind the published charts are your pins? |
-| `scripts/check-deployed-charts.sh --applicationset <file>` | Do the versions you deploy carry known advisories? |
+Day-2 work — deploying apps, bumping pins, watching drift and advisories on what
+the cluster runs, shipping backups off-site — lives in your own config repo, not
+here. Renovate (`docker` datasource on `ghcr.io/kevindebenedetti/charts/*`) is
+the simplest way to get pin bumps as PRs there.
 
 ## Updating the toolkit
 

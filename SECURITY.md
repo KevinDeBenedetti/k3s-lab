@@ -52,6 +52,4 @@ That watch deliberately stops at what this repository *publishes*, and needs no
 credentials to do it. Which versions a cluster actually **runs** is a different
 question: it depends on which published chart that cluster pins, which this
 repository cannot see and which can lag it by any number of releases. Answering
-it is the deployment repository's job — `scripts/check-deployed-charts.sh` and
-`scripts/check-deployed-pins.sh` live here and are meant to be run from there,
-against its own ApplicationSet.
+it is the job of the repository that deploys the cluster.

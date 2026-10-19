@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily local snapshot of the k3s datastore
+
+[Timer]
+OnCalendar={{ k3s_db_backup_schedule }}
+RandomizedDelaySec=900
+# run on next boot if the host was off at the scheduled time
+Persistent=true
+Unit=k3s-db-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -12,8 +12,7 @@ vault:
       # deployment that layers its own values may set the tag itself.
       #
       # scripts/check-rendered-images.sh asserts this pin reaches the render, so
-      # it cannot go decorative. It does NOT compare against a cluster:
-      # check-deployed-charts.sh does, from wherever the chart is deployed.
+      # it cannot go decorative. It does NOT compare against a cluster.
       tag: "1.21.4"
       pullPolicy: IfNotPresent
     # Standalone default: a single-node `helm install` of the umbrella wants
@@ -25,10 +24,14 @@ vault:
       enabled: true
       size: 5Gi
       storageClass: local-path
+    # No audit PVC: send the audit device to stdout instead
+    # (`vault audit enable file file_path=stdout`), where the log collector
+    # picks it up and rotates it. A file device on a PVC grows without bound,
+    # and Vault refuses EVERY request once its only audit device cannot write.
+    # volumeClaimTemplates are immutable — see README.md before flipping this on
+    # an existing install.
     auditStorage:
-      enabled: true
-      size: 2Gi
-      storageClass: local-path
+      enabled: false
     resources:
       requests:
         cpu: 50m

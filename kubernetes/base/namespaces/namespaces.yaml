@@ -16,6 +16,18 @@ metadata:
     pod-security.kubernetes.io/warn: restricted
 
 ---
+# Workloads in `apps` get no API token unless they ask for one (CIS 5.1.5/5.1.6):
+# a workload that needs the API uses its own ServiceAccount (see the app-base
+# component). Only `apps` is covered here — the platform namespaces run
+# third-party charts that are not audited for it.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: apps
+automountServiceAccountToken: false
+
+---
 apiVersion: v1
 kind: Namespace
 metadata:

@@ -27,8 +27,8 @@ chart_version() {
 }
 
 @test "the root keeps bare vX.Y.Z tags" {
-  # infra pins K3S_LAB_REF=vX.Y.Z and curls lib/ at that tag: a component
-  # prefix on the tag would 404 every one of those URLs.
+  # Consumers check out this repository at vX.Y.Z (Ansible roles, scripts):
+  # a component prefix on the tag would break every one of those refs.
   [ "$(jq -r '.packages["."]["include-component-in-tag"]' "$CONFIG")" = "false" ]
 }
 

@@ -35,7 +35,7 @@ ArgoCD — the tasks below cover provisioning, secrets, and day-2 operations.
 (re)fetch it standalone. After running:
 
 ```bash
-kubectl config use-context k3s-infra
+kubectl config use-context k3s-lab
 kubectl get nodes
 ```
 
@@ -76,7 +76,6 @@ These tasks create the secrets those charts consume and handle teardown.
 | `task vault:unseal`          | Unseal Vault                                 |
 | `task vault:configure`       | Configure Vault auth/policies/secret engines |
 | `task vault:seed`            | Seed application secrets into Vault          |
-| `task vault:seed-cloudflare` | Seed Cloudflare credentials into Vault       |
 | `task vault:status`          | Show Vault status                            |
 
 ---
@@ -120,14 +119,14 @@ These tasks create the secrets those charts consume and handle teardown.
 ```bash
 # 1. Copy and configure environment
 cp .env.example .env
-# Edit .env with your VPS IPs, domain, etc.
+# Edit .env with your node IPs, domain, etc.
 
 # 2. Provision the cluster with Ansible
 task provision:inventory
 task provision:site        # common + k3s server + agents + kubeconfig
 
 # 3. Configure kubectl
-kubectl config use-context k3s-infra
+kubectl config use-context k3s-lab
 task status:nodes          # Verify nodes are Ready
 
 # 4. Create stack secrets (charts are reconciled by ArgoCD)

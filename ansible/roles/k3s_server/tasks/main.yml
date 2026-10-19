@@ -146,3 +146,7 @@
 - name: Configure kine-vacuum timer
   ansible.builtin.import_tasks: kine-vacuum.yml
   tags: [kine-vacuum]
+
+- name: Configure k3s-db-backup timer
+  ansible.builtin.import_tasks: db-backup.yml
+  tags: [k3s-db-backup]

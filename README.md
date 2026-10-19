@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/KevinDeBenedetti/k3s-lab?style=for-the-badge)](https://github.com/KevinDeBenedetti/k3s-lab/releases)
 [![License](https://img.shields.io/github/license/KevinDeBenedetti/k3s-lab?style=for-the-badge)](LICENSE)
 
-> Reusable Kubernetes platform toolkit — Helm charts (OCI), Kustomize bases, and automation for k3s on VPS.
+> Reusable Kubernetes platform toolkit — Helm charts (OCI), Kustomize bases, and automation for a homelab k3s cluster (bare metal, VMs or VPS).
 
 ## Overview
 
@@ -21,10 +21,10 @@ There are two ways to use it, and the rest of this page is organized around them
 
 - **Helm charts** (OCI, on [GHCR](https://github.com/KevinDeBenedetti?tab=packages)) — one chart per platform component, plus an umbrella chart that aggregates them
 - **Kustomize bases** — reusable namespace, LimitRange, RBAC, ExternalSecret, and IngressRoute templates
-- **Ansible roles** — common (VPS base), k3s_server, k3s_agent, wireguard
+- **Ansible roles** — common (node base), k3s_server, k3s_agent, wireguard
 - Lightweight Kubernetes via [k3s](https://k3s.io) with automated control-plane and agent bootstrap
 - Ingress + automatic HTTPS via [Traefik](https://traefik.io) and [cert-manager](https://cert-manager.io)
-- Full observability: Prometheus, Grafana, Loki, Promtail (VPS-optimized)
+- Full observability: Prometheus, Grafana, Loki, Promtail (sized for a small single node)
 - Runtime security: Falco, Tetragon, Trivy Operator, Kyverno
 - Secret management: HashiCorp Vault + External Secrets Operator
 - GitOps: ArgoCD
@@ -46,7 +46,7 @@ One caveat worth knowing up front: on stock k3s or k3d, **disable the bundled Tr
 
 ### Provision a cluster from scratch (Ansible)
 
-From two fresh VPS nodes to a running k3s cluster:
+From fresh Debian/Ubuntu machines to a running k3s cluster:
 
 ```bash
 ansible-galaxy install -r ansible/requirements.yml
@@ -86,7 +86,6 @@ k3s-lab/
 │   ├── platform-security/         # Falco + Tetragon + Trivy + Kyverno
 │   ├── platform-traefik/          # Ingress controller (Traefik)
 │   ├── platform-vault/            # HashiCorp Vault
-│   └── platform-vault-seeder/     # Vault bootstrap/seeding job
 ├── kubernetes/                    # Kustomize bases + reusable components
 ├── taskfiles/                     # Includeable Task fragments (provision, deploy, …)
 ├── scripts/                       # Deployment + validation scripts
@@ -104,7 +103,7 @@ Releases are fully automated with [release-please](https://github.com/googleapis
 | everything (charts, scripts, `lib/`, Ansible, taskfiles) | `vX.Y.Z` | `CHANGELOG.md` |
 
 1. Merge a change to `main` (conventional commits: `feat:`, `fix:`, …)
-2. release-please opens a single release PR — changelog + version bump of every `Chart.yaml`, of the umbrella's pins and of the `K3S_LAB_RAW` refs in `scripts/` and `lib/`
+2. release-please opens a single release PR — changelog + version bump of every `Chart.yaml` and of the umbrella's pins
 3. Merging it creates the GitHub release and the `vX.Y.Z` tag
 4. `release-charts` publishes every chart whose version is not on GHCR yet (the umbrella last, since its pins resolve to the subcharts just pushed), then renders the umbrella as a post-publish check
 5. Consumers pin `ghcr.io/kevindebenedetti/charts/<chart>` at that version (Renovate: `docker` datasource)

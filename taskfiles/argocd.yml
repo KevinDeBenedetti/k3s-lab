@@ -50,7 +50,7 @@ tasks:
           echo ""
           echo "Next steps:"
           echo "  1. Add DNS: $ARGOCD_DOMAIN → $SERVER_IP"
-          echo "  2. task argocd:add-repo ARGOCD_REPO_URL=git@github.com:you/infra.git GITHUB_DEPLOY_KEY=~/.ssh/deploy_key"
+          echo "  2. task argocd:add-repo ARGOCD_REPO_URL=git@github.com:<you>/<config-repo>.git GITHUB_DEPLOY_KEY=~/.ssh/deploy_key"
           echo "  3. kubectl apply -f argocd/projects/ -f argocd/applicationsets/"
           echo "  4. Add GitHub webhook: https://$ARGOCD_DOMAIN/api/webhook"
         silent: true

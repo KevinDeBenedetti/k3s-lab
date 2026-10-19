@@ -12,8 +12,8 @@ the operator only — no `SecretStore`, no `ExternalSecret`.
 > [!IMPORTANT]
 > The operator is inert until something tells it where secrets live. In this
 > platform that binding is created by
-> [`platform-vault-seeder`](../platform-vault-seeder/README.md), which sets up
-> the Vault Kubernetes auth role and policy ESO authenticates with. Installing
+> [`scripts/vault-init.sh`](../../scripts/vault-init.sh) (`task vault:init`), which
+> sets up the Vault Kubernetes auth role and policy ESO authenticates with. Installing
 > this chart on its own gets you a running controller and nothing synced.
 
 ## What this wrapper changes
@@ -49,6 +49,5 @@ helm show values oci://ghcr.io/kevindebenedetti/charts/platform-external-secrets
 ## See also
 
 - [`platform-vault`](../platform-vault/README.md) — the backend ESO reads from
-- [`platform-vault-seeder`](../platform-vault-seeder/README.md) — creates the auth role, policy and stores
 - [Vault operations guide](../../docs/stack/vault.md)
 - [Upstream External Secrets chart](https://github.com/external-secrets/external-secrets)

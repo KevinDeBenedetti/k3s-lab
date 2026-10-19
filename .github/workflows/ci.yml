@@ -136,10 +136,7 @@ jobs:
   # whole script under `set -e` the day the last iteration's condition happens
   # to be false — the loop inherits that command's exit status as its own.
   # shellcheck does not reason about this. It has shipped for real more than
-  # once here: check-deployed-pins.sh (fixed 08f555b, opened issue #76 — a
-  # header with no verdict) and, found while adding this check, the same shape
-  # in check-inventory-ignored.sh, check-play-order.sh, check-rendered-images.sh
-  # and check-umbrella-render.sh (all fixed 2026-09-07). See
+  # once here (issue #76, then four more scripts fixed 2026-09-07). See
   # scripts/check-loop-trap-shape.sh for the exact shape this catches.
   loop-trap-shape:
     runs-on: ubuntu-latest
@@ -169,17 +166,12 @@ jobs:
 
   # ─── Rendered image pins (every other chart) ──────────────────────────────
   # The generalisation of `traefik-image` to the charts that pin an image with a
-  # `repository:` + `tag:` pair — today platform-vault and platform-vault-seeder.
+  # `repository:` + `tag:` pair — today platform-vault.
   #
-  # Audit finding 8: charts/platform-vault pinned hashicorp/vault 1.21.2 while
-  # the cluster's StatefulSet declared 1.21.4, and nothing in CI compared the
-  # pin to anything at all. Helm lint, kubeconform and the resource-limits check
-  # are all satisfied by a pin merely existing, which is how a pin can stop
-  # meaning anything without a single job going red.
-  #
-  # This asserts the narrower, offline half: the pin reaches the render. Cluster
-  # drift is a separate question owned by check-deployed-charts.sh, which needs
-  # access this PR-time job deliberately does not have.
+  # Helm lint, kubeconform and the resource-limits check are all satisfied by a
+  # pin merely existing, which is how a pin can stop meaning anything without a
+  # single job going red. This asserts that the pin reaches the render. What a
+  # cluster actually runs is the deploying repository's question, not this one's.
   rendered-images:
     runs-on: ubuntu-latest
     steps:
@@ -205,7 +197,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Confront the deployed proxy version with the traefik advisories
+      - name: Confront the shipped proxy version with the traefik advisories
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/check-traefik-advisories.sh

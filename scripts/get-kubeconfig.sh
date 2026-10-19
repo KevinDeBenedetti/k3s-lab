@@ -7,25 +7,17 @@ set -euo pipefail
 # =============================================================================
 
 SERVER_IP="${1:?'Usage: ./scripts/get-kubeconfig.sh <SERVER_IP> [SSH_USER] [CONTEXT_NAME]'}"
-SSH_USER="${2:-${SSH_USER:-kevin}}"
+SSH_USER="${2:-${SSH_USER:-${USER}}}"
 CONTEXT_NAME="${3:-${KUBECONFIG_CONTEXT:-k3s-lab}}"
 SSH_KEY="${SSH_KEY:-}"
 SSH_PORT="${SSH_PORT:-22}"
 
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.24.1}" # x-release-please-version
-
-# get-kubeconfig uses positional args before sourcing — keep manual preamble
-# since script-init.sh would try to load .env (not needed here).
-_run_src="${BASH_SOURCE[0]:-}"
-if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
-  source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"
-else
-  # shellcheck source=/dev/null
-  source <(curl -fsSL "${K3S_LAB_RAW}/lib/run-mode.sh")
-fi
-
-_lib log.sh
-_lib ssh-opts.sh
+# No script-init.sh: this script takes positional arguments and never reads .env.
+_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)"
+# shellcheck source=lib/log.sh
+source "${_lib_dir}/log.sh"
+# shellcheck source=lib/ssh-opts.sh
+source "${_lib_dir}/ssh-opts.sh"
 
 TMP_KUBECONFIG="$(mktemp)"
 TARGET="${HOME}/.kube/config"
@@ -34,7 +26,7 @@ chmod 700 "${HOME}/.kube"
 
 # accept-new: trusts the host key on first contact but refuses a CHANGED key —
 # this fetch carries cluster-admin credentials, never disable checking outright.
-# After a VPS rebuild, clear the old key first: task ssh:known-hosts-reset
+# After a node rebuild, clear the old key first: task ssh:known-hosts-reset
 build_ssh_opts "${SSH_PORT}" "accept-new"
 
 log_info "Fetching kubeconfig from ${SSH_USER}@${SERVER_IP} (port ${SSH_PORT})..."

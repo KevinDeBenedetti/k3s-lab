@@ -107,7 +107,7 @@ policy_count() {
 }
 
 @test "the removed validationFailureAction value key fails the render" {
-  # The alias was dropped on 2026-08-20, once infra had moved to `failureAction`.
+  # The deprecated alias was dropped on 2026-08-20.
   # Helm ignores unknown value keys silently, so a plain removal would not error
   # on a leftover override — it would quietly revert that install to the chart
   # default, downgrading `Enforce` to `Audit` with nothing to read in the diff.
@@ -192,9 +192,8 @@ policy_count() {
 }
 
 @test "trivy-operator is off by default and its subchart is condition-gated" {
-  # infra's platform-vendor ApplicationSet already installs the aquasecurity
-  # chart into trivy-system; a second operator would reconcile the same
-  # VulnerabilityReport CRDs. Asserted as a values+condition contract rather
+  # Opt-in: a cluster that already runs the aquasecurity chart in trivy-system
+  # would get a second operator reconciling the same VulnerabilityReport CRDs. Asserted as a values+condition contract rather
   # than by rendering the subchart, which this file cannot do offline — the two
   # together are what guarantee it stays out of the render.
   grep -A1 '^trivy-operator:' "${CHART_SRC}/values.yaml" | grep -q 'enabled: false'
@@ -210,10 +209,9 @@ policy_count() {
 # list, and the tempting "let's factor this out" refactor would widen five of
 # them at once — silently, since a wider exclusion never fails a render.
 #
-# `ci` (the ARC runner namespace) was added on 2026-08-19 to exactly the two
-# policies those pods violate, replacing infra's PolicyException. These tests
-# pin both halves: that it IS excluded where it must be, and that it is NOT
-# excluded anywhere else.
+# They only ever list namespaces this platform installs. A cluster that runs
+# something else the policies reject (CI runners, a vendor operator) adds a
+# PolicyException from its own repository — never a hardcoded exclusion here.
 
 # ns_for POLICY <<< render — the namespaces a policy's first rule excludes
 ns_for() {
@@ -228,31 +226,16 @@ ns_for() {
   '
 }
 
-@test "the ci namespace is excluded from require-ro-rootfs" {
+@test "no policy exempts a namespace the platform does not install" {
+  # `ci` (a CI runner namespace) was hardcoded into two policies until
+  # 2026-10-19 for a single consumer's cluster.
   run render --set kyverno.enabled=true --set kyvernoPolicies.enabled=true
   [ "$status" -eq 0 ]
-  ns="$(ns_for require-ro-rootfs <<<"$output")"
-  [[ "$ns" == *"ci"* ]]
-}
-
-@test "the ci namespace is excluded from restrict-capabilities" {
-  run render --set kyverno.enabled=true --set kyvernoPolicies.enabled=true
-  [ "$status" -eq 0 ]
-  ns="$(ns_for restrict-capabilities <<<"$output")"
-  [[ "$ns" == *"ci"* ]]
-}
-
-@test "the ci exemption does NOT leak into the other four policies" {
-  run render --set kyverno.enabled=true --set kyvernoPolicies.enabled=true
-  [ "$status" -eq 0 ]
-  for policy in require-non-root require-pod-resources \
-                disallow-privilege-escalation disallow-latest-tag; do
+  for policy in require-ro-rootfs restrict-capabilities require-non-root \
+                require-pod-resources disallow-privilege-escalation disallow-latest-tag; do
     ns="$(ns_for "$policy" <<<"$output")"
     if grep -qx 'ci' <<<"$ns"; then
-      echo "FAIL: '$policy' excludes ci; only require-ro-rootfs and"
-      echo "      restrict-capabilities should. The ARC runners violate those two"
-      echo "      and nothing else — a wider exemption is a security regression"
-      echo "      that no render will complain about."
+      echo "FAIL: '$policy' excludes ci — use a PolicyException in the cluster's repo"
       return 1
     fi
   done

@@ -1,5 +1,5 @@
 ---
-# common role — base VPS setup for all k3s nodes
+# common role — base setup for all k3s nodes
 # Idempotent: safe to run multiple times
 
 # Packages to install

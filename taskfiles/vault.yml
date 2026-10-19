@@ -113,18 +113,6 @@ tasks:
       DASHBOARD_USER: '{{.DASHBOARD_USER | default "admin"}}'
       DASHBOARD_PASSWORD: '{{.DASHBOARD_PASSWORD | default ""}}'
 
-  seed-cloudflare:
-    desc: Seed Cloudflare API token into Vault for cert-manager DNS-01
-    preconditions:
-      - sh: test -n "$VAULT_ROOT_TOKEN"
-        msg: "VAULT_ROOT_TOKEN is not set — add it to .env"
-    cmds:
-      - bash {{.TASKFILE_DIR}}/../scripts/vault-seed-cloudflare.sh
-    env:
-      VAULT_POD: '{{.VAULT_POD}}'
-      VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
-      VAULT_ROOT_TOKEN: '{{.VAULT_ROOT_TOKEN}}'
-
   status:
     desc: Show Vault seal status, ESO sync status, and managed secrets
     cmds:

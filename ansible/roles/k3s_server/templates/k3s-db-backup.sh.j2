@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# =============================================================================
+# k3s-db-backup — local, restorable snapshot of the k3s SQLite datastore
+# =============================================================================
+# A single-server k3s keeps the whole cluster state in kine's SQLite file
+# (`state.db`). k3s only snapshots embedded etcd on its own, so without this a
+# lost disk is a lost cluster.
+#
+# The snapshot alone does not restore: the server token and, because the role
+# enables `--secrets-encryption`, the encryption config are needed to read it
+# back. All three go into one archive, mode 0600, since it contains every
+# cluster Secret.
+#
+# This script:
+#   1. Snapshots state.db online with SQLite's backup API (consistent, k3s keeps
+#      running)
+#   2. Archives it with the token and the encryption config
+#   3. Keeps the newest $KEEP archives and deletes the rest
+#
+# Copying the archives off the node is the job of the repository that operates
+# the cluster (restic, rclone, …) — a backup on the same disk is not a backup.
+#
+# Managed by Ansible (k3s-lab role: k3s_server). Do not edit by hand.
+# =============================================================================
+set -euo pipefail
+
+SERVER_DIR="{{ k3s_db_backup_server_dir }}"
+DEST="{{ k3s_db_backup_dir }}"
+KEEP="{{ k3s_db_backup_keep }}"
+
+log() { printf '%s k3s-db-backup: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
+
+DB_FILE="${SERVER_DIR}/db/state.db"
+if [[ ! -f "$DB_FILE" ]]; then
+  log "no state.db at ${DB_FILE} (embedded-etcd cluster?) — nothing to do"
+  exit 0
+fi
+
+umask 077
+mkdir -p "$DEST"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+work="$(mktemp -d "${DEST}/.work.XXXXXX")"
+trap 'rm -rf "$work"' EXIT
+
+sqlite3 "$DB_FILE" ".backup '${work}/state.db'"
+cp "${SERVER_DIR}/token" "${work}/token"
+if [[ -f "${SERVER_DIR}/cred/encryption-config.json" ]]; then
+  cp "${SERVER_DIR}/cred/encryption-config.json" "${work}/encryption-config.json"
+fi
+
+archive="${DEST}/k3s-${stamp}.tar.gz"
+tar -C "$work" -czf "${archive}.tmp" .
+mv "${archive}.tmp" "$archive"
+log "wrote ${archive} ($(numfmt --to=iec --suffix=B "$(stat -c%s "$archive")"))"
+
+# Retention: newest first, drop everything past $KEEP.
+mapfile -t old < <(find "$DEST" -maxdepth 1 -name 'k3s-*.tar.gz' -printf '%T@ %p\n' \
+  | sort -rn | tail -n +"$((KEEP + 1))" | cut -d' ' -f2-)
+if ((${#old[@]} > 0)); then
+  rm -f -- "${old[@]}"
+  log "pruned ${#old[@]} archive(s), keeping ${KEEP}"
+fi

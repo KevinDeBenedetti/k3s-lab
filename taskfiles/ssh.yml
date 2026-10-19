@@ -37,7 +37,7 @@ tasks:
       - ssh -i $SSH_KEY -p $SSH_PORT $SSH_USER@$AGENT_IP
 
   known-hosts-reset:
-    desc: Remove stale known_hosts entries (run after VPS reformat)
+    desc: Remove stale known_hosts entries (run after a node reinstall)
     cmds:
       - cmd: '[ -z "$SERVER_IP" ] || ssh-keygen -R "$SERVER_IP" 2>/dev/null; true'
         ignore_error: true

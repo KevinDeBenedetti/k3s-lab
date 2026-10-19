@@ -161,7 +161,7 @@ spec:
     - app.example.com
 ```
 
-See `apps/` in your infra repo for a complete example.
+See [Kustomize components](../kustomize-components.md) for a complete example.
 
 ---
 

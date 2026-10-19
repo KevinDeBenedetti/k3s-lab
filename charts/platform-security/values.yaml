@@ -151,9 +151,8 @@ kyvernoPolicies:
   # Defaults to `Audit` deliberately. Until 2026-08-05 these six policies shipped
   # hardcoded to `Enforce` and were installed on no cluster at all, so the setting
   # had never once been exercised against a real workload. Switching that on
-  # blind, against 54 running workloads including third-party ones (langfuse,
-  # reactive-resume, portfolio), rejects pods on the first sync — `require-ro-rootfs`
-  # and `require-non-root` in particular.
+  # blind against a cluster full of third-party workloads rejects pods on the
+  # first sync — `require-ro-rootfs` and `require-non-root` in particular.
   #
   # The staged path: deploy with `Audit`, read the PolicyReports
   # (`kubectl get polr -A`), fix or exclude what violates, then move to `Enforce`.
@@ -163,9 +162,8 @@ kyvernoPolicies:
   # Renamed from `validationFailureAction` on 2026-08-14 to match the field it
   # renders into: Kyverno 3.8 deprecated `spec.validationFailureAction` for the
   # per-rule `spec.rules[].validate.failureAction`, and the chart now emits the
-  # latter. The old key was kept as a deprecated alias for infra, which set it;
-  # infra moved to `failureAction` on 2026-08-19 and the alias was removed on
-  # 2026-08-20. Passing it now fails the render on purpose — Helm would ignore
+  # latter. The old key was a deprecated alias until 2026-08-20. Passing it now
+  # fails the render on purpose — Helm would ignore
   # the unknown key in silence and drop the install to the default instead.
   #
   # Deliberately left unset: the effective default (`Audit`) and the check that

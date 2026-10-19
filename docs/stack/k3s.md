@@ -1,6 +1,6 @@
 # k3s — Lightweight Kubernetes
 
-[k3s](https://k3s.io) is a certified, production-ready Kubernetes distribution packaged as a single binary (~100 MB). It is optimized for VPS, edge, and IoT environments.
+[k3s](https://k3s.io) is a certified, production-ready Kubernetes distribution packaged as a single binary (~100 MB). It is optimized for small machines: homelabs, edge and IoT.
 
 ## Why k3s
 
@@ -8,7 +8,7 @@
 | -------------------- | ----------------------------- |
 | Single binary        | No Docker daemon required     |
 | Built-in containerd  | Reduced resource footprint    |
-| ARM + x86 support    | Works on any VPS              |
+| ARM + x86 support    | Pi, mini PC, VM or VPS        |
 | Certified Kubernetes | 100% API compatible           |
 | Automatic TLS        | Internal cluster PKI included |
 
@@ -18,7 +18,7 @@
 
 ```
 ┌─────────────────────────────────┐    ┌─────────────────────────────────┐
-│          Server (VPS 1)         │    │          Agent (VPS 2)          │
+│         Server (node 1)         │    │         Agent (node 2)          │
 │                                 │    │                                 │
 │  k3s server                     │    │  k3s agent                      │
 │  ├─ kube-apiserver  :6443       │◄───│  ├─ kubelet                     │
@@ -42,7 +42,7 @@
 | -------------------------------- | ---------------------------------- |
 | Ubuntu 22.04+ / Debian 12+       | Both nodes                         |
 | 2 vCPU / 2 GB RAM (server)       | 1 GB minimum for agent             |
-| Public IP on each VPS            | Required for TLS SAN + UFW rules   |
+| Reachable IP on each node        | Required for TLS SAN + UFW rules   |
 | SSH access as root or sudo user  | Bootstrap uses `INITIAL_USER=root` |
 | Port `6443` open on server       | k3s API server                     |
 | Ports `80`, `443` open on server | HTTP + HTTPS traffic               |
@@ -175,6 +175,41 @@ The node token is a shared secret that agents use to authenticate with the serve
 - Stored on the server at `/var/lib/rancher/k3s/server/node-token`
 
 To rotate: uninstall both nodes and reinstall with a new token.
+
+---
+
+## Datastore backup
+
+A single server keeps all cluster state in SQLite
+(`/var/lib/rancher/k3s/server/db/state.db`). The `k3s_server` role installs a
+daily `k3s-db-backup.timer` that writes
+`/var/backups/k3s/k3s-<UTC timestamp>.tar.gz` (mode 0600, newest 7 kept). Each
+archive holds:
+
+| File | Why it is needed |
+| ---- | ---------------- |
+| `state.db` | the cluster state, snapshotted online |
+| `token` | k3s refuses to start on a datastore with a different server token |
+| `encryption-config.json` | Secrets are encrypted at rest (`--secrets-encryption`) — unreadable without it |
+
+Tune with `k3s_db_backup_*` in `group_vars` (`k3s_db_backup_enabled: false` to
+turn it off). **Copy the archives off the node** from your own config repo
+(restic, rclone, …): a backup on the same disk does not survive that disk.
+
+Restore on a server with the same k3s version:
+
+```bash
+systemctl stop k3s
+mkdir -p /tmp/k3s-restore && tar -C /tmp/k3s-restore -xzf k3s-<stamp>.tar.gz
+cp /tmp/k3s-restore/state.db               /var/lib/rancher/k3s/server/db/state.db
+cp /tmp/k3s-restore/token                  /var/lib/rancher/k3s/server/token
+cp /tmp/k3s-restore/encryption-config.json /var/lib/rancher/k3s/server/cred/
+rm -f /var/lib/rancher/k3s/server/db/state.db-{wal,shm}
+systemctl start k3s
+```
+
+PersistentVolume data (`local-path`) is **not** in this archive — back up
+volumes separately (e.g. Velero) from your config repo.
 
 ---
 

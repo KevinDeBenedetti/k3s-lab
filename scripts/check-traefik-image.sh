@@ -23,9 +23,8 @@
 #   scripts/check-traefik-image.sh --no-update  # assume charts/ is populated
 #   scripts/check-traefik-image.sh -- -f overlay.yaml   # args passed to helm template
 #
-# The `--` passthrough exists to replay the check against a cluster overlay
-# (infra/platform/traefik/values.yaml), which is how it was done by hand until
-# now. The reference is always the chart's own effective version, never the
+# The `--` passthrough exists to replay the check against a cluster's own
+# values overlay. The reference is always the chart's own effective version, never the
 # overlay's — an overlay that moves the image is precisely what this catches.
 # =============================================================================
 set -euo pipefail
@@ -165,7 +164,7 @@ log_ok "Render matches: ${#images[@]} traefik image(s) at $expected"
 # The README restates two facts it does not own — the subchart version and the
 # proxy version — because a reader needs them at the top of the page, not after
 # opening Chart.lock. Restating is fine; restating *without a check* is what let
-# the sibling comment in infra/platform/traefik/values.yaml sit wrong for nine
+# a copy of the same comment in a consumer's values overlay sit wrong for nine
 # days. So the copies are verified rather than generated: generating them would
 # mean owning a templating step for two table rows, and this repo has already
 # decided once that that trade is not worth it (see the umbrella pins).

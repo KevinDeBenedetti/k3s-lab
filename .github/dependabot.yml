@@ -17,8 +17,8 @@
 #
 # `github-actions` is the only ecosystem here on purpose. This repo vendors no
 # npm/pip/go dependencies; Helm chart versions are pinned in charts/*/Chart.yaml
-# and are not a Dependabot ecosystem — they are guarded by check-deployed-pins.sh
-# and check-umbrella-pins.sh instead.
+# and are not a Dependabot ecosystem — check-umbrella-pins.sh guards the
+# umbrella's pins instead.
 # =============================================================================
 version: 2
 
@@ -39,9 +39,11 @@ updates:
       # action bump lands under "chore" and never triggers a release of its own.
       prefix: chore
       include: scope
-    labels:
-      - dependencies
-      - github-actions
+    # No labels on purpose: this repo does not maintain any, and a label that
+    # does not exist makes Dependabot comment a warning on every PR. `[]` (not
+    # omitting the key) also disables the defaults (`dependencies`,
+    # `github_actions`), which are just as absent.
+    labels: []
     groups:
       # One PR for the whole set rather than five. These move together in
       # practice, and a single PR is one CI run and one review instead of five.

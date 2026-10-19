@@ -7,7 +7,7 @@
 #
 # Usage in app kustomization.yaml:
 #   components:
-#     - ../../../../vendor/k3s-lab/kubernetes/components/traefik-ingress
+#     - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/traefik-ingress?ref=vX.Y.Z
 #   resources:
 #     - deployment.yaml
 #   patchesStrategicMerge:

@@ -1,0 +1,12 @@
+[Unit]
+Description=Snapshot the k3s SQLite datastore with its token and encryption config
+After=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/k3s-db-backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+StandardOutput=journal
+StandardError=journal

@@ -22,12 +22,10 @@
 # failure here, not as "nothing to check".
 #
 # ⚠️ What this does NOT catch: cluster drift. A pin can be honoured by the render
-# and still not be what runs, because the infra `platform-vault` Application is
-# multi-source and layers `$values/platform/vault/values.yaml` on top. That is a
-# different question with a different answer — scripts/check-deployed-charts.sh
-# and check-deployed-pins.sh own it, and they need cluster access this script
-# deliberately does not want. Keep the two apart: this one must stay offline so
-# it can run on every PR.
+# and still not be what runs, because a deployment typically layers its own
+# values on top. That is the deploying repository's question, and it needs
+# cluster access this script deliberately does not want: this one must stay
+# offline so it can run on every PR.
 #
 # Traefik keeps its own script rather than folding in here, even though the bare
 # `image.tag` shape is now understood. check-traefik-image.sh answers a question

@@ -4,7 +4,7 @@ set -euo pipefail
 # =============================================================================
 # vault-init.sh — Initialize Vault, configure auth methods, create policies
 #
-# Run AFTER Vault pods are Running: make vault-init
+# Run AFTER Vault pods are Running: task vault:init
 #
 # Steps:
 #   1. Check init + seal status
@@ -17,14 +17,7 @@ set -euo pipefail
 # =============================================================================
 
 # shellcheck source=lib/script-init.sh
-_src="${BASH_SOURCE[0]:-}"
-if [[ -n "${_src}" && "${_src}" != /dev/fd/* && -f "${_src}" ]]; then
-  source "$(cd "$(dirname "${_src}")" && pwd)/../lib/script-init.sh"
-else
-  # shellcheck source=/dev/null
-  source <(curl -fsSL "${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.24.1}/lib/script-init.sh") # x-release-please-version
-fi
-unset _src
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
 
 if ! command -v python3 &> /dev/null; then
   echo "ERROR: python3 is required but not installed" >&2

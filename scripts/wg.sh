@@ -19,19 +19,10 @@ set -euo pipefail
 
 WG_INTERFACE="${WG_INTERFACE:-wg0}"
 
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.24.1}" # x-release-please-version
-
-# wg.sh takes a positional subcommand and never needs .env — keep the manual
-# preamble (run-mode.sh + log.sh) instead of script-init.sh, which would load .env.
-_run_src="${BASH_SOURCE[0]:-}"
-if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
-  source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"
-else
-  # shellcheck source=/dev/null
-  source <(curl -fsSL "${K3S_LAB_RAW}/lib/run-mode.sh")
-fi
-
-_lib log.sh
+# No script-init.sh: this script takes positional arguments and never reads .env.
+_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)"
+# shellcheck source=lib/log.sh
+source "${_lib_dir}/log.sh"
 
 # Connection state from wg-quick's own runtime marker (created on up, removed on
 # down) — reliable and independent of the client IP or interface naming.

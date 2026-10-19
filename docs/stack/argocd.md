@@ -1,7 +1,7 @@
 # ArgoCD — GitOps Continuous Delivery
 
 [ArgoCD](https://argo-cd.readthedocs.io) is the GitOps controller for this cluster.
-It watches your `infra` repo and automatically applies any changes to Kubernetes.
+It watches your own config repo and applies any change to the cluster.
 
 ---
 
@@ -20,12 +20,12 @@ It watches your `infra` repo and automatically applies any changes to Kubernetes
 ## Architecture
 
 ```
-GitHub (infra repo)
+GitHub (your config repo)
       │  push
       │  webhook → https://<ARGOCD_DOMAIN>/api/webhook
       ▼
 ArgoCD (argocd namespace)
-  ├── repo-server   ← clones infra via SSH deploy key
+  ├── repo-server   ← clones the config repo via SSH deploy key
   ├── application-controller ← diffs desired vs actual state
   ├── server        ← UI + API (--insecure, Traefik handles TLS)
   └── redis         ← cache
@@ -39,7 +39,7 @@ Kubernetes (apps, monitoring, … namespaces)
 
 ## Installation
 
-ArgoCD is deployed via Helm from `infra/`:
+ArgoCD is bootstrapped with Helm from this repo:
 
 ```bash
 task argocd:deploy
@@ -73,21 +73,22 @@ This installs `argo/argo-cd` chart at the version pinned in `ARGOCD_VERSION`
 
 ## Repo registration
 
-ArgoCD accesses your private `infra` repo via an SSH deploy key stored as a
+ArgoCD accesses your private config repo via an SSH deploy key stored as a
 Kubernetes Secret:
 
 ```bash
-task argocd:add-repo GITHUB_DEPLOY_KEY=~/.ssh/argocd_deploy_key
+task argocd:add-repo ARGOCD_REPO_URL=git@github.com:<you>/<config-repo>.git \
+  GITHUB_DEPLOY_KEY=~/.ssh/argocd_deploy_key
 ```
 
-This creates (or updates) the `argocd-infra-repo` secret in the `argocd`
+This creates (or updates) the repository secret in the `argocd`
 namespace with label `argocd.argoproj.io/secret-type=repository`.
 
-The public key must be added to GitHub:
-**`https://github.com/KevinDeBenedetti/infra/settings/keys`** (read-only).
+Add the public key to the repo as a **read-only** deploy key
+(GitHub → Settings → Deploy keys).
 
 > The `repoURL` in every ArgoCD `Application` manifest **must use the SSH format**
-> (`git@github.com:KevinDeBenedetti/infra.git`) to match this secret.
+> (`git@github.com:<you>/<config-repo>.git`) to match this secret.
 > Using `https://` will result in `authentication required` errors.
 
 ---
@@ -95,10 +96,10 @@ The public key must be added to GitHub:
 ## Applications
 
 ArgoCD Applications are managed via **ApplicationSets** that auto-discover
-app directories. In the consuming `infra` repo:
+app directories. A typical layout for your config repo:
 
 ```
-infra/
+<config-repo>/
   argocd/
     projects/         ← AppProjects (RBAC boundaries)
     applicationsets/  ← Git directory generators (auto-discover apps/ and platform/)
@@ -110,9 +111,9 @@ infra/
 ApplicationSets are applied once during bootstrap:
 
 ```bash
-kubectl --context k3s-infra apply -f argocd/projects/
-kubectl --context k3s-infra apply -f argocd/applicationsets/
-kubectl --context k3s-infra apply -f argocd/applications/
+kubectl --context homelab apply -f argocd/projects/
+kubectl --context homelab apply -f argocd/applicationsets/
+kubectl --context homelab apply -f argocd/applications/
 ```
 
 After that, adding a new app is just `mkdir apps/myapp/ && git push`.
@@ -128,7 +129,7 @@ metadata:
 spec:
   generators:
     - git:
-        repoURL: git@github.com:KevinDeBenedetti/infra.git
+        repoURL: git@github.com:<you>/<config-repo>.git
         revision: main
         directories:
           - path: apps/*
@@ -138,7 +139,7 @@ spec:
     spec:
       project: apps
       source:
-        repoURL: git@github.com:KevinDeBenedetti/infra.git
+        repoURL: git@github.com:<you>/<config-repo>.git
         targetRevision: main
         path: "{{path}}"
       destination:
@@ -163,7 +164,7 @@ For instant sync (instead of polling every 3 minutes), configure a webhook:
 | Events       | **Just the push event**               |
 | Secret       | *(leave empty)*                       |
 
-**`https://github.com/KevinDeBenedetti/infra/settings/hooks`**
+Configure it in the config repo under GitHub → Settings → Webhooks.
 
 ---
 
@@ -197,20 +198,20 @@ The gRPC route has higher priority and is selected by the `Content-Type` header.
 
 ```bash
 # List all apps and their sync/health status
-kubectl --context k3s-infra get applications -n argocd
+kubectl --context homelab get applications -n argocd
 
 # Force sync an app immediately
-kubectl --context k3s-infra patch application whoami -n argocd \
+kubectl --context homelab patch application whoami -n argocd \
   --type merge -p '{"operation":{"sync":{}}}'
 
 # See sync error details
-kubectl --context k3s-infra describe application whoami -n argocd
+kubectl --context homelab describe application whoami -n argocd
 
 # Tail ArgoCD server logs
-kubectl --context k3s-infra logs -n argocd deploy/argocd-server -f
+kubectl --context homelab logs -n argocd deploy/argocd-server -f
 
 # List registered repos
-kubectl --context k3s-infra get secrets -n argocd \
+kubectl --context homelab get secrets -n argocd \
   -l argocd.argoproj.io/secret-type=repository
 ```
 
@@ -218,6 +219,5 @@ kubectl --context k3s-infra get secrets -n argocd \
 
 ## See also
 
-- [Deploy a new app](../operations/deploy-app.md) — step-by-step guide
 - [Traefik](./traefik.md) — IngressRoute reference
 - [ArgoCD official docs](https://argo-cd.readthedocs.io)

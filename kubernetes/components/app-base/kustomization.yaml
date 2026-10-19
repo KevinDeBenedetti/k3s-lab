@@ -11,7 +11,7 @@
 #
 # Usage in app kustomization.yaml:
 #   components:
-#     - ../../../../vendor/k3s-lab/kubernetes/components/app-base
+#     - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/app-base?ref=vX.Y.Z
 #   resources:
 #     - deployment.yaml      # your app-specific deployment
 #   patchesStrategicMerge:

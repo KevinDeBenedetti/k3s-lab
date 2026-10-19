@@ -50,9 +50,9 @@ namespace: homepage
 
 # Use reusable components
 components:
-  - ../../../../vendor/k3s-lab/kubernetes/components/app-base
-  - ../../../../vendor/k3s-lab/kubernetes/components/traefik-ingress
-  - ../../../../vendor/k3s-lab/kubernetes/components/network-policies
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/app-base?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/traefik-ingress?ref=vX.Y.Z
+  - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/network-policies?ref=vX.Y.Z
 
 # Only app-specific resources
 resources:
@@ -204,7 +204,7 @@ metadata:
   name: app-https
 spec:
   routes:
-    - match: "Host(`homepage.kevindb.dev`)" # ← override domain
+    - match: "Host(`homepage.example.com`)" # ← override domain
       kind: Rule
       services:
         - name: homepage # ← match service name

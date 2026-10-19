@@ -251,7 +251,7 @@ EOF
 }
 
 @test "a values overlay can turn the policies off" {
-  # How infra's own values file would be passed in.
+  # How a cluster's own values file would be passed in.
   cat > "${BATS_TEST_TMPDIR}/override.yaml" <<'EOF'
 kyvernoPolicies:
   enabled: false

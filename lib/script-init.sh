@@ -1,32 +1,26 @@
 # shellcheck shell=bash
-# lib/script-init.sh — One-line preamble for all k3s-lab deploy scripts.
+# lib/script-init.sh — One-line preamble for the k3s-lab scripts that read .env.
 #
 # Usage (after set -euo pipefail):
 #   source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
 #
-# Or in remote/pipe mode (when BASH_SOURCE is /dev/fd/*):
-#   source <(curl -fsSL "${K3S_LAB_RAW}/lib/script-init.sh")
-#
 # What it does:
-#   1. Detects LOCAL vs REMOTE execution mode (via run-mode.sh)
+#   1. Sets _RUN_REPO (the repository root) and defines _lib <name>, which
+#      sources lib/<name>
 #   2. Sources log.sh and load-env.sh
-#   3. Loads .env (fallback — vars from Make take precedence)
+#   3. Loads ${_RUN_REPO}/.env as a fallback — variables already exported
+#      (Taskfile, shell) take precedence
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Remote fetches default to the released tag, not the moving main branch
-# (supply-chain pinning — kept current by release-please).
-K3S_LAB_RAW="${K3S_LAB_RAW:-https://raw.githubusercontent.com/KevinDeBenedetti/k3s-lab/v0.24.1}" # x-release-please-version
+_RUN_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Detect caller context — [1] is the script that sourced us
-_run_src="${BASH_SOURCE[1]:-}"
-if [[ -n "${_run_src}" && "${_run_src}" != /dev/fd/* && -f "${_run_src}" ]]; then
-  source "$(cd "$(dirname "${_run_src}")" && pwd)/../lib/run-mode.sh"
-else
-  # shellcheck source=/dev/null
-  source <(curl -fsSL "${K3S_LAB_RAW}/lib/run-mode.sh")
-fi
+# _lib <name> — source a helper from lib/.
+_lib() {
+  # shellcheck disable=SC1090
+  source "${_RUN_REPO}/lib/$1"
+}
 
 _lib log.sh
 _lib load-env.sh
 
-load_env "${_RUN_REPO:-.}/.env"
+load_env "${_RUN_REPO}/.env"

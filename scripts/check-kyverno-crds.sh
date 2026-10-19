@@ -40,8 +40,8 @@
 # `helm template` actually emitted, not from re-reading `kyvernoPolicies.
 # failureAction` a second time.
 #
-# ⚠️ Needs cluster access, so it is NOT part of the offline PR checks — same
-# split as check-deployed-charts.sh. scripts/check-rendered-images.sh and
+# ⚠️ Needs cluster access, so it is NOT part of the offline PR checks.
+# scripts/check-rendered-images.sh and
 # tests/bats/platform-security-render.bats own the offline half.
 #
 # Usage:

@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks you through provisioning a production-ready k3s cluster from two fresh VPS nodes.
+This guide walks you through provisioning a production-ready k3s cluster from fresh machines — bare metal, VMs or VPS.
 
 ## Two ways to use k3s-lab
 
@@ -21,12 +21,12 @@ This guide walks you through provisioning a production-ready k3s cluster from tw
 | ------------- | ---------------------------------- | ---------------------------- |
 | `kubectl`     | Kubernetes CLI                     | `brew install kubectl`       |
 | `helm`        | Helm package manager               | `brew install helm`          |
-| `ssh` / `scp` | VPS access                         | Pre-installed on macOS/Linux |
+| `ssh` / `scp` | Node access                        | Pre-installed on macOS/Linux |
 | `htpasswd`    | BasicAuth secret generation        | `brew install httpd`         |
 | `envsubst`    | Variable substitution in manifests | `brew install gettext`       |
 | `bats`        | Optional: run tests locally        | `brew install bats-core`     |
 
-### VPS nodes
+### Nodes
 
 | Requirement        | Value                                                                   |
 | ------------------ | ----------------------------------------------------------------------- |
@@ -35,14 +35,18 @@ This guide walks you through provisioning a production-ready k3s cluster from tw
 | Server: vCPU / RAM | 2 vCPU / 2 GB minimum (4 GB recommended)                                |
 | Agent: vCPU / RAM  | 2 vCPU / 1 GB minimum (2 GB recommended)                                |
 | Disk               | 20 GB+ (server), 20 GB+ (agent)                                         |
-| Public IP          | Required on each node                                                   |
-| DNS                | Managed by Cloudflare (A records created automatically by external-dns) |
+| Network            | Nodes reachable from each other (LAN or VPN); public IP optional         |
+| DNS                | A domain you control; any cert-manager DNS-01 provider for TLS          |
 
 ### DNS records
 
-> **No manual DNS setup required.** Once `external-dns` is deployed, it automatically creates and updates Cloudflare A records whenever you add an `IngressRoute` with the `external-dns.alpha.kubernetes.io/hostname` annotation.
+> Point your records (or a wildcard) at the node, or at your router's public IP
+> if you expose the cluster. For a LAN-only homelab, a local resolver
+> (Pi-hole, AdGuard, router) is enough.
 >
-> TLS certificates use the **DNS-01 challenge** (Cloudflare API), so they can be issued even before traffic is routed — no chicken-and-egg problem with DNS propagation.
+> Prefer the **DNS-01 challenge** for TLS: certificates are issued without the
+> cluster being reachable from the internet. See
+> [cert-manager](./stack/cert-manager.md).
 
 ---
 
@@ -155,8 +159,8 @@ All pods should be `Running` or `Completed`.
 
 ## Deploy an example app
 
-Create your app manifests in `apps/` (for infra repo) or follow the
-[Deploying an App](./operations/deploy-app) guide:
+Apps live in your own config repo, which ArgoCD watches (see
+[ArgoCD](./stack/argocd.md)):
 
 ```bash
 # ArgoCD auto-discovers apps/ directories — just push to git

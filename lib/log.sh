@@ -1,9 +1,7 @@
 # shellcheck shell=bash
-# lib/log.sh — Shared logging helpers for infra scripts.
+# lib/log.sh — Shared logging helpers for the k3s-lab scripts.
 # Source this file at the top of any script:
 #   source "$(dirname "$0")/../lib/log.sh"
-#
-# Mirrors dotfiles/os/helpers/log.sh for consistency across repos.
 
 _red='\e[0;31m'
 _green='\e[0;32m'

@@ -16,11 +16,16 @@ traefik:
   # GHSA-qvj7-gq9c-hp7q, GHSA-53qr-784g-cj35, GHSA-rv2h-qh7j-xrjw,
   # GHSA-qm9f-w54v-q2qh, GHSA-mwrr-6hp4-pxr6, GHSA-mhjw-hmjv-p99x,
   # GHSA-cw35-4q88-3rmp). Chart 41.7.0 ships v3.7.14 upstream but is not yet
-  # published (latest is 41.6.1 -> v3.7.13). DROP this pin at the first
-  # published subchart whose appVersion is >= v3.7.14.
+  # published (latest is 41.6.1 -> v3.7.13).
+  #
+  # PIN BUMPED 2026-10-19 — v3.7.14 -> v3.7.15: 3 advisories (2 high, 1 low)
+  # published 2026-10-16 against v3.7.14, all patched in v3.7.15
+  # (GHSA-ww7c-q3mv-xx22, GHSA-p8wx-ph99-xgcr, GHSA-28hp-c82p-8vqj). Latest
+  # published subcharts (41.7.1, 42.0.0) still ship v3.7.14. DROP this pin at
+  # the first published subchart whose appVersion is >= v3.7.15.
   # Never `versionOverride`, see README.md.
   image:
-    tag: v3.7.14
+    tag: v3.7.15
 
   ingressRoute:
     dashboard:

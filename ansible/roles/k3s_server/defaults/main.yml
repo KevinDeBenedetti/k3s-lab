@@ -96,3 +96,22 @@ kine_vacuum_randomized_delay: 3600
 
 # k3s systemd unit name (override to `k3s-agent.service` or similar if needed)
 kine_vacuum_k3s_service: k3s.service
+
+# =============================================================================
+# k3s-db-backup — daily local snapshot of the SQLite datastore
+# =============================================================================
+# Archives state.db (online SQLite backup), the server token and the secrets
+# encryption config into k3s_db_backup_dir, mode 0600. Without the last two a
+# snapshot cannot be restored. Off-site copies are up to the repository that
+# operates the cluster. No-op on an embedded-etcd server.
+k3s_db_backup_enabled: true
+
+# k3s server data directory (holds db/, token and cred/)
+k3s_db_backup_server_dir: /var/lib/rancher/k3s/server
+
+# Where archives are written, and how many to keep
+k3s_db_backup_dir: /var/backups/k3s
+k3s_db_backup_keep: 7
+
+# systemd OnCalendar expression. Default: daily at 03:00.
+k3s_db_backup_schedule: "*-*-* 03:00:00"

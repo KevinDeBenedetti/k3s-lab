@@ -59,11 +59,6 @@
         },
         {
           "type": "yaml",
-          "path": "charts/platform-vault-seeder/Chart.yaml",
-          "jsonpath": "$.version"
-        },
-        {
-          "type": "yaml",
           "path": "charts/platform-deployment/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
@@ -71,51 +66,6 @@
           "type": "yaml",
           "path": "charts/platform-deployment/Chart.yaml",
           "jsonpath": "$.dependencies[*].version"
-        },
-        {
-          "type": "yaml",
-          "path": "charts/platform-vault-seeder/Chart.yaml",
-          "jsonpath": "$.appVersion"
-        },
-        {
-          "type": "generic",
-          "path": "lib/script-init.sh"
-        },
-        {
-          "type": "generic",
-          "path": "lib/run-mode.sh"
-        },
-        {
-          "type": "generic",
-          "path": "scripts/vault-init.sh"
-        },
-        {
-          "type": "generic",
-          "path": "scripts/vault-configure.sh"
-        },
-        {
-          "type": "generic",
-          "path": "scripts/vault-seed-cloudflare.sh"
-        },
-        {
-          "type": "generic",
-          "path": "scripts/uninstall.sh"
-        },
-        {
-          "type": "generic",
-          "path": "scripts/generate-inventory.sh"
-        },
-        {
-          "type": "generic",
-          "path": "scripts/deploy-grafana-oauth.sh"
-        },
-        {
-          "type": "generic",
-          "path": "scripts/get-kubeconfig.sh"
-        },
-        {
-          "type": "generic",
-          "path": "scripts/wg.sh"
         }
       ]
     }

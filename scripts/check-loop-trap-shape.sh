@@ -13,8 +13,8 @@
 # found something.
 #
 # This shipped for real, more than once:
-#   - check-deployed-pins.sh (fixed 08f555b): `[ … ] && printf …` inside a
-#     `while … | while read` capture — the LAST published tag is never newer
+#   - a since-removed pin-drift script (fixed 08f555b): `[ … ] && printf …`
+#     inside a `while read` capture — the LAST published tag is never newer
 #     than an up-to-date pin, so the trap fired exactly when there was nothing
 #     to report. Opened issue #76 (a header with no verdict).
 #   - check-inventory-ignored.sh, check-play-order.sh, check-rendered-images.sh,

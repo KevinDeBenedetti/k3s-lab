@@ -1,4 +1,4 @@
-# VPS-optimized monitoring defaults (8GB single-node)
+# Monitoring defaults sized for a small single node (8 GB)
 
 # ─── Dashboard toggles (disable dashboards for components not deployed) ───
 dashboards:
@@ -130,7 +130,7 @@ promtail:
       memory: 128Mi
 
 kube-prometheus-stack:
-  # Disable components already provided by this chart or not needed on a single-node VPS
+  # Disable components already provided by this chart or not needed on a single node
   grafana:
     enabled: false
   alertmanager:

@@ -12,12 +12,12 @@ cp .env.example .env
 
 ## All variables
 
-### VPS nodes
+### Nodes
 
-| Variable    | Example   | Required | Description                        |
-| ----------- | --------- | -------- | ---------------------------------- |
-| `SERVER_IP` | `1.2.3.4` | ✅        | Public IP of the control-plane VPS |
-| `AGENT_IP`  | `5.6.7.8` | ✅        | Public IP of the agent VPS         |
+| Variable    | Example        | Required | Description |
+| ----------- | -------------- | -------- | ----------- |
+| `SERVER_IP` | `192.168.1.10` | ✅ | IP of the server node (LAN or public) |
+| `AGENT_IP`  | `192.168.1.11` | ✅ | IP of the agent node (LAN or public) |
 
 ### SSH
 
@@ -28,7 +28,7 @@ cp .env.example .env
 | `INITIAL_USER` | `root`              | —        | User for the very first connection (before bootstrap creates `SSH_USER`) |
 | `SSH_PORT`     | `22`                | —        | SSH port (default, not in `.env.example`)                                |
 
-> `INITIAL_USER` is only used for the initial Ansible connection. After the VPS is bootstrapped, `SSH_USER` takes over.
+> `INITIAL_USER` is only used for the initial Ansible connection. After the node is bootstrapped, `SSH_USER` takes over.
 
 ### k3s
 
@@ -64,7 +64,7 @@ refreshing them only resets the clock on the same drift.
 > in this repo and there never was. Dependency automation is
 > [`.github/dependabot.yml`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/.github/dependabot.yml), added 2026-08-06, and it
 > covers GitHub Actions only — chart pins are bumped by hand and guarded by
-> `scripts/check-deployed-pins.sh` and `scripts/check-umbrella-pins.sh`.
+> `scripts/check-umbrella-pins.sh`.
 
 The one exception is `ARGOCD_VERSION`, which really is read — by
 `taskfiles/argocd.yml`, the Helm bootstrap that installs ArgoCD before ArgoCD
@@ -77,9 +77,8 @@ can manage anything itself:
 Keep it equal to the `argo-cd` dependency in
 [`charts/platform-argocd/Chart.yaml`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-argocd/Chart.yaml).
 Because ArgoCD is bootstrapped by Helm rather than by its own ApplicationSet,
-this is the one component `scripts/check-deployed-pins.sh` structurally cannot
-see — which is how the cluster reached `platform-argocd 0.9.2` against a
-published `0.18.3` (audit finding 3). When you bump one, bump both.
+nothing that watches ArgoCD-managed pins will see it drift. When you bump one,
+bump both.
 
 ### Application
 

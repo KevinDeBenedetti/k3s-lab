@@ -343,7 +343,6 @@ helm rollback platform-deployment 1 -n argocd
 
 - [Helm Umbrella Charts](https://helm.sh/docs/chart_template_guide/subcharts_and_globals/)
 - [platform-traefik](../platform-traefik/README.md) — ingress, and the proxy-version constraint
-- [platform-vault-seeder](../platform-vault-seeder/README.md) — Vault seeding jobs
 - [ArgoCD Helm Integration](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/)
 
 The subcharts without a README of their own are documented by their

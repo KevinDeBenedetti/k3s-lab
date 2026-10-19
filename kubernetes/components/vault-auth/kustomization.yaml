@@ -8,7 +8,7 @@
 #
 # Usage in app kustomization.yaml:
 #   components:
-#     - ../../../../vendor/k3s-lab/kubernetes/components/vault-auth
+#     - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/vault-auth?ref=vX.Y.Z
 #   resources:
 #     - deployment.yaml
 #

@@ -7,7 +7,7 @@ disabled, resource limits sized for a small node.
 | | |
 |---|---|
 | Subchart | `traefik` [`41.5.0`](https://traefik.github.io/charts) |
-| Deployed proxy | `docker.io/traefik:v3.7.14` (pinned via `traefik.image.tag` — subchart `appVersion` is still v3.7.13, see below) |
+| Deployed proxy | `docker.io/traefik:v3.7.15` (pinned via `traefik.image.tag` — subchart `appVersion` is still v3.7.13, see below) |
 | Per-cluster overrides | `<your-repo>/platform/traefik/values.yaml` |
 
 > The two versions in that table are copies of `Chart.lock` and of the value
@@ -51,8 +51,9 @@ it does not download dependencies.
 2. otherwise `image.tag`;
 3. otherwise the subchart's `.Chart.AppVersion` (`v3.7.13` with 41.5.0).
 
-Since 2026-10-08 we sit on step 2: `traefik.image.tag` pins `v3.7.14` because
-an advisory landed before upstream published the fix. Drop the pin when a
+Since 2026-10-08 we sit on step 2: `traefik.image.tag` pins `v3.7.15` (bumped
+from `v3.7.14` on 2026-10-19) because advisories landed before upstream
+published the fix. Drop the pin when a
 published subchart's `appVersion` catches up (step 3). The pinless
 state is also a trap in the other direction: *forgetting* `image.tag` back
 when it was load-bearing raised no error at all, it just silently downgraded
@@ -172,6 +173,9 @@ July 2026 the upstream chart lagged behind the proxy's own fixes, so
 | `GHSA-mwrr-6hp4-pxr6` (HIGH) — Ingress-NGINX provider forwards forged `Ssl-Client-*` identity headers on its HTTP route | v3.7.0 – v3.7.13 | v3.7.14 |
 | `GHSA-mhjw-hmjv-p99x` (medium) — unsynchronized write to the per-connection sticky round tripper shared by concurrent HTTP/2 streams | v3.0.0 – v3.7.13 | v3.7.14 |
 | `GHSA-cw35-4q88-3rmp` (HIGH) — connection-scoped NTLM/Kerberos sticky round tripper not keyed by service, applying one service's TLS client config to another | v3.0.0 – v3.7.13 | v3.7.14 |
+| `GHSA-ww7c-q3mv-xx22` (HIGH) — data race on the shared `bufio.Reader` after an HTTP/1 upgrade in FastProxy panics the whole process | v3.2.0 – v3.7.14 | v3.7.15 |
+| `GHSA-p8wx-ph99-xgcr` (HIGH) — ingress-nginx provider: mTLS (`auth-tls-secret`) silently disabled for a host when another Ingress on the same host has no matching annotation | v3.7.0 – v3.7.14 | v3.7.15 |
+| `GHSA-28hp-c82p-8vqj` (low) — Ingress NGINX provider: TLS-option cache hit skips the cross-namespace authorization check on CA secrets | v3.7.11 – v3.7.14 | v3.7.15 |
 
 `GHSA-8rxv-jg7p-wvg3`, which motivated the original pin, **does not concern
 us**: it targets the `kubernetesIngressNGINX` provider, which we do not enable.
@@ -231,8 +235,8 @@ published to the Helm repo (latest: 41.6.1, still `v3.7.13`), so
 > was on v3.7.9 and the daily watch reported clean every morning, while a
 > deployment ran v3.7.8 under `GHSA-3ccp` because it still pinned the previous
 > chart. Fixing the version here does **not** fix production — it has
-> to be released *and* pinned. `scripts/check-deployed-traefik.sh` is the check
-> that asks the second question.
+> to be released *and* pinned, and watching that is the job of the repository
+> that deploys the cluster.
 
 ## Looking Traefik advisories up
 
@@ -288,7 +292,6 @@ full list.
 
 - [`scripts/check-traefik-image.sh`](../../scripts/check-traefik-image.sh) — render conformance check
 - [`scripts/check-traefik-advisories.sh`](../../scripts/check-traefik-advisories.sh) — advisory watch, on the version *this repo* would deploy
-- [`scripts/check-deployed-traefik.sh`](../../scripts/check-deployed-traefik.sh) — advisory watch, on the version the *cluster is running*
-- [`lib/traefik-pin.sh`](../../lib/traefik-pin.sh) — resolves the effective proxy version for both
+- [`lib/traefik-pin.sh`](../../lib/traefik-pin.sh) — resolves the effective proxy version for both checks
 - [`platform-deployment`](../platform-deployment/README.md) — umbrella chart that embeds this one
 - [Upstream Traefik chart](https://github.com/traefik/traefik-helm-chart)

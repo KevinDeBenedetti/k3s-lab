@@ -8,7 +8,7 @@
 #
 # Usage in app kustomization.yaml:
 #   components:
-#     - ../../../../vendor/k3s-lab/kubernetes/components/network-policies
+#     - https://github.com/KevinDeBenedetti/k3s-lab//kubernetes/components/network-policies?ref=vX.Y.Z
 #
 # This is a DRY way to apply consistent network policy across all apps
 # without duplicating the same rules in each app namespace.

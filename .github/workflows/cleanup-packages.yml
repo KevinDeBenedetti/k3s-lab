@@ -8,8 +8,8 @@
 # ⚠️  Retention must stay well above the number of releases separating the
 # oldest version still pinned by a consumer (ArgoCD, umbrella chart) from the
 # latest published one. With a retention of 5, the 2026-07-21 purge deleted
-# platform-*:0.9.1, still referenced by the `platform` ApplicationSet in
-# infra/argocd — the Applications could no longer resolve their chart.
+# platform-*:0.9.1 while a consumer's ArgoCD ApplicationSet still pinned it —
+# its Applications could no longer resolve their chart.
 #
 # ─── Checking what is actually published, before any purge ───────────────────
 #
@@ -62,7 +62,6 @@ jobs:
           - charts/platform-security
           - charts/platform-traefik
           - charts/platform-vault
-          - charts/platform-vault-seeder
 
     steps:
       - name: Delete old versions of ${{ matrix.chart }}

@@ -98,10 +98,9 @@ jobs:
                 fi
               done
               helm package "$chart" -d /tmp/charts/
-              # Exact name, never a glob: "${chart_name}-*" also captures charts
-              # whose name is a prefix (platform-vault-* catches
-              # platform-vault-seeder-*.tgz), and `charts/*/` sorts the seeder
-              # first — the trailing slash makes '-' sort before '/'.
+              # Exact name, never a glob: "${chart_name}-*" also captures any
+              # chart whose name starts with this one's (platform-vault-* would
+              # catch a platform-vault-foo-*.tgz packaged earlier in the loop).
               pkg="/tmp/charts/${chart_name}-${version}.tgz"
               helm push "$pkg" "oci://${registry_path}"
               published="${published}${chart_name}:${version} "

@@ -136,7 +136,7 @@ Installs the `external-secrets/external-secrets` Helm chart into the `external-s
 ## Step 5 — Apply ClusterSecretStore + ExternalSecrets
 
 ```bash
-# In your infra repo:
+# In your config repo:
 kubectl apply -f secrets/cluster-secret-store.yaml
 kubectl apply -f secrets/
 ```
@@ -160,6 +160,16 @@ task vault:unseal   # requires VAULT_UNSEAL_KEY_1 + VAULT_UNSEAL_KEY_2 in .env
 Or interactively:
 ```bash
 kubectl exec -it -n vault vault-0 -- env VAULT_SKIP_VERIFY=true vault operator unseal
+```
+
+## Audit log
+
+Enable it once, to **stdout** — never to a file on a volume: an unrotated file
+fills the disk, and Vault then refuses every request.
+
+```bash
+kubectl exec -it -n vault vault-0 -- env VAULT_SKIP_VERIFY=true VAULT_TOKEN=<root> \
+  vault audit enable file file_path=stdout
 ```
 
 ---

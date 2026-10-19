@@ -32,8 +32,7 @@ deliberate **0.x line**:
   the `platform-*` pins of `platform-deployment` — release-please owns them.
   The whole repository is one release-please component
   (`.github/release/release-please-config.json`) and shares one version:
-  every chart, the umbrella's pins and the `K3S_LAB_RAW` refs move together,
-  in a single release PR.
+  every chart and the umbrella's pins move together, in a single release PR.
 - **A new chart needs one entry** in `release-please-config.json`: an
   `extra-files` line for its `Chart.yaml` (`$.version`). Without it its version
   stops moving; `release-please-config.bats` and `check-umbrella-pins.sh`
@@ -55,13 +54,12 @@ fix(scripts/check-umbrella-pins.sh): handle single-segment registry paths
 
 ## Security-sensitive changes
 
-The Traefik/cert-manager/external-secrets versions the charts ship are
-security decisions with their own daily advisory watch. If you touch a wrapped
-component's version, run the corresponding check before opening the PR:
+The component versions the charts ship are security decisions. Traefik has its
+own daily advisory watch; if you touch its version, run the check before
+opening the PR:
 
 ```bash
 scripts/check-traefik-advisories.sh
-scripts/check-deployed-charts.sh --only <chart> --chart-version <candidate>
 ```
 
 For vulnerabilities, see [SECURITY.md](SECURITY.md) — never a public issue.

@@ -33,10 +33,8 @@ The action comes from `kyvernoPolicies.failureAction`, which matches the CRD
 field, and falls back to `Audit`, the chart default.
 
 `kyvernoPolicies.validationFailureAction` was a deprecated alias for it from
-2026-08-14 to 2026-08-20 — a single consumer (infra) pinned this chart and set
-the old key, until it moved to `failureAction` on 2026-08-19. For the day after
-that, a dedicated `fail` lived here rejecting the stale key by name: Helm
-otherwise ignores an unknown value key in silence, which would have quietly
+2026-08-14 to 2026-08-20. For the day after that, a dedicated `fail` lived
+here rejecting the stale key by name: Helm otherwise ignores an unknown value key in silence, which would have quietly
 dropped an `Enforce` install back to `Audit` with nothing to read in the diff.
 
 That dedicated `fail` is gone as of 2026-09-07: `values.schema.json` now sets
