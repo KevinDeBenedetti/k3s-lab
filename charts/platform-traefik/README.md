@@ -6,8 +6,8 @@ disabled, resource limits sized for a small node.
 
 | | |
 |---|---|
-| Subchart | `traefik` [`41.5.0`](https://traefik.github.io/charts) |
-| Deployed proxy | `docker.io/traefik:v3.7.15` (pinned via `traefik.image.tag` — subchart `appVersion` is still v3.7.13, see below) |
+| Subchart | `traefik` [`42.1.3`](https://traefik.github.io/charts) |
+| Deployed proxy | `docker.io/traefik:v3.7.16` (subchart `appVersion`, no pin — see below) |
 | Per-cluster overrides | `<your-repo>/platform/traefik/values.yaml` |
 
 > The two versions in that table are copies of `Chart.lock` and of the value
@@ -30,11 +30,11 @@ The upstream Traefik chart declares, **in its `Chart.yaml` annotations**, the
 range of proxy versions it knows how to configure:
 
 ```yaml
-# charts/traefik/Chart.yaml (subchart 41.5.0)
+# charts/traefik/Chart.yaml (subchart 42.1.3)
 annotations:
   traefik.io/proxy-min-version: v3.6.0
-  traefik.io/proxy-max-version: v3.7.13
-appVersion: v3.7.13
+  traefik.io/proxy-max-version: v3.7.16
+appVersion: v3.7.16
 ```
 
 `templates/requirements.yaml` compares the proxy version against that range on
@@ -49,12 +49,11 @@ it does not download dependencies.
 
 1. `versionOverride` if set — **it short-circuits everything else**;
 2. otherwise `image.tag`;
-3. otherwise the subchart's `.Chart.AppVersion` (`v3.7.13` with 41.5.0).
+3. otherwise the subchart's `.Chart.AppVersion` (`v3.7.16` with 42.1.3).
 
-Since 2026-10-08 we sit on step 2: `traefik.image.tag` pins `v3.7.15` (bumped
-from `v3.7.14` on 2026-10-19) because advisories landed before upstream
-published the fix. Drop the pin when a
-published subchart's `appVersion` catches up (step 3). The pinless
+Since 2026-10-23 we sit on step 3 again: subchart 42.1.3 ships `v3.7.16`, so
+the `traefik.image.tag` pin carried since 2026-10-08 was dropped. Re-add it
+(step 2) only when an advisory lands before upstream publishes the fix. The pinless
 state is also a trap in the other direction: *forgetting* `image.tag` back
 when it was load-bearing raised no error at all, it just silently downgraded
 the proxy. `lib/traefik-pin.sh` mirrors steps 2 and 3 so that both checks
@@ -64,7 +63,7 @@ always speak about the version really shipped, whether or not a pin exists.
 |---|---|---|
 | Version deployed | the pin | subchart appVersion |
 | What the checks compare against | the pin | subchart appVersion |
-| When it applies | an advisory is ahead of upstream (**today**) | upstream is current |
+| When it applies | an advisory is ahead of upstream | upstream is current (**today**) |
 
 ### What fails, and what only warns
 
@@ -176,6 +175,7 @@ July 2026 the upstream chart lagged behind the proxy's own fixes, so
 | `GHSA-ww7c-q3mv-xx22` (HIGH) — data race on the shared `bufio.Reader` after an HTTP/1 upgrade in FastProxy panics the whole process | v3.2.0 – v3.7.14 | v3.7.15 |
 | `GHSA-p8wx-ph99-xgcr` (HIGH) — ingress-nginx provider: mTLS (`auth-tls-secret`) silently disabled for a host when another Ingress on the same host has no matching annotation | v3.7.0 – v3.7.14 | v3.7.15 |
 | `GHSA-28hp-c82p-8vqj` (low) — Ingress NGINX provider: TLS-option cache hit skips the cross-namespace authorization check on CA secrets | v3.7.11 – v3.7.14 | v3.7.15 |
+| `GHSA-hrpp-p4fc-wwf8` (HIGH) — ForwardAuth shares the auth-server connection pool, leaking NTLM/Negotiate-bound identity across clients | v3.0.0 – v3.7.15 | v3.7.16 |
 
 `GHSA-8rxv-jg7p-wvg3`, which motivated the original pin, **does not concern
 us**: it targets the `kubernetesIngressNGINX` provider, which we do not enable.
@@ -208,7 +208,16 @@ medium — mostly the NTLM/Negotiate backend pool and the Ingress-NGINX
 provider) were published on 2026-10-07 against `v3.7.13`, all patched in
 `v3.7.14`. Chart 41.7.0 ships that appVersion upstream but was not yet
 published to the Helm repo (latest: 41.6.1, still `v3.7.13`), so
-`traefik.image.tag: v3.7.14` was set rather than waiting.
+`traefik.image.tag: v3.7.14` was set rather than waiting. It was bumped to
+`v3.7.15` on 2026-10-19 (three advisories published 2026-10-16), the
+published subcharts (41.7.1, 42.0.0) still shipping `v3.7.14`.
+
+It was dropped on 2026-10-23: `GHSA-hrpp-p4fc-wwf8` (HIGH, published
+2026-10-21) covers up to `v3.7.15` and is patched in `v3.7.16`, which chart
+**42.1.1** onwards already ships. The subchart was bumped straight to
+**42.1.3** rather than chasing the pin. The 42.0.0 major requires Kubernetes
+>= 1.30 (`k3s_version` defaults to v1.32); its other breaking changes only
+concern Traefik Hub, which we do not enable.
 
 > [!WARNING]
 > Dropping the pin removed a redundancy, **not** the risk. The version still

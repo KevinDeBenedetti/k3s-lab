@@ -21,11 +21,15 @@ traefik:
   # PIN BUMPED 2026-10-19 — v3.7.14 -> v3.7.15: 3 advisories (2 high, 1 low)
   # published 2026-10-16 against v3.7.14, all patched in v3.7.15
   # (GHSA-ww7c-q3mv-xx22, GHSA-p8wx-ph99-xgcr, GHSA-28hp-c82p-8vqj). Latest
-  # published subcharts (41.7.1, 42.0.0) still ship v3.7.14. DROP this pin at
-  # the first published subchart whose appVersion is >= v3.7.15.
-  # Never `versionOverride`, see README.md.
-  image:
-    tag: v3.7.15
+  # published subcharts (41.7.1, 42.0.0) still ship v3.7.14.
+  #
+  # PIN DROPPED 2026-10-23 — subchart bumped 41.5.0 -> 42.1.3, which ships
+  # appVersion v3.7.16: GHSA-hrpp-p4fc-wwf8 (high, published 2026-10-21,
+  # ForwardAuth auth-server connection pool leaking NTLM/Negotiate identity)
+  # covers <= v3.7.15 and is patched in v3.7.16. 42.x requires Kubernetes
+  # >= 1.30 (k3s_version defaults to v1.32); its other breaking changes only
+  # touch Traefik Hub. If a pin has to come back, set `image.tag` here —
+  # never `versionOverride`, see README.md.
 
   ingressRoute:
     dashboard:
