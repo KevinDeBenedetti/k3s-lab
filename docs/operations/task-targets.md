@@ -142,6 +142,6 @@ task status:all
 ## Using the taskfiles from another repo
 
 The taskfiles are includable fragments: a config repo of your own can include
-them from a pinned checkout of this repository (`includes: <ns>: taskfile:
-<path>/taskfiles/<ns>.yml`). For the homelab path without Task, see
-[Running a homelab](../homelab.md).
+them from a pinned checkout of this repository
+(`includes: <ns>: taskfile: <path>/taskfiles/<ns>.yml`). For the homelab path
+without Task, see [Running a homelab](../homelab.md).
