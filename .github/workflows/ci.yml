@@ -57,7 +57,7 @@ jobs:
 
   # ─── Shell linting ─────────────────────────────────────────────────────────
   shell-ci:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@fece8ead969e822fc15920a07b9db46c01f4673b # v0.25.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@705c48dec1b83bb519e9dc602b8f61a771c4d92c # v0.27.0
     with:
       run-shellcheck: true
       shellcheck-severity: warning
@@ -71,7 +71,7 @@ jobs:
 
   # ─── Kubernetes validation + .env.example check ──────────────────────────
   kubernetes:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-kubernetes.yml@fece8ead969e822fc15920a07b9db46c01f4673b # v0.25.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-kubernetes.yml@705c48dec1b83bb519e9dc602b8f61a771c4d92c # v0.27.0
     with:
       run-kubeconform: true
       kubeconform-paths: kubernetes/
@@ -86,7 +86,7 @@ jobs:
 
   # ─── Secret scanning ──────────────────────────────────────────────────────
   security:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/security.yml@fece8ead969e822fc15920a07b9db46c01f4673b # v0.25.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/security.yml@705c48dec1b83bb519e9dc602b8f61a771c4d92c # v0.27.0
     permissions:
       security-events: write
       actions: read
@@ -101,7 +101,7 @@ jobs:
 
   # ─── Helm chart linting ─────────────────────────────────────────────────────
   helm-lint:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-helm.yml@fece8ead969e822fc15920a07b9db46c01f4673b # v0.25.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-helm.yml@705c48dec1b83bb519e9dc602b8f61a771c4d92c # v0.27.0
     with:
       run-lint: true
       # `helm lint` alone does not download dependencies, so the subchart guards
