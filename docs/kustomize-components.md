@@ -322,6 +322,6 @@ No need to edit 8 individual apps! 🎉
 
 ## See Also
 
-- [Kustomize Components Documentation](https://kubernetes-sigs.github.io/kustomize/guides/components/)
+- [Kustomize Components Documentation](https://kubectl.docs.kubernetes.io/guides/config_management/components/)
 - [`kubernetes/components/`](https://github.com/KevinDeBenedetti/k3s-lab/tree/main/kubernetes/components)
 - [DRY Principle in Kubernetes](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)
