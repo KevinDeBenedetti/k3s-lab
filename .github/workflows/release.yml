@@ -19,7 +19,6 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    with:
-      app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
-    secrets:
-      APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+    # No token secret: release-please runs on GITHUB_TOKEN (needs "Allow GitHub
+    # Actions to create and approve pull requests"; CI on the release PR waits
+    # for "Approve workflows to run").
