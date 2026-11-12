@@ -28,8 +28,14 @@ traefik:
   # ForwardAuth auth-server connection pool leaking NTLM/Negotiate identity)
   # covers <= v3.7.15 and is patched in v3.7.16. 42.x requires Kubernetes
   # >= 1.30 (pin k3s_version to v1.30 or later); its other breaking changes only
-  # touch Traefik Hub. If a pin has to come back, set `image.tag` here —
-  # never `versionOverride`, see README.md.
+  # touch Traefik Hub.
+  #
+  # SUBCHART BUMPED 2026-11-12 — 42.1.3 -> 42.4.0, which ships appVersion
+  # v3.7.18: 6 advisories (5 high, 1 medium) against v3.7.16, patched in
+  # v3.7.17/v3.7.18 (GHSA-xv5x-242w-7hf7, GHSA-p956-6gvv-mxqp,
+  # GHSA-x5pf-cqh3-2gv8, GHSA-ccgh-9g52-6vwg, GHSA-cp28-5662-543f,
+  # GHSA-rr42-h8r2-f28g). Still no pin. If one has to come back, set
+  # `image.tag` here — never `versionOverride`, see README.md.
 
   ingressRoute:
     dashboard:
@@ -74,6 +80,10 @@ traefik:
     kubernetesIngress:
       enabled: true
 
-  # Service type — LoadBalancer for bare metal (k3s klipper-lb or metallb)
+  # Service type — LoadBalancer for bare metal (k3s klipper-lb or metallb).
+  # Under `spec:` — a top-level `service.type` was never read by the chart (it
+  # only matched the upstream default by luck), and chart 42.4.0's schema
+  # rejects it.
   service:
-    type: LoadBalancer
+    spec:
+      type: LoadBalancer
