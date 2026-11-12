@@ -44,6 +44,10 @@ updates:
     # omitting the key) also disables the defaults (`dependencies`,
     # `github_actions`), which are just as absent.
     labels: []
+    # github-workflows bumps come with each of its releases, as a pull request
+    # its propagate-release job opens: Dependabot would only duplicate them.
+    ignore:
+      - dependency-name: "KevinDeBenedetti/github-workflows*"
     groups:
       # One PR for the whole set rather than five. These move together in
       # practice, and a single PR is one CI run and one review instead of five.
