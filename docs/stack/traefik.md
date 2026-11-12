@@ -20,16 +20,24 @@ k3s ships with Traefik by default, but this repo **disables the built-in Traefik
 
 ## Helm install
 
+Traefik is installed from the `platform-traefik` wrapper chart, which pins the
+upstream `traefik` subchart (and so the proxy version) in its `Chart.yaml`:
+
 ```bash
-helm upgrade --install traefik traefik/traefik \
-  --version "${TRAEFIK_CHART_VERSION}" \
+helm upgrade --install traefik oci://ghcr.io/kevindebenedetti/charts/platform-traefik \
+  --version <k3s-lab release, e.g. 0.24.1> \
   --namespace ingress \
   --create-namespace \
-  --values charts/platform-base/values.yaml \
-  --set service.externalIPs="{${SERVER_IP}}"
+  --set 'traefik.service.spec.externalIPs={<server public IP>}'
 ```
 
-> The `--set service.externalIPs` flag pins the LoadBalancer service to the server node's public IP. This is skipped automatically for local testing (`127.*` addresses).
+> `traefik.service.spec.externalIPs` pins the LoadBalancer Service to the server
+> node's public IP. The Service settings live under `service.spec`: since
+> subchart 42.4.0 the chart's values schema rejects keys placed directly under
+> `service` (`service.type`, `service.externalIPs`), which older versions
+> silently ignored. The subchart version, the deployed proxy version and the
+> advisory history are in the
+> [chart README](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-traefik/README.md).
 
 ---
 
