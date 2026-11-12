@@ -1,13 +1,25 @@
 ---
-- name: Validate the k3s version pin
+# First, before anything reads the node. `fullmatch`, not `match`: `$` lets a
+# trailing newline through. A MALFORMED pin is the dangerous case: an empty
+# k3s_version becomes INSTALL_K3S_VERSION="", which get.k3s.io resolves to the
+# current `stable` release — an unpinned up- or downgrade. An empty checksum
+# would download get.k3s.io and run it as root with no integrity check.
+# Same task in k3s_agent.
+- name: Validate the k3s version pin and the installer checksum
   ansible.builtin.assert:
     that:
       - k3s_version is defined
-      - k3s_version is match('^v[0-9]+\\.[0-9]+\\.[0-9]+\\+k3s[0-9]+$')
+      - k3s_version is regex('v[0-9]+[.][0-9]+[.][0-9]+[+]k3s[0-9]+', match_type='fullmatch')
+      - k3s_installer_checksum is defined
+      - k3s_installer_checksum is regex('sha256:[0-9a-f]{64}', match_type='fullmatch')
     fail_msg: >-
       k3s_version must be set in your inventory (group_vars/all.yml) to an exact
-      k3s release such as "v1.32.13+k3s1". The roles ship no default, so a run
-      can never silently downgrade a node.
+      k3s release, vX.Y.Z+k3sN such as "v1.32.13+k3s1" — the roles ship no
+      default, so a run can never silently downgrade a node. Got
+      {{ (k3s_version | to_json) if k3s_version is defined else 'nothing (undefined)' }}.
+      k3s_installer_checksum must be sha256:<64 hex>, the digest of the
+      get.k3s.io script run as root. Got
+      {{ (k3s_installer_checksum | to_json) if k3s_installer_checksum is defined else 'nothing (undefined)' }}.
     quiet: true
 
 - name: Check if k3s is already installed
@@ -15,65 +27,167 @@
     path: /usr/local/bin/k3s
   register: k3s_binary
 
+# check_mode: false — read-only, and without it a --check run sees no version,
+# concludes the installer must run and reports a reinstall that would not happen.
 - name: Get installed k3s version
   ansible.builtin.command: k3s --version
   register: k3s_installed_version
   changed_when: false
+  check_mode: false
   failed_when: k3s_installed_version.rc not in [0, 1, 2, 127]
   when: k3s_binary.stat.exists
 
-- name: Download k3s installer
-  ansible.builtin.get_url:
-    url: https://get.k3s.io
-    dest: /tmp/k3s-install.sh
-    mode: "0700"
-    checksum: "{{ k3s_installer_checksum if k3s_installer_checksum else omit }}"
-  when: >
-    not k3s_binary.stat.exists or
-    k3s_version not in (k3s_installed_version.stdout | default(''))
-
-# Invoked through `bash <script>` rather than executed directly: CIS-hardened
-# hosts mount /tmp with `noexec`, which makes the 0700 bit useless and fails the
-# install with "Permission denied". The interpreter reads the file, it does not
-# exec it, so noexec no longer applies.
-- name: Install k3s server
-  ansible.builtin.command:
-    cmd: bash /tmp/k3s-install.sh
-  environment:
-    INSTALL_K3S_VERSION: "{{ k3s_version }}"
-    INSTALL_K3S_EXEC: >-
+# The exact arguments the installer receives (INSTALL_K3S_EXEC), and therefore
+# what the unit must run. Composed once, so the drift check and the installer
+# can never disagree on it.
+- name: Compose the k3s server arguments
+  ansible.builtin.set_fact:
+    k3s_server_install_exec: >-
       server
       --node-ip {{ k3s_node_ip }}
+      {% if k3s_advertise_address | length > 0 %}--advertise-address {{ k3s_advertise_address }} {% endif %}
+      {% if k3s_node_external_ip | length > 0 %}--node-external-ip {{ k3s_node_external_ip }} {% endif %}
+      {% if k3s_flannel_iface | length > 0 %}--flannel-iface {{ k3s_flannel_iface }} {% endif %}
       --cluster-cidr {{ k3s_pod_cidr }}
       --service-cidr {{ k3s_service_cidr }}
       --cluster-dns {{ k3s_cluster_dns }}
       --flannel-backend {{ k3s_flannel_backend }}
       {% for component in k3s_disable %}--disable {{ component }} {% endfor %}
+      {% for label in k3s_node_labels %}--node-label {{ label }} {% endfor %}
+      {% for taint in k3s_node_taints %}--node-taint {{ taint }} {% endfor %}
+      {% if k3s_audit_policy_enabled | bool %}--kube-apiserver-arg=audit-policy-file={{ k3s_audit_policy_path }} {% endif %}
       {{ k3s_extra_server_args }}
-  when: >
-    not k3s_binary.stat.exists or
-    k3s_version not in (k3s_installed_version.stdout | default(''))
-  changed_when: true
-  notify: Restart k3s
 
-- name: Wait for k3s to be ready
-  ansible.builtin.command: k3s kubectl get nodes
-  register: k3s_nodes
-  retries: 30
-  delay: 5
-  until: k3s_nodes.rc == 0
+# The installer used to run only when the k3s VERSION changed, so a change to
+# any argument above never reached an installed node — silently. This compares
+# the unit's ExecStart with them (order-insensitive: reordering flags restarts
+# nothing). See files/k3s-exec-drift.sh and tests/bats/k3s-exec-drift.bats.
+- name: Compare the k3s unit with the wanted arguments
+  ansible.builtin.script: k3s-exec-drift.sh /etc/systemd/system/k3s.service
+  environment:
+    K3S_DESIRED_EXEC: "{{ k3s_server_install_exec }}"
+  register: k3s_server_exec_drift
   changed_when: false
+  check_mode: false
 
-- name: Read node token
-  ansible.builtin.slurp:
-    src: /var/lib/rancher/k3s/server/node-token
-  register: k3s_node_token_raw
-  no_log: true
-
-- name: Set node token fact
+- name: Decide whether the installer must run
   ansible.builtin.set_fact:
-    k3s_node_token: "{{ k3s_node_token_raw.content | b64decode | trim }}"
-  no_log: true
+    k3s_server_install_needed: >-
+      {{ not k3s_binary.stat.exists
+         or k3s_version not in (k3s_installed_version.stdout | default(''))
+         or (k3s_server_exec_drift.stdout_lines | first) != 'in-sync' }}
+
+- name: Show how the running k3s differs from the wanted arguments
+  ansible.builtin.debug:
+    msg: "{{ k3s_server_exec_drift.stdout_lines }}"
+  when: (k3s_server_exec_drift.stdout_lines | first) == 'drift'
+
+# Everything k3s reads only at start-up is written BEFORE the installer, so a
+# first install already boots with it, and a later change goes through the one
+# conditional restart further down — never a handler, which would restart k3s a
+# second time at the end of the play after the installer already did.
+
+- name: Deploy the API server audit policy
+  when: k3s_audit_policy_enabled | bool
+  block:
+    - name: Create the audit policy directory
+      ansible.builtin.file:
+        path: "{{ k3s_audit_policy_path | dirname }}"
+        state: directory
+        mode: "0700"
+
+    # The API server refuses to start when --audit-policy-file is missing.
+    - name: Copy the audit policy
+      ansible.builtin.copy:
+        src: "{{ k3s_audit_policy_src }}"
+        dest: "{{ k3s_audit_policy_path }}"
+        mode: "0600"
+      register: k3s_audit_policy
+
+- name: Create the kubelet configuration drop-in directory
+  ansible.builtin.file:
+    path: "{{ k3s_kubelet_config_dir }}"
+    state: directory
+    mode: "0700"
+  when: k3s_kubelet_config | length > 0
+  tags: [kubelet-config]
+
+- name: Deploy the kubelet configuration drop-in
+  ansible.builtin.template:
+    src: kubelet-dropin.conf.j2
+    dest: "{{ k3s_kubelet_config_dir }}/50-k3s-lab.conf"
+    mode: "0600"
+  register: k3s_kubelet_dropin
+  when: k3s_kubelet_config | length > 0
+  tags: [kubelet-config]
+
+- name: Remove the kubelet configuration drop-in when none is wanted
+  ansible.builtin.file:
+    path: "{{ k3s_kubelet_config_dir }}/50-k3s-lab.conf"
+    state: absent
+  register: k3s_kubelet_dropin_removed
+  when: k3s_kubelet_config | length == 0
+  tags: [kubelet-config]
+
+# The kubelet raises logind's InhibitDelayMaxSec itself, in
+# logind.conf.d/99-kubelet.conf, but Debian's unattended-upgrades (installed by
+# the common role) ships unattended-upgrades-logind-maxdelay.conf at 30s, and
+# logind applies drop-ins in file-name order: "u…" sorts after "99-…", so the
+# 30s wins and the kubelet gives up its shutdown manager — no graceful shutdown,
+# and nothing says so. This file sorts after both.
+- name: Raise logind's inhibit delay to the kubelet's shutdown grace period
+  when: k3s_kubelet_config.shutdownGracePeriod is defined
+  tags: [kubelet-config]
+  block:
+    - name: Create the logind drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/logind.conf.d
+        state: directory
+        mode: "0755"
+
+    - name: Write the logind inhibit delay
+      ansible.builtin.copy:
+        dest: /etc/systemd/logind.conf.d/zz-k3s-kubelet-shutdown.conf
+        content: |
+          # Managed by Ansible (k3s_server / k3s_agent roles) from
+          # k3s_kubelet_config.shutdownGracePeriod. Named to sort after every
+          # other drop-in, the 30s of unattended-upgrades included.
+          [Login]
+          InhibitDelayMaxSec={{ k3s_kubelet_config.shutdownGracePeriod }}
+        mode: "0644"
+      register: k3s_logind_dropin
+
+    - name: Make logind read the new inhibit delay  # noqa: no-handler — must run before the k3s restart below
+      ansible.builtin.command: systemctl kill --signal=SIGHUP systemd-logind
+      when: k3s_logind_dropin is changed
+      changed_when: true
+
+# The installer writes k3s.service and leaves drop-ins alone, so this survives
+# every reinstall. Same block in k3s_agent.
+- name: Make k3s wait for the units its node IP depends on
+  when: k3s_unit_after | length > 0
+  block:
+    - name: Create the k3s unit drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/k3s.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Order k3s after those units
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/k3s.service.d/10-after.conf
+        content: |
+          # Managed by Ansible (k3s_server role, k3s_unit_after).
+          [Unit]
+          After={{ k3s_unit_after | join(' ') }}
+          Wants={{ k3s_unit_after | join(' ') }}
+        mode: "0644"
+      register: k3s_server_unit_dropin
+
+    - name: Reload the systemd units  # noqa: no-handler — must count before the installer or the restart below
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      when: k3s_server_unit_dropin is changed
 
 - name: Ensure k3s config.yaml.d directory exists
   ansible.builtin.file:
@@ -94,8 +208,90 @@
       {% endfor %}
     mode: "0600"
   when: k3s_tls_sans | length > 0
-  notify: Restart k3s
+  register: k3s_tls_san_dropin
   tags: [api-access]
+
+- name: Download k3s installer
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: "0700"
+    # Never `omit`: an empty digest is refused by the first task of this role.
+    checksum: "{{ k3s_installer_checksum }}"
+  when: k3s_server_install_needed | bool
+
+# Invoked through `bash <script>` rather than executed directly: CIS-hardened
+# hosts mount /tmp with `noexec`, which makes the 0700 bit useless and fails the
+# install with "Permission denied". The interpreter reads the file, it does not
+# exec it, so noexec no longer applies. Re-run at the SAME version on drift.
+#
+# No `notify: Restart k3s`: the installer restarts k3s itself whenever the
+# binary, unit or env file changed, and it only runs here because one of them
+# does. A handler restarted it a second time at the end of the play, which is
+# enough to kill controllers still starting up after the first restart.
+- name: Install k3s server
+  ansible.builtin.command:
+    cmd: bash /tmp/k3s-install.sh
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+    INSTALL_K3S_EXEC: "{{ k3s_server_install_exec }}"
+  when: k3s_server_install_needed | bool
+  changed_when: true
+
+# The API server reads the audit policy and the SAN list, the kubelet its
+# drop-in, only at start-up. When the installer ran, k3s was restarted already;
+# otherwise a changed file needs a restart — one, however many changed. The
+# `default({})` lets `--tags kubelet-config` / `--tags api-access` run this
+# without the tasks that registered the others.
+- name: Restart k3s to load a changed start-up file  # noqa: no-handler — only when the installer did not restart it
+  ansible.builtin.systemd_service:
+    name: k3s
+    state: restarted
+    daemon_reload: true
+  when:
+    - >-
+      (k3s_audit_policy | default({}) is changed)
+      or (k3s_kubelet_dropin | default({}) is changed)
+      or (k3s_kubelet_dropin_removed | default({}) is changed)
+      or (k3s_logind_dropin | default({}) is changed)
+      or (k3s_tls_san_dropin | default({}) is changed)
+    - not (k3s_server_install_needed | default(false) | bool)
+  tags: [kubelet-config, api-access]
+
+- name: Wait for k3s to be ready
+  ansible.builtin.command: k3s kubectl get nodes
+  register: k3s_nodes
+  retries: 30
+  delay: 5
+  until: k3s_nodes.rc == 0
+  changed_when: false
+  tags: [kubelet-config, api-access]
+
+# The proof that graceful shutdown is armed: the kubelet's delay lock, taken by
+# its shutdown manager a few seconds after start-up. Without it the next reboot
+# kills the pods, and only this task would say so.
+- name: Check that the kubelet holds its shutdown inhibitor lock
+  ansible.builtin.command: systemd-inhibit --list --no-legend --no-pager
+  register: k3s_inhibitors
+  retries: 12
+  delay: 5
+  until: "'kubelet' in k3s_inhibitors.stdout"
+  changed_when: false
+  when:
+    - k3s_kubelet_config.shutdownGracePeriod is defined
+    - not ansible_check_mode
+  tags: [kubelet-config]
+
+- name: Read node token
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: k3s_node_token_raw
+  no_log: true
+
+- name: Set node token fact
+  ansible.builtin.set_fact:
+    k3s_node_token: "{{ k3s_node_token_raw.content | b64decode | trim }}"
+  no_log: true
 
 - name: Open firewall ports for agents
   community.general.ufw:
@@ -161,3 +357,27 @@
 - name: Configure k3s-db-backup timer
   ansible.builtin.import_tasks: db-backup.yml
   tags: [k3s-db-backup]
+
+# CIS 1.1.20: k3s creates the PKI certificates in server/tls with mode 0644;
+# the benchmark wants 0600 or tighter. The private keys are already 0600 (1.1.21).
+# Nothing reads them as a non-root user: k3s runs as root, and so does the
+# db-backup timer.
+- name: Restrict the k3s server PKI certificates to their owner (CIS 1.1.20)
+  when: k3s_restrict_pki_certs | bool
+  tags: [cis]
+  block:
+    - name: Find the PKI certificates of the k3s server
+      ansible.builtin.find:
+        paths: /var/lib/rancher/k3s/server/tls
+        patterns: "*.crt"
+        file_type: file
+        recurse: false
+      register: k3s_server_pki_certs
+
+    - name: Set the PKI certificates to 0600
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        mode: "0600"
+      loop: "{{ k3s_server_pki_certs.files }}"
+      loop_control:
+        label: "{{ item.path }}"

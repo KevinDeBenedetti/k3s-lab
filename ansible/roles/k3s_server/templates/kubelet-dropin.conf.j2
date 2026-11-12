@@ -1,0 +1,6 @@
+# Managed by Ansible (k3s_server / k3s_agent roles) from k3s_kubelet_config.
+# k3s merges this file after its own 00-k3s-defaults.conf; the kubelet reads it
+# at start-up only (the roles restart k3s when it changes).
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+{{ k3s_kubelet_config | to_nice_yaml(indent=2) | trim }}

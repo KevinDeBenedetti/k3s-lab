@@ -17,7 +17,7 @@ ArgoCD — the tasks below cover provisioning, secrets, and day-2 operations.
 
 | Target                     | Required                   | Description                                                  |
 | -------------------------- | -------------------------- | ------------------------------------------------------------ |
-| `task provision:inventory` | Terraform outputs / hosts  | Generate the Ansible inventory                               |
+| `task provision:inventory` | Terraform outputs          | Optional: generate the inventory (contract in `generate-inventory.sh`) |
 | `task provision:server`    | inventory                  | Provision the server node (common + k3s server)              |
 | `task provision:agents`    | inventory + running server | Join agent nodes to the cluster                              |
 | `task provision:site`      | inventory                  | Full provisioning: common + k3s server + agents + kubeconfig |

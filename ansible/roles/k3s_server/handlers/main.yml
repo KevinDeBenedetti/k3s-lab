@@ -1,9 +1,7 @@
 ---
-- name: Restart k3s
-  ansible.builtin.systemd:
-    name: k3s
-    state: restarted
-    daemon_reload: true
+# No `Restart k3s` handler on purpose: tasks/main.yml restarts k3s at most once,
+# in place, and only when the installer did not already do it. A handler ran at
+# the end of the play, after the installer's own restart — a second stop.
 
 # Role-qualified on 2026-08-18. `Reload UFW` was defined under that exact name by
 # k3s_server, k3s_agent AND wireguard, and k3s_server + wireguard are applied in

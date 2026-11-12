@@ -5,54 +5,66 @@
 # Usage (standalone):  task argocd:status
 # Usage (included):    includes: argocd: taskfile: <path-to-k3s-lab>/taskfiles/argocd.yml
 #
-# Required env (from .env or cluster.env):
-#   KUBECONFIG_CONTEXT
+# Required env (from .env):
+#   KUBECONFIG_CONTEXT   kubectl context of the target cluster
 #   ARGOCD_DOMAIN        e.g. argocd.example.com
-#   SERVER_IP            for deploy post-install hint
+# Optional env:
+#   SERVER_IP            only used in the post-install DNS hint
 #
 # Vars (override via includes vars:):
-#   ARGOCD_VERSION            default: 9.5.17
-#   ARGOCD_VALUES_FILE        default: platform/argocd/values.yaml
+#   ARGOCD_VALUES_FILE   your per-cluster values, layered on the chart's
+#                        defaults; path relative to the directory task runs
+#                        from. Default: none
+#
+# The chart installed is this checkout's charts/platform-argocd, so the
+# argo-cd version is the one pinned in its Chart.yaml (bumped with the rest of
+# the repository), never a separate variable that can drift from it.
 # =============================================================================
 version: '3'
 
 vars:
-  ARGOCD_VERSION: '{{.ARGOCD_VERSION | default "9.5.17"}}'
-  ARGOCD_VALUES_FILE: '{{.ARGOCD_VALUES_FILE | default "platform/argocd/values.yaml"}}'
+  ARGOCD_CHART_DIR: '{{.TASKFILE_DIR}}/../charts/platform-argocd'
+  ARGOCD_VALUES_FILE: '{{.ARGOCD_VALUES_FILE | default ""}}'
   ARGOCD_REPO_SECRET_NAME: '{{.ARGOCD_REPO_SECRET_NAME | default "argocd-repo"}}'
 
 tasks:
   deploy:
-    desc: Deploy ArgoCD via Helm (run once after bootstrap)
+    desc: Deploy ArgoCD (charts/platform-argocd) via Helm — run once after bootstrap
     preconditions:
+      - sh: test -n "$KUBECONFIG_CONTEXT"
+        msg: "KUBECONFIG_CONTEXT is not set — add it to .env"
       - sh: test -n "$ARGOCD_DOMAIN"
         msg: "ARGOCD_DOMAIN is not set — add it to .env"
-      - sh: test -f "{{.ARGOCD_VALUES_FILE}}"
-        msg: "{{.ARGOCD_VALUES_FILE}} not found"
+      - sh: test -z "{{.ARGOCD_VALUES_FILE}}" || test -f "{{.ARGOCD_VALUES_FILE}}"
+        msg: "ARGOCD_VALUES_FILE not found: {{.ARGOCD_VALUES_FILE}}"
     cmds:
-      - helm repo add argo https://argoproj.github.io/argo-helm --force-update
-      - helm repo update argo
+      # The chart's own dependency (upstream argo-cd) at the version pinned in
+      # its Chart.lock.
+      - helm dependency build "{{.ARGOCD_CHART_DIR}}"
+      # Release `argocd` renders the same `argocd-*` resource names as the
+      # upstream chart installed under that release name, so an install made
+      # with `argo/argo-cd` upgrades in place.
       - |
-        helm upgrade --install argocd argo/argo-cd \
-          --version "{{.ARGOCD_VERSION}}" \
+        helm upgrade --install argocd "{{.ARGOCD_CHART_DIR}}" \
+          --kube-context "$KUBECONFIG_CONTEXT" \
           --namespace argocd \
           --create-namespace \
-          --values {{.ARGOCD_VALUES_FILE}} \
-          --set "global.domain=$ARGOCD_DOMAIN" \
-          --set "configs.cm.url=https://$ARGOCD_DOMAIN" \
+          {{if .ARGOCD_VALUES_FILE}}--values "{{.ARGOCD_VALUES_FILE}}" {{end}}\
+          --set "argo-cd.global.domain=$ARGOCD_DOMAIN" \
+          --set "argo-cd.configs.cm.url=https://$ARGOCD_DOMAIN" \
           --wait \
           --timeout 300s
       - cmd: |
           echo ""
           echo "  UI:       https://$ARGOCD_DOMAIN"
           echo "  User:     admin"
-          echo "  Password: $(kubectl --context $KUBECONFIG_CONTEXT -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo '(secret already deleted)')"
+          echo "  Password: task argocd:password"
           echo ""
           echo "Next steps:"
-          echo "  1. Add DNS: $ARGOCD_DOMAIN → $SERVER_IP"
+          echo "  1. Add DNS: $ARGOCD_DOMAIN → ${SERVER_IP:-<your ingress IP>}"
           echo "  2. task argocd:add-repo ARGOCD_REPO_URL=git@github.com:<you>/<config-repo>.git GITHUB_DEPLOY_KEY=~/.ssh/deploy_key"
-          echo "  3. kubectl apply -f argocd/projects/ -f argocd/applicationsets/"
-          echo "  4. Add GitHub webhook: https://$ARGOCD_DOMAIN/api/webhook"
+          echo "  3. Apply your AppProjects and root Application (or ApplicationSets) from your config repo"
+          echo "  4. Add a GitHub webhook: https://$ARGOCD_DOMAIN/api/webhook"
         silent: true
 
   add-repo:

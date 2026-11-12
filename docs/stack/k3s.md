@@ -51,25 +51,54 @@
 
 ## Install flags explained
 
-The k3s server Ansible role (`ansible/roles/k3s_server`) installs k3s with these key flags:
+The `k3s_server` role composes the installer's arguments (`INSTALL_K3S_EXEC`)
+from its variables. With the defaults it runs:
 
 ```bash
-curl -sfL https://get.k3s.io | \
-  INSTALL_K3S_VERSION="${K3S_VERSION}" \
-  K3S_TOKEN="${K3S_NODE_TOKEN}" \
-  sh -s - server \
-    --disable=traefik \          # Managed via Helm for full control
-    --disable=servicelb \        # No built-in LB — use externalIPs instead
-    --node-ip="${NODE_IP}" \     # Internal NIC IP (Flannel overlay)
-    --advertise-address="${NODE_IP}" \
-    --tls-san="${PUBLIC_IP}" \   # Public IP added to API server certificate SAN
-    --flannel-backend=vxlan \    # Stable VXLAN overlay (UDP 8472)
-    --protect-kernel-defaults \  # Enforces sysctl requirements
-    --secrets-encryption \       # Encrypts Kubernetes Secrets at rest
-    --write-kubeconfig-mode=600  # Restrict kubeconfig permissions
+INSTALL_K3S_VERSION="<k3s_version>" bash /tmp/k3s-install.sh   # get.k3s.io, checksum-pinned
+# INSTALL_K3S_EXEC:
+server
+  --node-ip <k3s_node_ip>
+  --cluster-cidr 10.42.0.0/16 --service-cidr 10.43.0.0/16 --cluster-dns 10.43.0.10
+  --flannel-backend vxlan                    # UDP 8472
+  --disable traefik --disable servicelb      # Traefik is installed by Helm
+  --kube-apiserver-arg=audit-policy-file=…   # files/audit-policy.yaml
+  --secrets-encryption=true                  # never remove once initialised
+  --kube-apiserver-arg=audit-log-path=/var/log/k3s-audit.log …
+  --protect-kernel-defaults
 ```
 
-> **`--tls-san`** is critical — without the public IP in the TLS SAN, your local `kubectl` will get a certificate error when connecting remotely.
+Optional flags appear only when their variable is set: `--advertise-address`,
+`--node-external-ip`, `--flannel-iface`, `--node-label`, `--node-taint`.
+Extra API server certificate SANs (`k3s_tls_sans`) go in a
+`config.yaml.d` drop-in instead. See
+[Configuration → Ansible role variables](../configuration.md).
+
+### Changing an argument on an installed node
+
+The roles compare the arguments the `k3s` (or `k3s-agent`) unit runs with the
+ones they would install, ignoring order. When they differ, the playbook prints
+the difference and re-runs the installer at the same version, which rewrites
+the unit and restarts k3s once. Before this check existed, a changed argument
+only reached a node with the next version bump.
+
+> Upgrading from k3s-lab 0.24 or earlier: the first run adds
+> `--audit-policy-file` to the server, so it reinstalls k3s at the same version
+> and restarts it once. Agents with unchanged arguments are not touched.
+
+Files k3s reads only at start-up (the audit policy, the kubelet drop-in, the
+TLS SAN list) are written before the installer. When one changes and the
+installer does not run, the role restarts k3s itself, once.
+
+### Audit log
+
+`audit-log-*` flags alone record nothing: the API server logs only what a
+policy selects. The role installs a generic baseline
+(`roles/k3s_server/files/audit-policy.yaml`): health probes, leases, events and
+node heartbeats are dropped, Secrets and ConfigMaps are logged at `Metadata`
+only (never their content), and writes to RBAC and admission configuration keep
+their request body. Use your own with `k3s_audit_policy_src`, or turn it off
+with `k3s_audit_policy_enabled: false`.
 
 ---
 

@@ -1,0 +1,85 @@
+# =============================================================================
+# API server audit policy — installed by the k3s_server role to
+# k3s_audit_policy_path and passed as --audit-policy-file.
+#
+# Without a policy file the audit-log-* flags in k3s_extra_server_args write
+# NOTHING: the API server only records what a policy selects.
+#
+# Generic baseline for a small cluster, in the spirit of the upstream examples:
+#   * drop the high-volume, low-value traffic (health probes, leader-election
+#     leases, node heartbeats, events, read-only discovery);
+#   * never log the bodies of Secrets, ConfigMaps or token requests — they
+#     carry credentials — only who touched them (Metadata);
+#   * record request bodies for writes to RBAC and admission configuration;
+#   * Metadata for everything else.
+# Rules are evaluated in order; the first match wins.
+#
+# Bring your own: set k3s_audit_policy_src to a file in your repository.
+# =============================================================================
+apiVersion: audit.k8s.io/v1
+kind: Policy
+omitStages:
+  - RequestReceived
+rules:
+  # ── Noise ──────────────────────────────────────────────────────────────────
+  - level: None
+    nonResourceURLs:
+      - /healthz*
+      - /livez*
+      - /readyz*
+      - /metrics
+      - /version
+      - /openapi*
+      - /api
+      - /api/*
+      - /apis
+      - /apis/*
+  - level: None
+    resources:
+      - group: coordination.k8s.io
+        resources: ["leases"]
+  - level: None
+    resources:
+      - group: ""
+        resources: ["events"]
+      - group: events.k8s.io
+        resources: ["events"]
+  - level: None
+    userGroups: ["system:nodes"]
+    verbs: ["get", "list", "watch"]
+  - level: None
+    userGroups: ["system:nodes"]
+    resources:
+      - group: ""
+        resources: ["nodes/status", "pods/status"]
+  - level: None
+    users: ["system:kube-proxy"]
+    verbs: ["watch"]
+  - level: None
+    verbs: ["watch"]
+    userGroups: ["system:serviceaccounts", "system:authenticated"]
+    resources:
+      - group: ""
+        resources: ["endpoints", "services"]
+      - group: discovery.k8s.io
+        resources: ["endpointslices"]
+
+  # ── Credentials: who, never what ──────────────────────────────────────────
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps", "serviceaccounts/token"]
+      - group: authentication.k8s.io
+        resources: ["tokenreviews"]
+      - group: certificates.k8s.io
+        resources: ["certificatesigningrequests"]
+
+  # ── Privilege changes: keep the request body ──────────────────────────────
+  - level: Request
+    verbs: ["create", "update", "patch", "delete", "deletecollection"]
+    resources:
+      - group: rbac.authorization.k8s.io
+      - group: admissionregistration.k8s.io
+
+  # ── Everything else ────────────────────────────────────────────────────────
+  - level: Metadata

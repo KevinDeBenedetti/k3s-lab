@@ -45,16 +45,24 @@ ArgoCD is bootstrapped with Helm from this repo:
 task argocd:deploy
 ```
 
-This installs `argo/argo-cd` chart at the version pinned in `ARGOCD_VERSION`
-(default: `7.8.26`) with values from `platform/argocd/values.yaml`
-(consuming repo override) or `charts/platform-argocd/values.yaml` (k3s-lab defaults).
+This installs this checkout's `charts/platform-argocd` (a wrapper around the
+upstream `argo-cd` chart, at the version its `Chart.yaml` pins) as release
+`argocd` in namespace `argocd`, on the `KUBECONFIG_CONTEXT` cluster. Your own
+values go on top with `ARGOCD_VALUES_FILE`, a path in your config repo:
+
+```bash
+task argocd:deploy ARGOCD_VALUES_FILE=platform/argocd/values.yaml
+```
+
+An install made earlier from `argo/argo-cd` under the same release name renders
+the same `argocd-*` resource names, so it upgrades in place.
 
 ### Key configuration choices
 
 | Setting                 | Value    | Why                                                      |
 | ----------------------- | -------- | -------------------------------------------------------- |
-| `server.insecure: true` | enabled  | Traefik terminates TLS; ArgoCD runs plain HTTP behind it |
-| `dex.enabled: false`    | disabled | Single-user setup; no SSO needed                         |
+| `server.insecure: "false"` | TLS on | ArgoCD terminates TLS itself rather than trusting a proxy to have done it |
+| `dex.enabled: false`    | disabled | SSO, if wanted, goes through `configs.cm` OIDC settings  |
 | `redis` in-cluster      | enabled  | Required for app state cache                             |
 
 ---

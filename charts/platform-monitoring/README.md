@@ -38,8 +38,14 @@ a filesystem object store — not a scalable deployment, and not intended to be.
 ## Dashboards and datasources
 
 This chart owns its templates: Loki and Prometheus datasources, plus dashboards
-for Kubernetes, logs, self-monitoring, Falco, Tetragon and Trivy. They are
+for Kubernetes, logs, self-monitoring, Tetragon and Trivy. They are
 delivered through the Grafana sidecar (`grafana_dashboard` label).
+
+There is no Falco dashboard. The one shipped until 0.24 read Falcosidekick's
+metrics only, and no configuration of `platform-security` produces them:
+Falcosidekick is off by default, and Falco is not set to send it events even
+when it is on. Falco writes its alerts to its pods' stdout, so they are in Loki: the
+logs dashboard finds them (filter on the Falco pods).
 
 Every dashboard is gated. The security ones because a dashboard for a component
 you did not deploy is worse than no dashboard; the generic ones so a consumer
@@ -47,8 +53,7 @@ that ships its own dashboards can drop them:
 
 | Toggle | Default | Turn off when |
 |---|---|---|
-| `dashboards.falco.enabled` | `true` | `platform-security` runs without Falco |
-| `dashboards.tetragon.enabled` | `true` | …without Tetragon |
+| `dashboards.tetragon.enabled` | `true` | `platform-security` runs without Tetragon |
 | `dashboards.trivy.enabled` | `true` | …without Trivy Operator |
 | `dashboards.kubernetes.enabled` | `true` | you ship your own cluster overview |
 | `dashboards.logs.enabled` | `true` | you ship your own logs dashboard |

@@ -5,6 +5,11 @@ kind: ClusterPolicy
 metadata:
   name: require-non-root
   annotations:
+    # Kyverno auto-generates this policy's rules for the Pod controllers listed
+    # here. Its default list adds ReplicaSet and ReplicationController: every
+    # Deployment rollout keeps old ReplicaSets at zero replicas, whose policy
+    # reports repeat the Deployment's failure until the next rollout.
+    pod-policies.kyverno.io/autogen-controllers: DaemonSet,Deployment,StatefulSet,Job,CronJob
     policies.kyverno.io/title: Require Non-Root User
     policies.kyverno.io/category: Pod Security Standards (Restricted)
     policies.kyverno.io/severity: medium

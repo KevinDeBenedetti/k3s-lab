@@ -1,9 +1,5 @@
 ---
-- name: Restart k3s-agent
-  ansible.builtin.systemd:
-    name: k3s-agent
-    state: restarted
-    daemon_reload: true
+# No `Restart k3s-agent` handler on purpose — see the k3s_server role's handlers.
 
 # Role-qualified on 2026-08-18. `Reload UFW` was defined under that exact name by
 # k3s_server, k3s_agent AND wireguard, and k3s_server + wireguard are applied in

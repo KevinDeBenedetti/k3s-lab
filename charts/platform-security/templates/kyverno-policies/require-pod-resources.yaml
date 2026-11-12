@@ -5,13 +5,26 @@ kind: ClusterPolicy
 metadata:
   name: require-pod-resources
   annotations:
+    # Kyverno auto-generates this policy's rules for the Pod controllers listed
+    # here. Its default list adds ReplicaSet and ReplicationController: every
+    # Deployment rollout keeps old ReplicaSets at zero replicas, whose policy
+    # reports repeat the Deployment's failure until the next rollout.
+    pod-policies.kyverno.io/autogen-controllers: DaemonSet,Deployment,StatefulSet,Job,CronJob
     policies.kyverno.io/title: Require Pod Resource Limits
     policies.kyverno.io/category: Best Practices
     policies.kyverno.io/severity: medium
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
       Requiring resource limits prevents resource exhaustion and improves cluster stability.
-      This policy ensures all containers define both CPU and memory requests and limits.
+      This policy ensures all containers and init containers define CPU and
+      memory requests and a memory limit. A CPU limit is optional: a memory
+      limit protects the node (the container is killed), a CPU limit only
+      throttles, and on a small node throttling a proxy or a backup burst hurts
+      more than it protects.
+# initContainers too: an init container counts in the pod's effective request
+# (the max of the init containers vs the sum of the app containers). NOT
+# ephemeralContainers: Kubernetes forbids `resources` on them, so every
+# debug container would be refused.
 spec:
   background: true
   rules:
@@ -33,9 +46,17 @@ spec:
                 - vault
       validate:
         failureAction: {{ include "platform-security.failureAction" . }}
-        message: "All containers must have CPU and memory requests and limits defined."
+        message: "All containers must define CPU and memory requests and a memory limit (a CPU limit is optional)."
         pattern:
           spec:
+            =(initContainers):
+              - resources:
+                  requests:
+                    memory: "?*"
+                    cpu: "?*"
+                  limits:
+                    memory: "?*"
+                    =(cpu): "?*"
             containers:
               - resources:
                   requests:
@@ -43,5 +64,5 @@ spec:
                     cpu: "?*"
                   limits:
                     memory: "?*"
-                    cpu: "?*"
+                    =(cpu): "?*"
 {{- end }}

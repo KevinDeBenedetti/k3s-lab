@@ -7,7 +7,7 @@ with the pieces this platform does not use switched off.
 |---|---|
 | Subchart | `argo-cd` [`9.5.17`](https://argoproj.github.io/argo-helm) |
 | Namespace (convention) | `argocd` — set at install time; this chart neither creates nor enforces it |
-| Per-cluster overrides | `<your-repo>/platform/argocd/values.yaml` |
+| Per-cluster overrides | a values file in your config repo (`task argocd:deploy ARGOCD_VALUES_FILE=…`) |
 
 > [!IMPORTANT]
 > `argo-cd.global.domain` and `argo-cd.configs.cm.url` both default to
