@@ -6,8 +6,8 @@ disabled, resource limits sized for a small node.
 
 | | |
 |---|---|
-| Subchart | `traefik` [`42.1.3`](https://traefik.github.io/charts) |
-| Deployed proxy | `docker.io/traefik:v3.7.16` (subchart `appVersion`, no pin — see below) |
+| Subchart | `traefik` [`42.4.0`](https://traefik.github.io/charts) |
+| Deployed proxy | `docker.io/traefik:v3.7.18` (subchart `appVersion`, no pin — see below) |
 | Per-cluster overrides | `<your-repo>/platform/traefik/values.yaml` |
 
 > The two versions in that table are copies of `Chart.lock` and of the value
@@ -30,11 +30,11 @@ The upstream Traefik chart declares, **in its `Chart.yaml` annotations**, the
 range of proxy versions it knows how to configure:
 
 ```yaml
-# charts/traefik/Chart.yaml (subchart 42.1.3)
+# charts/traefik/Chart.yaml (subchart 42.4.0)
 annotations:
   traefik.io/proxy-min-version: v3.6.0
-  traefik.io/proxy-max-version: v3.7.16
-appVersion: v3.7.16
+  traefik.io/proxy-max-version: v3.7.18
+appVersion: v3.7.18
 ```
 
 `templates/requirements.yaml` compares the proxy version against that range on
@@ -49,10 +49,11 @@ it does not download dependencies.
 
 1. `versionOverride` if set — **it short-circuits everything else**;
 2. otherwise `image.tag`;
-3. otherwise the subchart's `.Chart.AppVersion` (`v3.7.16` with 42.1.3).
+3. otherwise the subchart's `.Chart.AppVersion` (`v3.7.18` with 42.4.0).
 
-Since 2026-10-23 we sit on step 3 again: subchart 42.1.3 ships `v3.7.16`, so
-the `traefik.image.tag` pin carried since 2026-10-08 was dropped. Re-add it
+Since 2026-10-23 we sit on step 3 again (subchart 42.4.0 ships `v3.7.18`
+since 2026-11-12), the `traefik.image.tag` pin carried since 2026-10-08 having
+been dropped. Re-add it
 (step 2) only when an advisory lands before upstream publishes the fix. The pinless
 state is also a trap in the other direction: *forgetting* `image.tag` back
 when it was load-bearing raised no error at all, it just silently downgraded
@@ -176,6 +177,12 @@ July 2026 the upstream chart lagged behind the proxy's own fixes, so
 | `GHSA-p8wx-ph99-xgcr` (HIGH) — ingress-nginx provider: mTLS (`auth-tls-secret`) silently disabled for a host when another Ingress on the same host has no matching annotation | v3.7.0 – v3.7.14 | v3.7.15 |
 | `GHSA-28hp-c82p-8vqj` (low) — Ingress NGINX provider: TLS-option cache hit skips the cross-namespace authorization check on CA secrets | v3.7.11 – v3.7.14 | v3.7.15 |
 | `GHSA-hrpp-p4fc-wwf8` (HIGH) — ForwardAuth shares the auth-server connection pool, leaking NTLM/Negotiate-bound identity across clients | v3.0.0 – v3.7.15 | v3.7.16 |
+| `GHSA-xv5x-242w-7hf7` (HIGH) — per-connection backend transport leak from unauthenticated Negotiate/NTLM headers | v3.7.14 – v3.7.16 | v3.7.17 |
+| `GHSA-p956-6gvv-mxqp` (HIGH) — incomplete fix for `GHSA-hrpp-p4fc-wwf8`: ForwardAuth NTLM authentication bypass via `Proxy-Authorization` | v3.0.0 – v3.7.17 | v3.7.18 |
+| `GHSA-x5pf-cqh3-2gv8` (HIGH) — unauthenticated memory-exhaustion DoS through the Compress middleware's zstd encoder state | v3.1.0 – v3.7.17 | v3.7.18 |
+| `GHSA-ccgh-9g52-6vwg` (HIGH) — ingress-nginx provider: `auth-tls-secret` verification bypass and `Ssl-Client-*` header spoofing on shared hosts | v3.7.15 – v3.7.17 | v3.7.18 |
+| `GHSA-cp28-5662-543f` (HIGH) — `sanitizePath` keeps path-parameter dot-segments (`/..;x/`), bypassing path-based authorization | v3.0.0 – v3.7.17 | v3.7.18 |
+| `GHSA-rr42-h8r2-f28g` (medium) — unbounded BasicAuth password length, CPU amplification through MD5-crypt before authentication | v3.0.0 – v3.7.17 | v3.7.18 |
 
 `GHSA-8rxv-jg7p-wvg3`, which motivated the original pin, **does not concern
 us**: it targets the `kubernetesIngressNGINX` provider, which we do not enable.
@@ -216,8 +223,15 @@ It was dropped on 2026-10-23: `GHSA-hrpp-p4fc-wwf8` (HIGH, published
 2026-10-21) covers up to `v3.7.15` and is patched in `v3.7.16`, which chart
 **42.1.1** onwards already ships. The subchart was bumped straight to
 **42.1.3** rather than chasing the pin. The 42.0.0 major requires Kubernetes
->= 1.30 (`k3s_version` defaults to v1.32); its other breaking changes only
+>= 1.30 (pin `k3s_version` to v1.30 or later); its other breaking changes only
 concern Traefik Hub, which we do not enable.
+
+On 2026-11-12 six advisories (five HIGH, one medium) were found against
+`v3.7.16`, patched in `v3.7.17` and `v3.7.18`. Chart **42.4.0**, published the
+same day, ships `v3.7.18`, so the subchart was bumped rather than pinned. Its
+stricter values schema also rejected our top-level `service.type`, a key the
+chart never read: it moved to `service.spec.type`. The render otherwise only
+gains upstream's new 5s `requestAcceptGraceTimeout` on both entry points.
 
 > [!WARNING]
 > Dropping the pin removed a redundancy, **not** the risk. The version still

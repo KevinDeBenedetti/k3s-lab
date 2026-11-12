@@ -26,7 +26,13 @@
   hosts: k3s_agents
   become: true
   vars:
-    k3s_server_url: "https://{{ hostvars[groups['k3s_servers'][0]].ansible_host }}:6443"
+    # Agents join on the server's CLUSTER address, which is not always the one
+    # Ansible reaches it on over SSH (a public IP, a bastion, a tunnel). First
+    # match wins: k3s_server_join_address, then k3s_node_ip, set on the server
+    # host in the inventory; ansible_host only as the last resort.
+    k3s_server_url: >-
+      {%- set srv = hostvars[groups['k3s_servers'][0]] -%}
+      https://{{ srv.k3s_server_join_address | default(srv.k3s_node_ip | default(srv.ansible_host)) }}:6443
     k3s_node_token: "{{ hostvars[groups['k3s_servers'][0]].k3s_node_token }}"
   roles:
     - k3s_agent

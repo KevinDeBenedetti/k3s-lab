@@ -66,19 +66,16 @@ refreshing them only resets the clock on the same drift.
 > covers GitHub Actions only — chart pins are bumped by hand and guarded by
 > `scripts/check-umbrella-pins.sh`.
 
-The one exception is `ARGOCD_VERSION`, which really is read — by
-`taskfiles/argocd.yml`, the Helm bootstrap that installs ArgoCD before ArgoCD
-can manage anything itself:
+There is no exception for ArgoCD: `task argocd:deploy` installs this
+checkout's [`charts/platform-argocd`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-argocd/Chart.yaml),
+so the `argo-cd` version it bootstraps is the one pinned there. Earlier
+versions read a separate `ARGOCD_VERSION` variable that had to be kept equal to
+that pin by hand; it is gone.
 
-| Variable         | Default  | Required | Description                                       |
-| ---------------- | -------- | -------- | ------------------------------------------------- |
-| `ARGOCD_VERSION` | `9.5.17` | —        | `argo/argo-cd` chart version used by `task argocd:install` |
-
-Keep it equal to the `argo-cd` dependency in
-[`charts/platform-argocd/Chart.yaml`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-argocd/Chart.yaml).
-Because ArgoCD is bootstrapped by Helm rather than by its own ApplicationSet,
-nothing that watches ArgoCD-managed pins will see it drift. When you bump one,
-bump both.
+| Variable             | Default | Required | Description |
+| -------------------- | ------- | -------- | ----------- |
+| `ARGOCD_DOMAIN`      | —       | ✅        | Hostname of the ArgoCD UI (`argo-cd.global.domain`, `configs.cm.url`) |
+| `ARGOCD_VALUES_FILE` | —       | —        | Task var: your values file, layered on the chart defaults |
 
 ### Application
 
@@ -116,6 +113,51 @@ A few settings are **Ansible variables, not `.env` variables**. They are read by
 the roles during provisioning, so putting them in `.env` has no effect — set them
 in `ansible/inventory/group_vars/all.yml`, or pass them at call time with
 `-e <name>=<value>`.
+
+### k3s pin and addresses
+
+| Variable                  | Default | Description |
+| ------------------------- | ------- | ----------- |
+| `k3s_version`             | *none, required* | Exact k3s release, e.g. `v1.32.13+k3s1`. Shared by server and agents. The roles fail fast when it is missing, so a stale default can never downgrade a node |
+| `k3s_node_ip`             | default IPv4 | Per host: the address k3s uses between nodes. When set on the server, agents join on it |
+| `k3s_server_join_address` | — | Set on the server host to override the address agents join on (a tunnel IP, a VIP). Wins over `k3s_node_ip`; `ansible_host` is the last resort |
+| `k3s_kubeconfig_dest`     | `./kubeconfig.yaml` | Where `site.yml` writes the kubeconfig, relative to the directory `ansible-playbook` runs from |
+| `k3s_kubeconfig_fetch`    | `true` | `false` skips writing the kubeconfig locally |
+| `k3s_advertise_address`   | — | Server only: address the API server advertises (k3s default: the node IP) |
+| `k3s_node_external_ip`    | — | Public address reported on the Node object |
+| `k3s_flannel_iface`       | — | Interface flannel binds to, e.g. `wg0` |
+| `k3s_node_labels`         | `[]` | `key=value` labels, applied when the node registers |
+| `k3s_node_taints`         | `[]` | `key=value:Effect` taints, applied when the node registers |
+| `k3s_unit_after`          | `[]` | systemd units k3s starts after, e.g. `wg-quick@wg0.service` |
+
+Changing any of these on an installed node re-runs the installer at the same
+version (see [k3s → Changing an argument](./stack/k3s.md#changing-an-argument-on-an-installed-node)).
+Labels and taints are only read when k3s registers the node: on an existing
+node, change them with `kubectl`.
+
+### Audit policy, kubelet configuration, CIS
+
+| Variable                   | Default | Description |
+| -------------------------- | ------- | ----------- |
+| `k3s_audit_policy_enabled` | `true`  | Install an API server audit policy and pass `--audit-policy-file` |
+| `k3s_audit_policy_src`     | role's `audit-policy.yaml` | Your own policy file instead of the generic baseline |
+| `k3s_audit_policy_path`    | `/var/lib/rancher/k3s/server/audit-policy.yaml` | Where it is installed on the server |
+| `k3s_kubelet_config`       | `{}`    | `KubeletConfiguration` fields written as a k3s drop-in on every node; empty = none |
+| `k3s_restrict_pki_certs`   | `true`  | `chmod 0600` the server's `tls/*.crt` (CIS 1.1.20) |
+
+Graceful node shutdown, for example:
+
+```yaml
+# group_vars/all.yml
+k3s_kubelet_config:
+  shutdownGracePeriod: 60s
+  shutdownGracePeriodCriticalPods: 20s
+```
+
+With `shutdownGracePeriod` set, the roles also raise systemd-logind's
+`InhibitDelayMaxSec` to match (Debian's unattended-upgrades caps it at 30s,
+which silently disables the kubelet's shutdown manager) and check that the
+kubelet holds its shutdown inhibitor lock.
 
 ### Firewall
 

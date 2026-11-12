@@ -114,7 +114,7 @@ whose components cannot satisfy that particular rule. `kube-system` and
 | `disallow-latest-tag` | an explicit image tag, not `:latest` | — |
 | `disallow-privilege-escalation` | `allowPrivilegeEscalation: false` | `vault` |
 | `require-non-root` | `securityContext.runAsNonRoot: true` | `argocd`, `vault`, `ingress` |
-| `require-pod-resources` | CPU and memory requests **and** limits | `argocd`, `cert-manager`, `external-secrets`, `vault` |
+| `require-pod-resources` | CPU and memory requests and a memory limit, on containers and init containers (a CPU limit is optional) | `argocd`, `cert-manager`, `external-secrets`, `vault` |
 | `restrict-capabilities` | all capabilities dropped | `argocd`, `vault`, `ingress`, `cert-manager`, `monitoring` |
 | `require-ro-rootfs` | read-only root filesystem | `argocd`, `vault`, `monitoring`, `external-secrets`, `cert-manager`, `ingress` |
 

@@ -2,8 +2,6 @@
 
 # ─── Dashboard toggles (disable dashboards for components not deployed) ───
 dashboards:
-  falco:
-    enabled: true
   tetragon:
     enabled: true
   trivy:

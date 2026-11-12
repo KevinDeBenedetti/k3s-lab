@@ -17,10 +17,15 @@ cp ansible/inventory.example.yml ansible/inventory/hosts.yml
 $EDITOR ansible/inventory/hosts.yml        # hosts, SSH user
 ```
 
-`ansible/inventory/` is gitignored: it holds your node addresses. Role defaults
-(`ansible/roles/*/defaults/main.yml`) cover the rest; override what you need in
-`ansible/inventory/group_vars/all.yml` — typically `k3s_version` and
-`k3s_ufw_allow_from` (your LAN CIDR).
+`ansible/inventory/` is gitignored: it holds your node addresses. Nodes
+created by Terraform? `task provision:inventory` writes this file from your
+Terraform outputs instead; the outputs it expects are listed at the top of
+`scripts/generate-inventory.sh`. Set
+`k3s_version` there (it is **required**: the roles ship no default, so a run can
+never downgrade a node). Role defaults (`ansible/roles/*/defaults/main.yml`)
+cover the rest; override what you need in
+`ansible/inventory/group_vars/all.yml`, typically `k3s_ufw_allow_from` (your
+LAN CIDR).
 
 ## 2 — Provision the nodes and install k3s
 
@@ -30,7 +35,30 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/site.yml
 ```
 
 `site.yml` runs `common` on every node, `k3s_server` (+ `wireguard` if enabled)
-on the server, `k3s_agent` on the agents, and turns the firewall on last.
+on the server, `k3s_agent` on the agents, and turns the firewall on last. It
+writes the kubeconfig to `./kubeconfig.yaml` in the directory you run it from.
+
+### From your own config repo
+
+Keep the inventory in your own repository and install the roles from a pinned
+release as the `kevindebenedetti.k3s_lab` collection, instead of copying them:
+
+```yaml
+# requirements.yml in your repo
+collections:
+  - name: https://github.com/KevinDeBenedetti/k3s-lab.git#/ansible/
+    type: git
+    version: vX.Y.Z
+```
+
+```bash
+ansible-galaxy collection install -r requirements.yml
+ansible-playbook -i inventory/hosts.yml kevindebenedetti.k3s_lab.site
+```
+
+The scripts and taskfiles work from a pinned checkout too. They read `.env`
+from the directory they run from (your repo), not from the checkout. Set
+`K3S_LAB_ENV_FILE` to point at another file.
 
 ## 3 — Get a kubeconfig
 

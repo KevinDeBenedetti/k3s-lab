@@ -1,7 +1,11 @@
 ---
 # k3s_server role defaults
 
-k3s_version: "v1.32.13+k3s1"
+# k3s_version has NO default on purpose: it must come from the inventory
+# (group_vars/all.yml), e.g. k3s_version: "v1.32.13+k3s1". A role default goes
+# stale silently, and a run against a node already upgraded past it would
+# DOWNGRADE k3s. The role asserts the pin is set before touching the node.
+# Server and agents must share the same value.
 
 # Integrity pin for the get.k3s.io installer script, which is downloaded and
 # then executed as root on every node. Empty = no verification at all, which is
@@ -28,8 +32,30 @@ k3s_cluster_dns: "10.43.0.10"
 k3s_flannel_backend: vxlan
 
 # Node IP used for inter-node communication (private network)
-# Override with the node's private IP from Hetzner network
+# Override per host with the node's private IP when it has one
 k3s_node_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
+
+# Optional node addressing, each passed to k3s only when non-empty (empty =
+# k3s's own default):
+#   k3s_advertise_address  address the API server advertises to the cluster
+#                          (k3s default: the node IP)
+#   k3s_node_external_ip   public address reported on the Node object
+#   k3s_flannel_iface      interface flannel binds to, e.g. wg0 when nodes talk
+#                          over a WireGuard tunnel
+k3s_advertise_address: ""
+k3s_node_external_ip: ""
+k3s_flannel_iface: ""
+
+# Labels and taints for this node, as k3s takes them: "key=value" and
+# "key=value:Effect". Applied when k3s registers the node — k3s does not
+# update them on an existing Node object, so change them with kubectl there.
+k3s_node_labels: []
+k3s_node_taints: []
+
+# systemd units k3s must start after (and wants), e.g. ["wg-quick@wg0.service"]
+# when k3s_node_ip is a tunnel address the kubelet refuses until it exists.
+# Written as a drop-in, which survives every reinstall. Empty = no drop-in.
+k3s_unit_after: []
 
 # Disable bundled components (managed externally via Helm/ArgoCD)
 k3s_disable:
@@ -50,6 +76,38 @@ k3s_extra_server_args: >-
   --kube-apiserver-arg=audit-log-maxbackup=10
   --kube-apiserver-arg=audit-log-maxsize=100
   --protect-kernel-defaults
+
+# =============================================================================
+# API server audit policy
+# =============================================================================
+# The audit-log-* flags above write NOTHING without a policy: the API server
+# records only what a policy selects. The role installs one and adds
+# --audit-policy-file. k3s_audit_policy_src is a file of this role by default
+# (files/audit-policy.yaml, a generic baseline); point it at your own.
+k3s_audit_policy_enabled: true
+k3s_audit_policy_src: audit-policy.yaml
+k3s_audit_policy_path: /var/lib/rancher/k3s/server/audit-policy.yaml
+
+# =============================================================================
+# Kubelet configuration
+# =============================================================================
+# KubeletConfiguration fields (https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/)
+# written as a drop-in that k3s merges after its own 00-k3s-defaults.conf.
+# Empty = no drop-in. Example — graceful node shutdown:
+#   k3s_kubelet_config:
+#     shutdownGracePeriod: 60s
+#     shutdownGracePeriodCriticalPods: 20s
+# With shutdownGracePeriod set, the role also raises systemd-logind's
+# InhibitDelayMaxSec to match (Debian's unattended-upgrades caps it at 30s) and
+# checks that the kubelet holds its shutdown inhibitor lock.
+# Same variables in the k3s_agent role: set them once in group_vars/all.yml.
+k3s_kubelet_config: {}
+k3s_kubelet_config_dir: /var/lib/rancher/k3s/agent/etc/kubelet.conf.d
+
+# CIS 1.1.20: restrict the server's PKI certificates (server/tls/*.crt, 0644
+# as k3s writes them) to their owner. Re-applied on every run, since k3s
+# rewrites a certificate it re-issues with its own mode.
+k3s_restrict_pki_certs: true
 
 # Firewall. k3s_lab_ufw_enabled is the single switch for every UFW task in the
 # repo; it is redeclared here (same default as the common role) because role

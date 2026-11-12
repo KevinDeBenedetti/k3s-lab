@@ -53,6 +53,13 @@ ansible-galaxy install -r ansible/requirements.yml
 ansible-playbook -i <your-inventory> ansible/playbooks/site.yml
 ```
 
+From your own repository, install the roles as the `kevindebenedetti.k3s_lab` collection, pinned to a release, instead of copying them ([collection README](ansible/README.md)):
+
+```bash
+ansible-galaxy collection install "git+https://github.com/KevinDeBenedetti/k3s-lab.git#/ansible/,vX.Y.Z"
+ansible-playbook -i <your-inventory> kevindebenedetti.k3s_lab.site
+```
+
 The full walkthrough — prerequisites, inventory, verification — is in **[Getting Started](docs/getting-started.md)**.
 
 ### Run it with GitOps (your own config repo)

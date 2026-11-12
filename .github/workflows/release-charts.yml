@@ -48,6 +48,19 @@ jobs:
         env:
           OWNER: ${{ github.repository_owner }}
 
+      # Helm cannot template a dependency's `repository:`, so the umbrella's
+      # Chart.yaml names this repository's registry literally. A fork (or a
+      # mirror under another owner) publishes its own subcharts: point the
+      # umbrella at them, or it would pin the upstream owner's copies. No-op
+      # here, where the owner already matches.
+      - name: Point the umbrella at this owner's registry
+        run: |
+          sed -i -E "s#^([[:space:]]*repository:[[:space:]]*)oci://ghcr\.io/[^/[:space:]]+/charts[[:space:]]*\$#\1oci://${REGISTRY_PATH}#" \
+            charts/platform-deployment/Chart.yaml
+          grep -n 'repository:' charts/platform-deployment/Chart.yaml
+        env:
+          REGISTRY_PATH: ${{ steps.registry.outputs.path }}
+
       - name: Install Helm
         uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
         with:
