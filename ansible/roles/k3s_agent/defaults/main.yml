@@ -29,6 +29,19 @@ k3s_node_token: ""
 # Node IP for inter-node communication (private network)
 k3s_node_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
 
+# Optional, each passed to k3s only when non-empty. Same meaning as in the
+# k3s_server role (see its defaults).
+k3s_node_external_ip: ""
+k3s_flannel_iface: ""
+k3s_node_labels: []
+k3s_node_taints: []
+k3s_unit_after: []
+
+# Kubelet configuration drop-in — same variables as the k3s_server role; set
+# them once in group_vars/all.yml. Empty = no drop-in.
+k3s_kubelet_config: {}
+k3s_kubelet_config_dir: /var/lib/rancher/k3s/agent/etc/kubelet.conf.d
+
 # Extra args for the agent
 k3s_extra_agent_args: ""
 

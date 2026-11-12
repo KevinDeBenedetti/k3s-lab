@@ -1,13 +1,20 @@
 ---
-- name: Validate the k3s version pin
+# Same pin guard as the k3s_server role — see its comment.
+- name: Validate the k3s version pin and the installer checksum
   ansible.builtin.assert:
     that:
       - k3s_version is defined
-      - k3s_version is match('^v[0-9]+\\.[0-9]+\\.[0-9]+\\+k3s[0-9]+$')
+      - k3s_version is regex('v[0-9]+[.][0-9]+[.][0-9]+[+]k3s[0-9]+', match_type='fullmatch')
+      - k3s_installer_checksum is defined
+      - k3s_installer_checksum is regex('sha256:[0-9a-f]{64}', match_type='fullmatch')
     fail_msg: >-
       k3s_version must be set in your inventory (group_vars/all.yml) to an exact
-      k3s release such as "v1.32.13+k3s1". The roles ship no default, so a run
-      can never silently downgrade a node.
+      k3s release, vX.Y.Z+k3sN such as "v1.32.13+k3s1" — the roles ship no
+      default, so a run can never silently downgrade a node. Got
+      {{ (k3s_version | to_json) if k3s_version is defined else 'nothing (undefined)' }}.
+      k3s_installer_checksum must be sha256:<64 hex>, the digest of the
+      get.k3s.io script run as root. Got
+      {{ (k3s_installer_checksum | to_json) if k3s_installer_checksum is defined else 'nothing (undefined)' }}.
     quiet: true
 
 - name: Validate required variables
@@ -26,21 +33,134 @@
   ansible.builtin.command: k3s --version
   register: k3s_installed_version
   changed_when: false
+  check_mode: false  # read-only; skipped under --check, an empty stdout would make the installer look needed
   failed_when: k3s_installed_version.rc not in [0, 1, 2, 127]
   when: k3s_binary.stat.exists
+
+# The server URL and token are not compared: the installer puts them in the
+# unit's env file, not in ExecStart.
+- name: Compose the k3s agent arguments
+  ansible.builtin.set_fact:
+    k3s_agent_install_exec: >-
+      agent
+      --node-ip {{ k3s_node_ip }}
+      {% if k3s_node_external_ip | length > 0 %}--node-external-ip {{ k3s_node_external_ip }} {% endif %}
+      {% if k3s_flannel_iface | length > 0 %}--flannel-iface {{ k3s_flannel_iface }} {% endif %}
+      {% for label in k3s_node_labels %}--node-label {{ label }} {% endfor %}
+      {% for taint in k3s_node_taints %}--node-taint {{ taint }} {% endfor %}
+      {{ k3s_extra_agent_args }}
+
+# The drift check lives with the k3s_server role; role_path/.. resolves to the
+# sibling role both from a checkout and from the installed collection.
+- name: Compare the k3s-agent unit with the wanted arguments
+  ansible.builtin.script: "{{ role_path }}/../k3s_server/files/k3s-exec-drift.sh /etc/systemd/system/k3s-agent.service"
+  environment:
+    K3S_DESIRED_EXEC: "{{ k3s_agent_install_exec }}"
+  register: k3s_agent_exec_drift
+  changed_when: false
+  check_mode: false
+
+- name: Decide whether the installer must run
+  ansible.builtin.set_fact:
+    k3s_agent_install_needed: >-
+      {{ not k3s_binary.stat.exists
+         or k3s_version not in (k3s_installed_version.stdout | default(''))
+         or (k3s_agent_exec_drift.stdout_lines | first) != 'in-sync' }}
+
+- name: Show how the running k3s-agent differs from the wanted arguments
+  ansible.builtin.debug:
+    msg: "{{ k3s_agent_exec_drift.stdout_lines }}"
+  when: (k3s_agent_exec_drift.stdout_lines | first) == 'drift'
+
+# Kubelet drop-in, logind delay and unit ordering: the same tasks as in the
+# k3s_server role, written before the installer for the same reasons.
+- name: Create the kubelet configuration drop-in directory
+  ansible.builtin.file:
+    path: "{{ k3s_kubelet_config_dir }}"
+    state: directory
+    mode: "0700"
+  when: k3s_kubelet_config | length > 0
+  tags: [kubelet-config]
+
+- name: Deploy the kubelet configuration drop-in
+  ansible.builtin.template:
+    src: "{{ role_path }}/../k3s_server/templates/kubelet-dropin.conf.j2"
+    dest: "{{ k3s_kubelet_config_dir }}/50-k3s-lab.conf"
+    mode: "0600"
+  register: k3s_kubelet_dropin
+  when: k3s_kubelet_config | length > 0
+  tags: [kubelet-config]
+
+- name: Remove the kubelet configuration drop-in when none is wanted
+  ansible.builtin.file:
+    path: "{{ k3s_kubelet_config_dir }}/50-k3s-lab.conf"
+    state: absent
+  register: k3s_kubelet_dropin_removed
+  when: k3s_kubelet_config | length == 0
+  tags: [kubelet-config]
+
+- name: Raise logind's inhibit delay to the kubelet's shutdown grace period
+  when: k3s_kubelet_config.shutdownGracePeriod is defined
+  tags: [kubelet-config]
+  block:
+    - name: Create the logind drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/logind.conf.d
+        state: directory
+        mode: "0755"
+
+    - name: Write the logind inhibit delay
+      ansible.builtin.copy:
+        dest: /etc/systemd/logind.conf.d/zz-k3s-kubelet-shutdown.conf
+        content: |
+          # Managed by Ansible (k3s_server / k3s_agent roles) from
+          # k3s_kubelet_config.shutdownGracePeriod.
+          [Login]
+          InhibitDelayMaxSec={{ k3s_kubelet_config.shutdownGracePeriod }}
+        mode: "0644"
+      register: k3s_logind_dropin
+
+    - name: Make logind read the new inhibit delay  # noqa: no-handler — must run before the k3s-agent restart below
+      ansible.builtin.command: systemctl kill --signal=SIGHUP systemd-logind
+      when: k3s_logind_dropin is changed
+      changed_when: true
+
+- name: Make k3s-agent wait for the units its node IP depends on
+  when: k3s_unit_after | length > 0
+  block:
+    - name: Create the k3s-agent unit drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/k3s-agent.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Order k3s-agent after those units
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/k3s-agent.service.d/10-after.conf
+        content: |
+          # Managed by Ansible (k3s_agent role, k3s_unit_after).
+          [Unit]
+          After={{ k3s_unit_after | join(' ') }}
+          Wants={{ k3s_unit_after | join(' ') }}
+        mode: "0644"
+      register: k3s_agent_unit_dropin
+
+    - name: Reload the systemd units  # noqa: no-handler — must count before the installer or the restart below
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      when: k3s_agent_unit_dropin is changed
 
 - name: Download k3s installer
   ansible.builtin.get_url:
     url: https://get.k3s.io
     dest: /tmp/k3s-install.sh
     mode: "0700"
-    checksum: "{{ k3s_installer_checksum if k3s_installer_checksum else omit }}"
-  when: >
-    not k3s_binary.stat.exists or
-    k3s_version not in (k3s_installed_version.stdout | default(''))
+    # Never `omit`: an empty digest is refused by the first task of this role.
+    checksum: "{{ k3s_installer_checksum }}"
+  when: k3s_agent_install_needed | bool
 
 # See the k3s_server role: `bash <script>` so a `noexec` /tmp (CIS) does not
-# break the install.
+# break the install, and no restart handler — the installer restarts the agent.
 - name: Install k3s agent
   ansible.builtin.command:
     cmd: bash /tmp/k3s-install.sh
@@ -49,21 +169,40 @@
     INSTALL_K3S_VERSION: "{{ k3s_version }}"
     K3S_URL: "{{ k3s_server_url }}"
     K3S_TOKEN: "{{ k3s_node_token }}"
-    INSTALL_K3S_EXEC: >-
-      agent
-      --node-ip {{ k3s_node_ip }}
-      {{ k3s_extra_agent_args }}
-  when: >
-    not k3s_binary.stat.exists or
-    k3s_version not in (k3s_installed_version.stdout | default(''))
+    INSTALL_K3S_EXEC: "{{ k3s_agent_install_exec }}"
+  when: k3s_agent_install_needed | bool
   changed_when: true
-  notify: Restart k3s-agent
+
+- name: Restart k3s-agent to load a changed kubelet drop-in or logind delay  # noqa: no-handler — only when the installer did not restart it
+  ansible.builtin.systemd_service:
+    name: k3s-agent
+    state: restarted
+    daemon_reload: true
+  when:
+    - >-
+      (k3s_kubelet_dropin | default({}) is changed)
+      or (k3s_kubelet_dropin_removed | default({}) is changed)
+      or (k3s_logind_dropin | default({}) is changed)
+    - not (k3s_agent_install_needed | default(false) | bool)
+  tags: [kubelet-config]
 
 - name: Wait for k3s-agent service to be active
   ansible.builtin.systemd:
     name: k3s-agent
     state: started
     enabled: true
+
+- name: Check that the kubelet holds its shutdown inhibitor lock
+  ansible.builtin.command: systemd-inhibit --list --no-legend --no-pager
+  register: k3s_inhibitors
+  retries: 12
+  delay: 5
+  until: "'kubelet' in k3s_inhibitors.stdout"
+  changed_when: false
+  when:
+    - k3s_kubelet_config.shutdownGracePeriod is defined
+    - not ansible_check_mode
+  tags: [kubelet-config]
 
 - name: Open firewall ports for cluster communication
   community.general.ufw:

@@ -17,7 +17,10 @@ cp ansible/inventory.example.yml ansible/inventory/hosts.yml
 $EDITOR ansible/inventory/hosts.yml        # hosts, SSH user
 ```
 
-`ansible/inventory/` is gitignored: it holds your node addresses. Set
+`ansible/inventory/` is gitignored: it holds your node addresses. Nodes
+created by Terraform? `task provision:inventory` writes this file from your
+Terraform outputs instead; the outputs it expects are listed at the top of
+`scripts/generate-inventory.sh`. Set
 `k3s_version` there (it is **required**: the roles ship no default, so a run can
 never downgrade a node). Role defaults (`ansible/roles/*/defaults/main.yml`)
 cover the rest; override what you need in

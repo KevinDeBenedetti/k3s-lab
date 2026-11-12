@@ -60,6 +60,7 @@ done
 GUARDED=(
   "ansible/inventory/hosts.yml"
   "ansible/inventory/group_vars/all.yml"
+  "ansible/inventory/group_vars/all/generated.yml"
 )
 
 log_step "Inventory must be unreachable from a commit"
