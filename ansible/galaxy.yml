@@ -1,0 +1,26 @@
+---
+namespace: kevindebenedetti
+name: k3s_lab
+version: 0.24.1
+readme: README.md
+authors:
+  - Kevin De Benedetti
+description: Provision k3s nodes (base OS, k3s server and agents, WireGuard, UFW)
+license:
+  - Apache-2.0
+tags:
+  - k3s
+  - kubernetes
+  - homelab
+  - infrastructure
+dependencies:
+  community.general: ">=12.5.0"
+  ansible.posix: ">=2.1.0"
+repository: https://github.com/KevinDeBenedetti/k3s-lab
+documentation: https://kevindebenedetti.github.io/k3s-lab/
+issues: https://github.com/KevinDeBenedetti/k3s-lab/issues
+build_ignore:
+  - ansible.cfg
+  - inventory
+  - requirements.yml
+  - "*.retry"

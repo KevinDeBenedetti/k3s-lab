@@ -35,3 +35,11 @@ skip_list:
   #
   # See docs/configuration.md, "Ansible role variables (not `.env`)".
   - var-naming[no-role-prefix]
+
+  # galaxy[no-changelog] — "No changelog found" for the collection in ansible/.
+  #
+  # Disabled deliberately: the collection is not versioned on its own. It
+  # shares the repository's single version (release-please bumps galaxy.yml with
+  # every chart), and that version's changelog is the root CHANGELOG.md. A
+  # second changelog under ansible/ would only drift from it.
+  - galaxy[no-changelog]

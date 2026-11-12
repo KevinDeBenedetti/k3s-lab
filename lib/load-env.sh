@@ -10,11 +10,10 @@
 #
 # Usage:
 #   source "${SCRIPT_DIR}/../lib/load-env.sh"
-#   load_env "${INFRA_ROOT}/.env"   # explicit path
-#   load_env                        # falls back to ${INFRA_ROOT}/.env if set
+#   load_env path/to/.env           # no argument, or a missing file: no-op
 
 load_env() {
-  local env_file="${1:-${INFRA_ROOT:+${INFRA_ROOT}/.env}}"
+  local env_file="${1:-}"
   [[ -n "${env_file}" && -f "${env_file}" ]] || return 0
   local key value
   while IFS='=' read -r key value || [[ -n "$key" ]]; do

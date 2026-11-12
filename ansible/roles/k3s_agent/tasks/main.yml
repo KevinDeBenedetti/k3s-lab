@@ -1,4 +1,15 @@
 ---
+- name: Validate the k3s version pin
+  ansible.builtin.assert:
+    that:
+      - k3s_version is defined
+      - k3s_version is match('^v[0-9]+\\.[0-9]+\\.[0-9]+\\+k3s[0-9]+$')
+    fail_msg: >-
+      k3s_version must be set in your inventory (group_vars/all.yml) to an exact
+      k3s release such as "v1.32.13+k3s1". The roles ship no default, so a run
+      can never silently downgrade a node.
+    quiet: true
+
 - name: Validate required variables
   ansible.builtin.assert:
     that:

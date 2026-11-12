@@ -216,7 +216,7 @@ It was dropped on 2026-10-23: `GHSA-hrpp-p4fc-wwf8` (HIGH, published
 2026-10-21) covers up to `v3.7.15` and is patched in `v3.7.16`, which chart
 **42.1.1** onwards already ships. The subchart was bumped straight to
 **42.1.3** rather than chasing the pin. The 42.0.0 major requires Kubernetes
->= 1.30 (`k3s_version` defaults to v1.32); its other breaking changes only
+>= 1.30 (pin `k3s_version` to v1.30 or later); its other breaking changes only
 concern Traefik Hub, which we do not enable.
 
 > [!WARNING]

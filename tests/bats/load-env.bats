@@ -83,8 +83,7 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "load_env returns 0 when called without argument and INFRA_ROOT unset" {
-  unset INFRA_ROOT
+@test "load_env returns 0 when called without argument" {
   run load_env
   [ "$status" -eq 0 ]
 }

@@ -11,16 +11,20 @@
 # scripts/check-inventory-ignored.sh keeps it that way. This example lives
 # outside it so it can be versioned.
 #
-# Every role has defaults (roles/*/defaults/main.yml): k3s version, firewall,
-# WireGuard (off by default) … Override any of them under `vars:` below or in
-# ansible/inventory/group_vars/all.yml. On a LAN-only homelab the usual ones:
-#   k3s_version          the k3s release to install, e.g. "v1.32.13+k3s1"
+# k3s_version is REQUIRED: the roles ship no default for it, so a run can
+# never silently downgrade a node. Everything else has a default
+# (roles/*/defaults/main.yml): firewall, WireGuard (off by default) … Override
+# any of them under `vars:` below or in ansible/inventory/group_vars/all.yml.
+# On a LAN-only homelab the usual ones:
 #   k3s_ufw_allow_from   CIDRs allowed to reach the node, e.g. your LAN
 #   wireguard_enabled    true only if you want remote access through a tunnel
+#   k3s_node_ip          per host, when the cluster address differs from
+#                        ansible_host (agents join the server on it)
 # =============================================================================
 all:
   vars:
     ansible_user: pi                 # a sudo-capable user that exists on every node
+    k3s_version: "v1.32.13+k3s1"     # REQUIRED — an exact k3s release
     # ansible_ssh_private_key_file: ~/.ssh/id_ed25519
   children:
     k3s_servers:

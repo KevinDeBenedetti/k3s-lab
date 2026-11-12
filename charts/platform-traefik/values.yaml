@@ -27,7 +27,7 @@ traefik:
   # appVersion v3.7.16: GHSA-hrpp-p4fc-wwf8 (high, published 2026-10-21,
   # ForwardAuth auth-server connection pool leaking NTLM/Negotiate identity)
   # covers <= v3.7.15 and is patched in v3.7.16. 42.x requires Kubernetes
-  # >= 1.30 (k3s_version defaults to v1.32); its other breaking changes only
+  # >= 1.30 (pin k3s_version to v1.30 or later); its other breaking changes only
   # touch Traefik Hub. If a pin has to come back, set `image.tag` here —
   # never `versionOverride`, see README.md.
 

@@ -1,7 +1,11 @@
 ---
 # k3s_server role defaults
 
-k3s_version: "v1.32.13+k3s1"
+# k3s_version has NO default on purpose: it must come from the inventory
+# (group_vars/all.yml), e.g. k3s_version: "v1.32.13+k3s1". A role default goes
+# stale silently, and a run against a node already upgraded past it would
+# DOWNGRADE k3s. The role asserts the pin is set before touching the node.
+# Server and agents must share the same value.
 
 # Integrity pin for the get.k3s.io installer script, which is downloaded and
 # then executed as root on every node. Empty = no verification at all, which is
@@ -28,7 +32,7 @@ k3s_cluster_dns: "10.43.0.10"
 k3s_flannel_backend: vxlan
 
 # Node IP used for inter-node communication (private network)
-# Override with the node's private IP from Hetzner network
+# Override per host with the node's private IP when it has one
 k3s_node_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
 
 # Disable bundled components (managed externally via Helm/ArgoCD)
