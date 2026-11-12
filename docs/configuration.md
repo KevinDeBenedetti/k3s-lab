@@ -117,6 +117,16 @@ the roles during provisioning, so putting them in `.env` has no effect — set t
 in `ansible/inventory/group_vars/all.yml`, or pass them at call time with
 `-e <name>=<value>`.
 
+### k3s pin and addresses
+
+| Variable                  | Default | Description |
+| ------------------------- | ------- | ----------- |
+| `k3s_version`             | *none, required* | Exact k3s release, e.g. `v1.32.13+k3s1`. Shared by server and agents. The roles fail fast when it is missing, so a stale default can never downgrade a node |
+| `k3s_node_ip`             | default IPv4 | Per host: the address k3s uses between nodes. When set on the server, agents join on it |
+| `k3s_server_join_address` | — | Set on the server host to override the address agents join on (a tunnel IP, a VIP). Wins over `k3s_node_ip`; `ansible_host` is the last resort |
+| `k3s_kubeconfig_dest`     | `./kubeconfig.yaml` | Where `site.yml` writes the kubeconfig, relative to the directory `ansible-playbook` runs from |
+| `k3s_kubeconfig_fetch`    | `true` | `false` skips writing the kubeconfig locally |
+
 ### Firewall
 
 | Variable                | Default | Description                                                    |

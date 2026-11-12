@@ -18,11 +18,21 @@
   hosts: k3s_agents
   become: true
   vars:
-    k3s_server_url: "https://{{ hostvars[groups['k3s_servers'][0]].ansible_host }}:6443"
+    # Agents join on the server's CLUSTER address, which is not always the one
+    # Ansible reaches it on over SSH (a public IP, a bastion, a tunnel). First
+    # match wins: k3s_server_join_address, then k3s_node_ip, set on the server
+    # host in the inventory; ansible_host only as the last resort.
+    k3s_server_url: >-
+      {%- set srv = hostvars[groups['k3s_servers'][0]] -%}
+      https://{{ srv.k3s_server_join_address | default(srv.k3s_node_ip | default(srv.ansible_host)) }}:6443
     k3s_node_token: "{{ hostvars[groups['k3s_servers'][0]].k3s_node_token }}"
   roles:
     - k3s_agent
 
+# Written to the directory ansible-playbook runs from (the repository that
+# operates the cluster), never next to the playbook: once the roles are
+# installed as a collection, playbook_dir is inside ~/.ansible/collections.
+# Override k3s_kubeconfig_dest, or set k3s_kubeconfig_fetch: false to skip.
 - name: Save kubeconfig locally
   hosts: k3s_servers
   become: true
@@ -30,10 +40,11 @@
     - name: Write kubeconfig to local file
       ansible.builtin.copy:
         content: "{{ k3s_kubeconfig }}"
-        dest: "{{ playbook_dir }}/../../kubeconfig.yaml"
+        dest: "{{ k3s_kubeconfig_dest | default(lookup('ansible.builtin.env', 'PWD') ~ '/kubeconfig.yaml') }}"
         mode: "0600"
       delegate_to: localhost
       become: false
+      when: k3s_kubeconfig_fetch | default(true) | bool
 
 # Must stay the LAST play: the firewall comes up only once every role has
 # registered its rules. See roles/ufw_enable/tasks/main.yml.

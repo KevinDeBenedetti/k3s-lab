@@ -83,3 +83,11 @@ chart_version() {
       "$CONFIG" >/dev/null || { echo "missing $jp"; return 1; }
   done
 }
+
+@test "the Ansible collection's galaxy.yml version is an extra-file at the shared version" {
+  jq -e '.packages["."]["extra-files"][]
+    | select(.path == "ansible/galaxy.yml" and .jsonpath == "$.version")' "$CONFIG" >/dev/null
+  want="$(jq -r '.["."]' "$MANIFEST")"
+  got="$(awk '/^version:/ { print $2; exit }' "${REPO_ROOT}/ansible/galaxy.yml")"
+  [ "$got" = "$want" ] || { echo "galaxy.yml '$got' vs manifest '$want'"; return 1; }
+}

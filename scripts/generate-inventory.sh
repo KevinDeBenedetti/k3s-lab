@@ -7,12 +7,16 @@ set -euo pipefail
 # Reads cluster configuration from CLUSTER_ENV and Terraform outputs to
 # produce hosts.yml and group_vars/all.yml for Ansible provisioning.
 #
+# Run it from the repository that operates the cluster: paths default to the
+# current directory (K3S_LAB_PROJECT_DIR), never to this k3s-lab checkout.
+#
 # Required:
-#   CLUSTER_ENV     Path to cluster.env file (e.g. clusters/prod/cluster.env)
+#   CLUSTER_ENV     Path to the env file holding K3S_VERSION and CLUSTER_DOMAIN
 #
 # Optional:
-#   TF_DIR          Terraform directory (default: ${REPO_ROOT}/terraform)
-#   ANSIBLE_DIR     Ansible directory (default: ${REPO_ROOT}/ansible)
+#   TF_DIR              Terraform directory (default: ${K3S_LAB_PROJECT_DIR}/terraform)
+#   ANSIBLE_DIR         Ansible directory (default: ${K3S_LAB_PROJECT_DIR}/ansible)
+#   K3S_UFW_ALLOW_FROM  CIDR allowed to reach the k3s ports (default: 10.0.0.0/16)
 # =============================================================================
 
 # shellcheck source=lib/script-init.sh
@@ -20,10 +24,9 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
 
 _lib require-vars.sh
 
-REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 CLUSTER_ENV="${CLUSTER_ENV:-}"
-TF_DIR="${TF_DIR:-${REPO_ROOT}/terraform}"
-ANSIBLE_DIR="${ANSIBLE_DIR:-${REPO_ROOT}/ansible}"
+TF_DIR="${TF_DIR:-${K3S_LAB_PROJECT_DIR}/terraform}"
+ANSIBLE_DIR="${ANSIBLE_DIR:-${K3S_LAB_PROJECT_DIR}/ansible}"
 INVENTORY_FILE="${ANSIBLE_DIR}/inventory/hosts.yml"
 GROUP_VARS_FILE="${ANSIBLE_DIR}/inventory/group_vars/all.yml"
 
@@ -48,9 +51,9 @@ mkdir -p "$(dirname "$GROUP_VARS_FILE")"
 cat > "$GROUP_VARS_FILE" << EOF
 ---
 # Auto-generated from ${CLUSTER_ENV} — do not edit manually
-# Regenerate with: make inventory
+# Regenerate with: task provision:inventory
 k3s_version: "${K3S_VERSION}"
-k3s_ufw_allow_from: "10.0.0.0/16"
+k3s_ufw_allow_from: "${K3S_UFW_ALLOW_FROM:-10.0.0.0/16}"
 
 # Domain (from CLUSTER_DOMAIN in cluster.env)
 cluster_domain: ${CLUSTER_DOMAIN}
@@ -59,15 +62,17 @@ EOF
 log_ok "group_vars written to: ${GROUP_VARS_FILE}"
 
 # ── Generate Ansible inventory from Terraform outputs ────────────────────────
-cd "$TF_DIR"
+# -chdir, not `cd`: ANSIBLE_DIR may be relative (the provision taskfile passes
+# `ansible`), and a cd here would land the inventory under TF_DIR.
+tf_output() { terraform -chdir="$TF_DIR" output "$@"; }
 
-SERVER_IP=$(terraform output -raw server_ip)
-SERVER_PRIVATE_IP=$(terraform output -raw server_private_ip 2>/dev/null || echo "")
-SERVER_NAME=$(terraform output -raw server_name)
+SERVER_IP=$(tf_output -raw server_ip)
+SERVER_PRIVATE_IP=$(tf_output -raw server_private_ip 2>/dev/null || echo "")
+SERVER_NAME=$(tf_output -raw server_name)
 
-AGENT_IPS=$(terraform output -json agent_ips)
-AGENT_PRIVATE_IPS=$(terraform output -json agent_private_ips)
-AGENT_NAMES=$(terraform output -json agent_names)
+AGENT_IPS=$(tf_output -json agent_ips)
+AGENT_PRIVATE_IPS=$(tf_output -json agent_private_ips)
+AGENT_NAMES=$(tf_output -json agent_names)
 AGENT_COUNT=$(echo "$AGENT_IPS" | jq 'length')
 
 mkdir -p "$(dirname "$INVENTORY_FILE")"
@@ -75,7 +80,7 @@ mkdir -p "$(dirname "$INVENTORY_FILE")"
 cat > "$INVENTORY_FILE" << EOF
 ---
 # Auto-generated from Terraform outputs — do not edit manually
-# Regenerate with: make inventory
+# Regenerate with: task provision:inventory
 all:
   children:
     k3s_servers:
