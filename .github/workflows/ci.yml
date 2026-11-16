@@ -8,7 +8,7 @@
 #   shell-ci    — shellcheck + actionlint + bats
 #   kubernetes  — kubeconform + .env.example check
 #   security    — Gitleaks secret scanning
-#   helm-lint   — Helm chart linting
+#   helm-lint / helm-template — Helm chart lint and render dry-run (inline)
 #   resource-limits — Verify all charts define resource limits
 #   ansible     — Playbook syntax-check + ansible-lint (both blocking)
 #
@@ -100,28 +100,90 @@ jobs:
       run-codeql: false
 
   # ─── Helm chart linting ─────────────────────────────────────────────────────
+  # Inline since github-workflows v0.47.0 removed its ci-helm.yml (2026-11,
+  # without a replacement): these two jobs do what it did for this repo.
   helm-lint:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-helm.yml@a3ad20900d4919ccf6ddd54a27f9520b35dfcb9c # v0.47.0
-    with:
-      run-lint: true
-      # `helm lint` alone does not download dependencies, so the subchart guards
-      # (e.g. traefik/templates/requirements.yaml, which rejects any proxy above
-      # traefik.io/proxy-max-version) are never rendered. The template job runs
-      # `helm dependency update` before `helm template` — that is what catches
-      # these failures. Without it, an unrenderable chart was published as
-      # 0.13.0, 0.13.1 and 0.13.2 without any CI complaining.
-      run-template: true
-      chart-paths: charts/*
-      # platform-deployment is a composition chart: it has no templates of its
-      # own (just NOTES.txt) and pulls its 7 dependencies from GHCR. Rendering it
-      # here would validate the registry's contents rather than this repo's
-      # source — and its subcharts are already rendered one by one by this same
-      # loop. That coupling created a circular deadlock on 2026-07-21: the
-      # umbrella pinned platform-traefik:0.13.0 (broken), CI failed, and the
-      # workflow_run gate prevented publishing the fix. Validating the umbrella
-      # belongs to release-charts, after the subcharts are published.
-      template-exclude-paths: charts/platform-deployment
-      helm-version: v3.17.0
+    name: Helm lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v3.17.0
+      - name: Lint charts
+        run: |
+          found=0
+          for chart in charts/*/; do
+            chart="${chart%/}"
+            [[ -f "$chart/Chart.yaml" ]] || continue
+            found=1
+            echo "::group::helm lint $chart"
+            helm lint "$chart"
+            echo "::endgroup::"
+          done
+          if [[ "$found" -eq 0 ]]; then
+            echo "::error::no chart found under charts/"
+            exit 1
+          fi
+
+  # `helm lint` alone does not download dependencies, so the subchart guards
+  # (e.g. traefik/templates/requirements.yaml, which rejects any proxy above
+  # traefik.io/proxy-max-version) are never rendered. This job fetches the
+  # dependencies before `helm template` — that is what catches
+  # these failures. Without it, an unrenderable chart was published as 0.13.0,
+  # 0.13.1 and 0.13.2 without any CI complaining.
+  #
+  # platform-deployment is skipped: it is a composition chart with no templates
+  # of its own (just NOTES.txt) that pulls its 7 dependencies from GHCR.
+  # Rendering it here would validate the registry's contents rather than this
+  # repo's source — and its subcharts are already rendered one by one by this
+  # loop. That coupling created a circular deadlock on 2026-07-21: the umbrella
+  # pinned platform-traefik:0.13.0 (broken), CI failed, and the workflow_run
+  # gate prevented publishing the fix. Validating the umbrella belongs to
+  # release-charts, after the subcharts are published.
+  helm-template:
+    name: Helm template dry-run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v3.17.0
+      - name: Template charts
+        run: |
+          rendered=0
+          for chart in charts/*/; do
+            chart="${chart%/}"
+            [[ -f "$chart/Chart.yaml" ]] || continue
+            if [[ "$chart" == "charts/platform-deployment" ]]; then
+              echo "⏭️  $chart skipped (rendered by release-charts after publish)"
+              continue
+            fi
+            echo "::group::helm template $chart"
+            # `update`, not `build`: build needs every repository registered
+            # with `helm repo add` first, update reads the URLs in Chart.yaml.
+            # A failed update is only a warning (a registry blip); the render
+            # below then fails on the missing dependency anyway.
+            helm dependency update "$chart" \
+              || echo "::warning::helm dependency update failed for $chart"
+            helm template dry-run "$chart" >/dev/null
+            echo "✅ $chart renders cleanly"
+            echo "::endgroup::"
+            rendered=$((rendered + 1))
+          done
+          if [[ "$rendered" -eq 0 ]]; then
+            echo "::error::no chart rendered"
+            exit 1
+          fi
+          echo "✅ $rendered chart(s) rendered"
 
   # ─── Resource limits check ────────────────────────────────────────────────
   resource-limits:
@@ -146,7 +208,7 @@ jobs:
         run: ./scripts/check-loop-trap-shape.sh
 
   # ─── Traefik image check ──────────────────────────────────────────────────
-  # helm-lint above renders the chart and proves it is *renderable*; it does not
+  # helm-template above renders the chart and proves it is *renderable*; it does not
   # say which image comes out. The proxy version is a security decision
   # (GHSA-cxjq <= v3.7.6, GHSA-3ccp <= v3.7.8) that the subchart has already had
   # the means to neutralise silently — versionOverride, or the
