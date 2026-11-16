@@ -4,33 +4,29 @@
 #
 # Called by: task vault:seed
 #
-# Reads environment variables set by task vault:seed (sourced from .env via
-# Task's dotenv:) and seeds the following Vault KV v2 paths:
+# Reads its values from .env (lib/script-init.sh) or the environment, and
+# seeds the following Vault KV v2 paths:
 #   secret/argocd/oidc        — OIDC client credentials for ArgoCD
 #   secret/grafana/admin      — Grafana admin username + password
 #   secret/grafana/oauth      — Grafana Generic OAuth full config
 #   secret/traefik/dashboard  — htpasswd users string for Traefik dashboard
 #
-# All values are read from environment — no interactive prompts.
-# Missing optional values are skipped with a warning.
-#
-# Required env:
-#   VAULT_ROOT_TOKEN, VAULT_POD, VAULT_NAMESPACE, KUBECONFIG_CONTEXT
+# Missing optional values are skipped with a message. Needs VAULT_ROOT_TOKEN.
+# Vault access (pod, namespace, context, the KUBECTL seam): see lib/vault.sh.
 # =============================================================================
 set -euo pipefail
 
-KUBECTL="${KUBECTL:-kubectl}"
-K="${KUBECTL} --context ${KUBECONFIG_CONTEXT:-k3s-lab}"
+# shellcheck source=lib/script-init.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/script-init.sh"
 
-# The token travels on stdin (first line), never as a process argument:
-# argv is visible in local `ps`, in the kubectl exec API request, and inside
-# the pod — stdin is none of those.
-vault_exec() {
-  # shellcheck disable=SC2086
-  printf '%s\n' "${VAULT_ROOT_TOKEN}" | \
-    ${K} exec -i -n "${VAULT_NAMESPACE:-vault}" "${VAULT_POD:-vault-0}" -- \
-    sh -c 'IFS= read -r VAULT_TOKEN; export VAULT_TOKEN VAULT_SKIP_VERIFY=true; exec vault "$@"' vault-cli "$@"
-}
+_lib require-vars.sh
+_lib vault.sh
+
+require_vars VAULT_ROOT_TOKEN
+vault_require_tools
+# Read by vault_exec (lib/vault.sh).
+# shellcheck disable=SC2034
+VAULT_TOKEN="${VAULT_ROOT_TOKEN}"
 
 echo "→ Seeding Vault secrets..."
 echo ""

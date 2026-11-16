@@ -76,11 +76,32 @@ task vault:init
 ```
 
 This script:
-1. Calls `vault operator init` (3 key shares, threshold 2)
-2. Unseals Vault with the generated keys
-3. Enables KV v2 at `secret/`
-4. Enables and configures Kubernetes auth
-5. Creates the `eso-read` policy and `eso` role
+1. Calls `vault operator init` (3 key shares, threshold 2: `VAULT_KEY_SHARES`
+   and `VAULT_KEY_THRESHOLD`)
+2. Unseals Vault with the generated keys, stopping at the threshold
+3. Runs the configure steps — the same ones `task vault:configure` re-applies
+   at any time:
+   - enables KV v2 at `secret/`
+   - enables and configures Kubernetes auth
+   - writes every `*.hcl` file of the policy directory as a policy named after
+     the file
+   - creates the `eso` role (policy `eso-read`)
+   - sets up OIDC login (policy `vault-admin`) when `OIDC_CLIENT_ID`,
+     `OIDC_CLIENT_SECRET`, `OIDC_ISSUER_URL`, `VAULT_DOMAIN` and `ADMIN_EMAIL`
+     are **all** set; with only some of them it stops before changing anything
+
+On an already initialised Vault it skips step 1, unseals if needed, and
+configures. All of it lives in `lib/vault.sh`; see
+[Configuration](../configuration.md) for every variable.
+
+### Policies
+
+The shipped policies are in `vault/policies/`: `eso-read` lets External Secrets
+read all of `secret/`, and `vault-admin` is the OIDC administrator. To narrow
+them, copy the directory into your config repo, edit it, and set
+`VAULT_POLICY_DIR` to the copy. Every `*.hcl` file there becomes a policy, so
+you can add your own. `configure` refuses a directory without `eso-read.hcl`,
+and without `vault-admin.hcl` when OIDC is on.
 
 **Output:**
 
@@ -114,12 +135,13 @@ VAULT_UNSEAL_KEY_2=def456...
 VAULT_ROOT_TOKEN=hvs.XXXXX task vault:seed
 ```
 
-The interactive prompt walks you through storing each secret:
+It reads its values from `.env` (or the environment) and writes each secret
+whose values are set, skipping the others with a message:
 
-- `secret/argocd/oidc` — Infomaniak OIDC `clientID` + `clientSecret`
-- `secret/grafana/admin` — Grafana admin `username` + `password`
-- `secret/grafana/oauth` — All `GF_AUTH_*` OAuth env vars
-- `secret/traefik/dashboard` — Traefik BasicAuth `password`
+- `secret/argocd/oidc`: OIDC `clientID` + `clientSecret` (`OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`)
+- `secret/grafana/admin`: Grafana admin `username` + `password` (`GRAFANA_PASSWORD`)
+- `secret/grafana/oauth`: all `GF_AUTH_*` OAuth settings (`OIDC_CLIENT_ID`, `OIDC_AUTH_URL`, …)
+- `secret/traefik/dashboard`: the htpasswd `users` string (`DASHBOARD_PASSWORD`, needs `htpasswd`)
 
 ---
 
@@ -154,8 +176,12 @@ task vault:status
 Vault becomes sealed when the pod restarts. Unseal with:
 
 ```bash
-task vault:unseal   # requires VAULT_UNSEAL_KEY_1 + VAULT_UNSEAL_KEY_2 in .env
+task vault:unseal
 ```
+
+It feeds `VAULT_UNSEAL_KEY_1`, `VAULT_UNSEAL_KEY_2`, … from `.env` one at a
+time and stops as soon as Vault reports unsealed. A key that is not set is asked
+for on the terminal.
 
 Or interactively:
 ```bash

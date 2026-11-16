@@ -72,9 +72,9 @@ These tasks create the secrets those charts consume and handle teardown.
 
 | Target                       | Description                                  |
 | ---------------------------- | -------------------------------------------- |
-| `task vault:init`            | Initialize Vault (one-time)                  |
-| `task vault:unseal`          | Unseal Vault                                 |
-| `task vault:configure`       | Configure Vault auth/policies/secret engines |
+| `task vault:init`            | Initialize (or unseal) Vault, then configure |
+| `task vault:unseal`          | Unseal Vault after a pod restart             |
+| `task vault:configure`       | Re-apply engines, auth, policies, roles      |
 | `task vault:seed`            | Seed application secrets into Vault          |
 | `task vault:status`          | Show Vault status                            |
 

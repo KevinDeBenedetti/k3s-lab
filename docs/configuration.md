@@ -106,6 +106,30 @@ that pin by hand; it is gone.
 | -------------------- | --------- | -------- | ------------------------------------------------------- |
 | `KUBECONFIG_CONTEXT` | `k3s-lab` | ✅        | kubectl context name created by `task kubeconfig:fetch` |
 
+### Vault
+
+Read by the `task vault:*` scripts through `lib/vault.sh`, the only place their
+defaults live. See [Vault](./stack/vault.md) for the steps they run.
+
+| Variable                 | Default            | Required | Description                                                      |
+| ------------------------ | ------------------ | -------- | ---------------------------------------------------------------- |
+| `VAULT_ROOT_TOKEN`       | —                  | ✅        | For `configure` and `seed`; `init` prints it once                |
+| `VAULT_UNSEAL_KEY_1`…`n` | —                  | —        | For `unseal`; a key that is not set is asked for on the terminal |
+| `VAULT_NAMESPACE`        | `vault`            | —        | Namespace of the Vault pod                                       |
+| `VAULT_POD`              | `vault-0`          | —        | Vault pod name                                                   |
+| `VAULT_POLICY_DIR`       | `vault/policies/`  | —        | Directory of `*.hcl` policies applied by `configure`             |
+| `VAULT_KEY_SHARES`       | `3`                | —        | Unseal keys created by `init`                                    |
+| `VAULT_KEY_THRESHOLD`    | `2`                | —        | Keys needed to unseal                                            |
+| `ESO_NAMESPACE`          | `external-secrets` | —        | Namespace of the External Secrets ServiceAccount                 |
+| `ESO_SA`                 | `external-secrets` | —        | ServiceAccount bound to the `eso` role                           |
+
+Vault's own OIDC login needs **all five** of `OIDC_CLIENT_ID`,
+`OIDC_CLIENT_SECRET`, `OIDC_ISSUER_URL`, `VAULT_DOMAIN` and `ADMIN_EMAIL`. With
+none of them set, OIDC is skipped. With only some of them, `configure` stops
+before changing anything and names the missing ones. `ADMIN_EMAIL` is part of
+the set because the role is bound to it: without it any account at the provider
+would get `vault-admin`.
+
 
 ## Ansible role variables (not `.env`)
 

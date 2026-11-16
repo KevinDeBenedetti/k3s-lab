@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# tests/bats/helpers/fake-vault-kubectl — an adapter at lib/vault.sh's KUBECTL
+# seam that behaves like a small Vault, so the bootstrap scripts can be run
+# end to end without a cluster.
+#
+# State lives in $FAKE_VAULT_DIR:
+#   initialized, sealed     "true" / "false"
+#   threshold               keys needed to unseal (default 2)
+#   accepted                unseal keys received since the last seal
+#   mounts                  one mount per line ("secret/", "auth:kubernetes/", …)
+#   root_token              the token `token lookup` accepts
+#   calls                   one line per call: argv joined with " | "
+#   stdin.<n>               the stdin of call n
+#   policies/<name>         HCL received by `policy write <name> -`
+#   writes                  one line per `write <path>` / `kv put <path>`
+set -euo pipefail
+
+d="${FAKE_VAULT_DIR:?FAKE_VAULT_DIR is not set}"
+n=$(( $(wc -l <"$d/calls" 2>/dev/null || echo 0) + 1 ))
+( IFS='|'; printf '%s\n' "$*" | sed 's/|/ | /g' ) >>"$d/calls"
+
+state() { cat "$d/$1" 2>/dev/null || echo "$2"; }
+has_mount() { grep -qxF "$1" "$d/mounts" 2>/dev/null; }
+
+# kubectl --context <ctx> <verb> …
+[[ "$1" == "--context" ]] && shift 2
+verb="$1"; shift
+
+case "$verb" in
+  wait) exit 0 ;;
+  exec) ;;
+  *) echo "fake kubectl: unexpected verb $verb" >&2; exit 64 ;;
+esac
+
+# exec -i -n <ns> <pod> -- sh -c <script> <argv0> [args…]
+while [[ "$1" != "--" ]]; do shift; done
+shift 3            # --  sh  -c
+shift              # the script
+argv0="$1"; shift
+
+cat >"$d/stdin.$n"
+
+if [[ "$argv0" == "vault-unseal" ]]; then
+  key="$(head -n1 "$d/stdin.$n")"
+  echo "$key" >>"$d/accepted"
+  if [[ "$(wc -l <"$d/accepted")" -ge "$(state threshold 2)" ]]; then
+    echo false >"$d/sealed"
+  fi
+  echo "Sealed: $(state sealed true)"
+  exit 0
+fi
+
+token="$(head -n1 "$d/stdin.$n")"
+cmd="$1 ${2:-}"
+
+case "$cmd" in
+  "status -format=json")
+    printf '{"initialized": %s, "sealed": %s}\n' "$(state initialized false)" "$(state sealed true)"
+    [[ "$(state sealed true)" == "true" ]] && exit 2
+    exit 0 ;;
+  "operator init")
+    shares=3
+    for a in "$@"; do
+      case "$a" in
+        -key-shares=*) shares="${a#*=}" ;;
+        -key-threshold=*) echo "${a#*=}" >"$d/threshold" ;;
+      esac
+    done
+    echo true >"$d/initialized"
+    echo true >"$d/sealed"
+    : >"$d/accepted"
+    keys=""
+    for ((i = 1; i <= shares; i++)); do keys+="${keys:+,}\"unseal-key-$i\""; done
+    echo "root-token-xyz" >"$d/root_token"
+    printf '{"unseal_keys_b64": [%s], "root_token": "root-token-xyz"}\n' "$keys"
+    exit 0 ;;
+  "token lookup")
+    [[ "$token" == "$(state root_token none)" ]] && exit 0
+    echo "permission denied" >&2; exit 2 ;;
+  "secrets list"|"auth list")
+    prefix=""; [[ "$1" == "auth" ]] && prefix="auth:"
+    printf '{'
+    sep=""
+    while IFS= read -r m; do
+      [[ -n "$prefix" && "$m" != auth:* ]] && continue
+      [[ -z "$prefix" && "$m" == auth:* ]] && continue
+      printf '%s"%s": {}' "$sep" "${m#auth:}"; sep=", "
+    done < <(cat "$d/mounts" 2>/dev/null)
+    printf '}\n'
+    exit 0 ;;
+  "secrets enable")
+    for a in "$@"; do [[ "$a" == -path=* ]] && echo "${a#-path=}/" >>"$d/mounts"; done
+    exit 0 ;;
+  "auth enable")
+    echo "auth:$3/" >>"$d/mounts"; exit 0 ;;
+  "policy write")
+    mkdir -p "$d/policies"
+    tail -n +2 "$d/stdin.$n" >"$d/policies/$3"
+    exit 0 ;;
+  "write "*|"kv put")
+    path="$2"; [[ "$1" == "kv" ]] && path="$3"
+    echo "$path" >>"$d/writes"
+    exit 0 ;;
+  *)
+    echo "fake vault: unexpected command: $*" >&2; exit 64 ;;
+esac

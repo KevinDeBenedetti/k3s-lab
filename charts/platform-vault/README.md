@@ -40,9 +40,12 @@ probes are configured to accept that (`sealedcode=204&uninitcode=204`), so the
 pod reports healthy while still sealed — a running pod is not evidence of a
 usable Vault. Initialisation and unsealing are handled by
 [`scripts/vault-init.sh`](../../scripts/vault-init.sh) (`task vault:init`), which
-also creates the ESO policy and Kubernetes auth role;
-[`scripts/vault-configure.sh`](../../scripts/vault-configure.sh) re-applies them.
-App secrets are yours to write, from your own config repo.
+then runs the same configure steps as
+[`scripts/vault-configure.sh`](../../scripts/vault-configure.sh): KV v2 at
+`secret/`, Kubernetes auth, the policies in
+[`vault/policies/`](../../vault/policies/) and the External Secrets role. All of
+it lives in [`lib/vault.sh`](../../lib/vault.sh). App secrets are yours to
+write, from your own config repo.
 
 Enable auditing to **stdout**, once, after unsealing:
 
