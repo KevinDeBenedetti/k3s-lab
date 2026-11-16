@@ -5,83 +5,54 @@
 # Usage (standalone):  task vault:status
 # Usage (included):    includes: vault: taskfile: <path-to-k3s-lab>/taskfiles/vault.yml
 #
-# Required env (from .env):
-#   KUBECONFIG_CONTEXT   kubectl context name
-#   VAULT_ROOT_TOKEN     for configure/seed tasks
-#   VAULT_UNSEAL_KEY_1   for unseal task
-#   VAULT_UNSEAL_KEY_2   for unseal task
+# The scripts read their configuration from .env (lib/script-init.sh) or the
+# environment, and their defaults live in lib/vault.sh only — the tasks pass
+# nothing through. Usual .env entries:
+#   KUBECONFIG_CONTEXT    kubectl context
+#   VAULT_ROOT_TOKEN      for configure/seed (init prints it once)
+#   VAULT_UNSEAL_KEY_1…n  for unseal (asked for on the terminal when unset)
+#   OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_ISSUER_URL, VAULT_DOMAIN,
+#   ADMIN_EMAIL           all five, or none, for Vault's OIDC login
+# Optional: VAULT_NAMESPACE (vault), VAULT_POD (vault-0), VAULT_POLICY_DIR,
+# VAULT_KEY_SHARES (3), VAULT_KEY_THRESHOLD (2) — see lib/vault.sh.
 #
 # Vars (override via includes vars:):
-#   VAULT_POD            default: vault-0
-#   VAULT_NAMESPACE      default: vault
+#   VAULT_CONFIGURE_SCRIPT   default: <k3s-lab>/scripts/vault-configure.sh
 # =============================================================================
 version: '3'
 
 vars:
+  # Used by `status` only, which runs kubectl itself. Task resolves them from
+  # the environment / .env too, so they follow the same values as the scripts.
   VAULT_POD: '{{.VAULT_POD | default "vault-0"}}'
   VAULT_NAMESPACE: '{{.VAULT_NAMESPACE | default "vault"}}'
   VAULT_CONFIGURE_SCRIPT: '{{.VAULT_CONFIGURE_SCRIPT | default (printf "%s/../scripts/vault-configure.sh" .TASKFILE_DIR)}}'
 
 tasks:
   init:
-    desc: Initialize Vault, unseal, enable K8s auth, create policies + ESO role
+    desc: Initialize (or unseal) Vault, then configure it
     summary: |
-      Runs vault-init.sh which bootstraps a fresh Vault instance:
-        1. vault operator init
-        2. vault operator unseal (3 keys)
-        3. Enable kubernetes auth method
-        4. Create read-only policy for ESO
-        5. Configure OIDC auth method
+      Runs scripts/vault-init.sh:
+        1. Wait for the Vault pod to be Ready
+        2. vault operator init (3 key shares, threshold 2) — or unseal an
+           already initialised Vault
+        3. Configure: KV v2 at secret/, Kubernetes auth, policies from
+           vault/policies/, the External Secrets role, and OIDC when all of
+           its five variables are set
 
-      Save the unseal keys and root token — they will not be shown again.
+      Save the unseal keys and the root token — they will not be shown again.
     cmds:
       - bash {{.TASKFILE_DIR}}/../scripts/vault-init.sh
-    env:
-      VAULT_POD: '{{.VAULT_POD}}'
-      VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
-      OIDC_CLIENT_ID: '{{.OIDC_CLIENT_ID | default ""}}'
-      OIDC_CLIENT_SECRET: '{{.OIDC_CLIENT_SECRET | default ""}}'
-      OIDC_ISSUER_URL: '{{.OIDC_ISSUER_URL | default ""}}'
-      VAULT_DOMAIN: '{{.VAULT_DOMAIN | default ""}}'
-      ADMIN_EMAIL: '{{.ADMIN_EMAIL | default ""}}'
 
   unseal:
-    desc: Unseal Vault after node reboot (requires VAULT_UNSEAL_KEY_1 + _2 in .env)
-    preconditions:
-      - sh: test -n "$VAULT_UNSEAL_KEY_1"
-        msg: "VAULT_UNSEAL_KEY_1 is not set — add it to .env"
-      - sh: test -n "$VAULT_UNSEAL_KEY_2"
-        msg: "VAULT_UNSEAL_KEY_2 is not set — add it to .env"
-    # Keys travel on stdin, not argv — argv is visible in `ps` and in the
-    # kubectl exec API request (printf is a shell builtin, no extra process).
+    desc: Unseal Vault after a pod restart (VAULT_UNSEAL_KEY_1, _2, … from .env, or asked for)
     cmds:
-      - printf '%s\n' "$VAULT_UNSEAL_KEY_1"
-          | kubectl --context $KUBECONFIG_CONTEXT exec -i -n {{.VAULT_NAMESPACE}} {{.VAULT_POD}} --
-          sh -c 'IFS= read -r k; export VAULT_SKIP_VERIFY=true; exec vault operator unseal "$k"'
-          | grep -E "Sealed|Progress"
-      - printf '%s\n' "$VAULT_UNSEAL_KEY_2"
-          | kubectl --context $KUBECONFIG_CONTEXT exec -i -n {{.VAULT_NAMESPACE}} {{.VAULT_POD}} --
-          sh -c 'IFS= read -r k; export VAULT_SKIP_VERIFY=true; exec vault operator unseal "$k"'
-          | grep -E "Sealed|Progress"
+      - bash {{.TASKFILE_DIR}}/../scripts/vault-unseal.sh
 
   configure:
-    desc: (Re)create Vault policies, K8s auth, OIDC roles (idempotent)
-    preconditions:
-      - sh: test -n "$VAULT_ROOT_TOKEN"
-        msg: "VAULT_ROOT_TOKEN is not set — add it to .env"
+    desc: (Re)apply Vault engines, auth methods, policies and roles (idempotent)
     cmds:
       - bash {{.VAULT_CONFIGURE_SCRIPT}}
-    env:
-      VAULT_POD: '{{.VAULT_POD}}'
-      VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
-      # NOTE: Task does not expand `$VAR` in env: values — use {{.VAR}} templates
-      # (resolved from Task vars, then the environment/dotenv).
-      VAULT_ROOT_TOKEN: '{{.VAULT_ROOT_TOKEN}}'
-      OIDC_CLIENT_ID: '{{.OIDC_CLIENT_ID | default ""}}'
-      OIDC_CLIENT_SECRET: '{{.OIDC_CLIENT_SECRET | default ""}}'
-      OIDC_ISSUER_URL: '{{.OIDC_ISSUER_URL | default ""}}'
-      VAULT_DOMAIN: '{{.VAULT_DOMAIN | default ""}}'
-      ADMIN_EMAIL: '{{.ADMIN_EMAIL | default ""}}'
 
   seed:
     desc: Seed core secrets into Vault (OIDC, Grafana admin/oauth, Traefik dashboard)
@@ -92,26 +63,9 @@ tasks:
         secret/grafana/oauth       — full Grafana Generic OAuth config
         secret/traefik/dashboard   — htpasswd users string
 
-      All values must be set in .env before running this task.
-    preconditions:
-      - sh: test -n "$VAULT_ROOT_TOKEN"
-        msg: "VAULT_ROOT_TOKEN is not set — add it to .env"
+      Values that are not set are skipped. Needs VAULT_ROOT_TOKEN.
     cmds:
       - bash {{.TASKFILE_DIR}}/../scripts/vault-seed.sh
-    env:
-      VAULT_POD: '{{.VAULT_POD}}'
-      VAULT_NAMESPACE: '{{.VAULT_NAMESPACE}}'
-      VAULT_ROOT_TOKEN: '{{.VAULT_ROOT_TOKEN}}'
-      OIDC_CLIENT_ID: '{{.OIDC_CLIENT_ID | default ""}}'
-      OIDC_CLIENT_SECRET: '{{.OIDC_CLIENT_SECRET | default ""}}'
-      OIDC_PROVIDER_NAME: '{{.OIDC_PROVIDER_NAME | default "OIDC"}}'
-      OIDC_ISSUER_URL: '{{.OIDC_ISSUER_URL | default ""}}'
-      OIDC_AUTH_URL: '{{.OIDC_AUTH_URL | default ""}}'
-      OIDC_TOKEN_URL: '{{.OIDC_TOKEN_URL | default ""}}'
-      OIDC_API_URL: '{{.OIDC_API_URL | default ""}}'
-      GRAFANA_PASSWORD: '{{.GRAFANA_PASSWORD | default ""}}'
-      DASHBOARD_USER: '{{.DASHBOARD_USER | default "admin"}}'
-      DASHBOARD_PASSWORD: '{{.DASHBOARD_PASSWORD | default ""}}'
 
   status:
     desc: Show Vault seal status, ESO sync status, and managed secrets
