@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.25.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.24.1...v0.25.0) (2026-11-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **vault:** OIDC needs all five of OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_ISSUER_URL, VAULT_DOMAIN and ADMIN_EMAIL; a partial set now stops vault:init/vault:configure before anything is written. vault:configure now also enables KV v2 at secret/ and writes the Kubernetes auth config. The vault tasks no longer pass variables through env: blocks, so VAULT_POD and VAULT_NAMESPACE come from .env or the environment, not from includes: vars:.
+
+### Features
+
+* **vault:** one Vault bootstrap module behind a kubectl seam ([eb9b792](https://github.com/KevinDeBenedetti/k3s-lab/commit/eb9b792b32835801dbd8d6713fd3aef75ef3deee))
+
 ## [0.24.1](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.24.0...v0.24.1) (2026-10-13)
 
 
