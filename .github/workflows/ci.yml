@@ -297,10 +297,24 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Galaxy resets connections now and then ("Connection reset by peer",
+      # 2026-11-16). A failed install here fails CI on main, and release-charts
+      # only runs after a green CI, so one blip can skip a chart release. Retry
+      # like release-charts does for `helm dependency update`.
       - name: Install ansible-core and the pinned collections
         run: |
           python3 -m pip install --quiet 'ansible-core==2.21.3'
-          ansible-galaxy collection install -r ansible/requirements.yml
+          for attempt in 1 2 3 4 5; do
+            if ansible-galaxy collection install -r ansible/requirements.yml; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::ansible-galaxy collection install failed after 5 attempts"
+              exit 1
+            fi
+            echo "::warning::ansible-galaxy collection install failed (attempt $attempt/5), retrying in 10s"
+            sleep 10
+          done
 
       # Runs BEFORE ansible-lint on purpose. ansible-lint's `syntax-check` rules
       # are tagged `unskippable`, so a collection that failed to install does not
