@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# tests/bats/helpers/fake-helm — an adapter at the HELM seam that behaves like
+# Helm 3 on the one point the deploy scripts depend on: how chart dependencies
+# are fetched on a machine with no repositories registered.
+#
+#   helm dependency build <chart>    fails, as real Helm does, unless every
+#                                    dependency repository of <chart> is listed
+#                                    in $HELM_CONFIG_HOME/repositories.yaml
+#                                    (that is, `helm repo add` ran first)
+#   helm dependency update <chart>   succeeds: it reads the repository URLs
+#                                    from Chart.yaml itself
+#   helm repo add <name> <url>       records the repository
+#   helm upgrade …                   succeeds
+#
+# Every call is appended to $FAKE_HELM_LOG, one line, arguments joined by " ".
+set -euo pipefail
+
+log="${FAKE_HELM_LOG:?FAKE_HELM_LOG is not set}"
+repos="${HELM_CONFIG_HOME:?HELM_CONFIG_HOME is not set}/repositories.yaml"
+echo "$*" >>"$log"
+
+case "$1 ${2:-}" in
+  "dependency build")
+    chart="$3"
+    missing=()
+    while IFS= read -r url; do
+      grep -qF "url: ${url}" "$repos" 2>/dev/null || missing+=("$url")
+    done < <(awk '/^[[:space:]]+repository:/ { print $2 }' "$chart/Chart.yaml")
+    if [[ ${#missing[@]} -gt 0 ]]; then
+      echo "Error: no repository definition for ${missing[*]}. Please add the missing repos via 'helm repo add'" >&2
+      exit 1
+    fi ;;
+  "dependency update") ;;
+  "repo add")
+    mkdir -p "$(dirname "$repos")"
+    printf -- '- name: %s\n  url: %s\n' "$3" "$4" >>"$repos" ;;
+  "upgrade --install") ;;
+  *) echo "fake helm: unexpected call: $*" >&2; exit 64 ;;
+esac
