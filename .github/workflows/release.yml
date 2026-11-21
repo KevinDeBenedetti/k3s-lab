@@ -14,7 +14,7 @@ on:
 
 jobs:
   release:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/release.yml@0ca5f46911f525a18f91a74b26443a91f717eae6 # v0.48.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/release.yml@2182020d9bf285c8183d0736f27262f6782ebe05 # v0.53.0
     permissions:
       contents: write
       issues: write
