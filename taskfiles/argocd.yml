@@ -23,49 +23,16 @@
 version: '3'
 
 vars:
-  ARGOCD_CHART_DIR: '{{.TASKFILE_DIR}}/../charts/platform-argocd'
   ARGOCD_VALUES_FILE: '{{.ARGOCD_VALUES_FILE | default ""}}'
   ARGOCD_REPO_SECRET_NAME: '{{.ARGOCD_REPO_SECRET_NAME | default "argocd-repo"}}'
 
 tasks:
   deploy:
     desc: Deploy ArgoCD (charts/platform-argocd) via Helm — run once after bootstrap
-    preconditions:
-      - sh: test -n "$KUBECONFIG_CONTEXT"
-        msg: "KUBECONFIG_CONTEXT is not set — add it to .env"
-      - sh: test -n "$ARGOCD_DOMAIN"
-        msg: "ARGOCD_DOMAIN is not set — add it to .env"
-      - sh: test -z "{{.ARGOCD_VALUES_FILE}}" || test -f "{{.ARGOCD_VALUES_FILE}}"
-        msg: "ARGOCD_VALUES_FILE not found: {{.ARGOCD_VALUES_FILE}}"
     cmds:
-      # The chart's own dependency (upstream argo-cd) at the version pinned in
-      # its Chart.lock.
-      - helm dependency build "{{.ARGOCD_CHART_DIR}}"
-      # Release `argocd` renders the same `argocd-*` resource names as the
-      # upstream chart installed under that release name, so an install made
-      # with `argo/argo-cd` upgrades in place.
-      - |
-        helm upgrade --install argocd "{{.ARGOCD_CHART_DIR}}" \
-          --kube-context "$KUBECONFIG_CONTEXT" \
-          --namespace argocd \
-          --create-namespace \
-          {{if .ARGOCD_VALUES_FILE}}--values "{{.ARGOCD_VALUES_FILE}}" {{end}}\
-          --set "argo-cd.global.domain=$ARGOCD_DOMAIN" \
-          --set "argo-cd.configs.cm.url=https://$ARGOCD_DOMAIN" \
-          --wait \
-          --timeout 300s
-      - cmd: |
-          echo ""
-          echo "  UI:       https://$ARGOCD_DOMAIN"
-          echo "  User:     admin"
-          echo "  Password: task argocd:password"
-          echo ""
-          echo "Next steps:"
-          echo "  1. Add DNS: $ARGOCD_DOMAIN → ${SERVER_IP:-<your ingress IP>}"
-          echo "  2. task argocd:add-repo ARGOCD_REPO_URL=git@github.com:<you>/<config-repo>.git GITHUB_DEPLOY_KEY=~/.ssh/deploy_key"
-          echo "  3. Apply your AppProjects and root Application (or ApplicationSets) from your config repo"
-          echo "  4. Add a GitHub webhook: https://$ARGOCD_DOMAIN/api/webhook"
-        silent: true
+      # An argument, not an env: entry: env: would export an empty value when
+      # the var is not given, and mask ARGOCD_VALUES_FILE from .env.
+      - bash {{.TASKFILE_DIR}}/../scripts/argocd-deploy.sh "{{.ARGOCD_VALUES_FILE}}"
 
   add-repo:
     desc: Register a Git repo in ArgoCD via SSH deploy key
