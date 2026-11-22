@@ -57,7 +57,7 @@ jobs:
 
   # ─── Shell linting ─────────────────────────────────────────────────────────
   shell-ci:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@d2ae4c97b55c46affe8f1e2b5a989cf7a10d3c4c # v0.54.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-shell.yml@25f03b7fb1c141105b83b5da0c5c3daf9576afe3 # v0.55.0
     with:
       run-shellcheck: true
       shellcheck-severity: warning
@@ -71,7 +71,7 @@ jobs:
 
   # ─── Kubernetes validation + .env.example check ──────────────────────────
   kubernetes:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-kubernetes.yml@d2ae4c97b55c46affe8f1e2b5a989cf7a10d3c4c # v0.54.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/ci-kubernetes.yml@25f03b7fb1c141105b83b5da0c5c3daf9576afe3 # v0.55.0
     with:
       run-kubeconform: true
       kubeconform-paths: kubernetes/
@@ -86,7 +86,7 @@ jobs:
 
   # ─── Secret scanning ──────────────────────────────────────────────────────
   security:
-    uses: KevinDeBenedetti/github-workflows/.github/workflows/security.yml@d2ae4c97b55c46affe8f1e2b5a989cf7a10d3c4c # v0.54.0
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/security.yml@25f03b7fb1c141105b83b5da0c5c3daf9576afe3 # v0.55.0
     permissions:
       security-events: write
       actions: read
