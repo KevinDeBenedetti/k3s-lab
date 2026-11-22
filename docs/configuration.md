@@ -75,7 +75,7 @@ that pin by hand; it is gone.
 | Variable             | Default | Required | Description |
 | -------------------- | ------- | -------- | ----------- |
 | `ARGOCD_DOMAIN`      | —       | ✅        | Hostname of the ArgoCD UI (`argo-cd.global.domain`, `configs.cm.url`) |
-| `ARGOCD_VALUES_FILE` | —       | —        | Task var: your values file, layered on the chart defaults |
+| `ARGOCD_VALUES_FILE` | —       | —        | Your values file, layered on the chart defaults: in `.env`, or `task argocd:deploy ARGOCD_VALUES_FILE=…` (wins) |
 
 ### Application
 
