@@ -5,7 +5,7 @@ four upstream charts and trimmed to fit an 8 GB single node.
 
 | | |
 |---|---|
-| Subcharts | `grafana` `10.5.15`, `loki` `7.0.0`, `promtail` `6.17.1`, `kube-prometheus-stack` `86.1.0` |
+| Subcharts | `grafana` [`10.5.15`](https://grafana.github.io/helm-charts), `loki` [`7.0.0`](https://grafana.github.io/helm-charts), `promtail` [`6.17.1`](https://grafana.github.io/helm-charts), `kube-prometheus-stack` [`86.1.0`](https://prometheus-community.github.io/helm-charts) |
 | Namespace (convention) | `monitoring` — set at install time; this chart neither creates nor enforces it |
 | Per-cluster overrides | `<your-repo>/platform/monitoring/values.yaml` |
 

@@ -53,3 +53,9 @@ credentials to do it. Which versions a cluster actually **runs** is a different
 question: it depends on which published chart that cluster pins, which this
 repository cannot see and which can lag it by any number of releases. Answering
 it is the job of the repository that deploys the cluster.
+
+Renovate (`renovate.json`, run by `.github/workflows/renovate.yml`) keeps the
+versions this repository pins moving: every Monday, it proposes each new
+release once it is three days old. It is not an advisory watch: the OSV
+vulnerability data it reads covers only the Python tools of the CI here, not
+the charts or their images.

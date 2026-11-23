@@ -6,7 +6,7 @@ TLS-enabled, Raft-backed** server for a single node.
 | | |
 |---|---|
 | Subchart | `vault` [`0.32.0`](https://helm.releases.hashicorp.com) |
-| Vault image | `hashicorp/vault:1.21.2` (pinned in `values.yaml`) |
+| Vault image | `hashicorp/vault:1.21.4` (pinned in `values.yaml`) |
 | Namespace (convention) | `vault` — set at install time; this chart neither creates nor enforces it |
 | Per-cluster overrides | `<your-repo>/platform/vault/values.yaml` |
 

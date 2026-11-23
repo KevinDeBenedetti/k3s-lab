@@ -1,3 +1,7 @@
+---
+title: Configuration Reference
+---
+
 # Configuration Reference
 
 All configuration is managed through a `.env` file at the repository root. Copy the template and fill in your values:
@@ -59,12 +63,22 @@ listed at `34.4.0` against a real pin of `41.1.0`, Loki `6.35.1` against
 They have been dropped from `.env.example` rather than refreshed, because
 refreshing them only resets the clock on the same drift.
 
-> Earlier revisions of this page claimed these versions were "managed by
-> Renovate via the shared preset in `renovate.json`". There is no `renovate.json`
-> in this repo and there never was. Dependency automation is
-> [`.github/dependabot.yml`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/.github/dependabot.yml), added 2026-08-06, and it
-> covers GitHub Actions only — chart pins are bumped by hand and guarded by
-> `scripts/check-umbrella-pins.sh`.
+Renovate keeps those pins current, from `renovate.json` on the shared preset
+[`KevinDeBenedetti/renovate-config`](https://github.com/KevinDeBenedetti/renovate-config):
+each new upstream subchart release becomes a pull request on a Monday morning,
+once it is three days old, with the chart's `Chart.lock` and the copy of the
+version in its `README.md` (not platform-traefik's: that pull request says
+what to update by hand). The `platform-*` pins of the umbrella are not
+Renovate's: release-please moves them in its release pull request, and
+`scripts/check-umbrella-pins.sh` guards them.
+
+::: info
+Earlier revisions of this page claimed these versions were "managed by
+Renovate via the shared preset in `renovate.json`" while this repo had no
+`renovate.json`. Until 2026-11-23 its only dependency automation was
+Dependabot (from 2026-08-06), for the GitHub Actions, and chart pins were
+bumped by hand.
+:::
 
 There is no exception for ArgoCD: `task argocd:deploy` installs this
 checkout's [`charts/platform-argocd`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-argocd/Chart.yaml),

@@ -22,16 +22,17 @@
 # commit. The SHAs chosen were the exact commits `@main` and `@v5`/`@v2` already
 # resolved to, so pinning changed nothing about what executes.
 #
-# They are re-resolved automatically by .github/dependabot.yml (github-actions
-# ecosystem, weekly, grouped into a single PR). Dependabot rewrites the SHA *and*
-# the trailing `# vX.Y.Z` comment, which is why that comment format is
-# load-bearing — keep it when editing a pin by hand.
-#
-# ⚠️ This paragraph asserted the exact opposite until 2026-08-18 ("Nothing bumps
-# these automatically. This repo has no dependabot.yml [...] docs/configuration.md
-# claims otherwise — it is wrong"). It was itself the stale one, and the docs it
-# accused were right: dependabot.yml landed 2026-08-06, the same day these SHAs
-# were pinned, and has been opening grouped bump PRs since (2161d07, 285115b).
+# They are re-resolved automatically, and both bots rewrite the SHA *and* the
+# trailing `# vX.Y.Z` comment, which is why that comment format is load-bearing
+# — keep it when editing a pin by hand:
+#   - the actions, by Renovate (renovate.json, weekly: minor and patch bumps
+#     grouped into one PR, a major in its own). It also moves the `version:`
+#     of setup-helm and the pip pins of the ansible job, in PRs of their own.
+#     .github/dependabot.yml did the actions from 2026-08-06, the day these
+#     SHAs were pinned, until 2026-11-23;
+#   - the github-workflows pins, by its propagate-release job, with each of its
+#     releases. It reads the comment to know which release a SHA is: a pin
+#     without one is never moved.
 # =============================================================================
 name: CI
 

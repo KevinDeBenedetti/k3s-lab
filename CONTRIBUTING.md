@@ -39,7 +39,12 @@ deliberate **0.x line**:
   catch that.
 - **Never add a `Release-As:` footer** to a commit.
 - Third-party dependency versions (`dependencies[].version` of the non-`platform-*`
-  subcharts) are the part humans — or Renovate — edit.
+  subcharts) are the part humans — or Renovate — edit. Renovate (`renovate.json`)
+  proposes each upstream release with its `Chart.lock`, and rewrites the copy of
+  the version in the chart README's `Subchart(s)` row in the same PR, as long as
+  the row keeps the form `` `name` [`version`](repository) ``. Not in
+  platform-traefik's README: `check-traefik-image.sh` verifies that page against
+  the subchart, and the traefik PR says what to update by hand.
 
 ## Commit messages
 
