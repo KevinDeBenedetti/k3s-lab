@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.26.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.25.0...v0.26.0) (2026-11-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* the Kyverno policies are now policies.kyverno.io/v1 ValidatingPolicy objects: an ArgoCD AppProject that whitelists cluster-scoped kinds must add policies.kyverno.io/ValidatingPolicy. The kubernetes/components/* directories are kind: Component and must be listed under components:, no longer under resources:.
+
+### Features
+
+* fix the 2026-11 audit findings ([#121](https://github.com/KevinDeBenedetti/k3s-lab/issues/121), [#123](https://github.com/KevinDeBenedetti/k3s-lab/issues/123)–[#135](https://github.com/KevinDeBenedetti/k3s-lab/issues/135)) ([a776d32](https://github.com/KevinDeBenedetti/k3s-lab/commit/a776d32dcf17cfa4930549d8cc34a23bdb80380b)), closes [#124](https://github.com/KevinDeBenedetti/k3s-lab/issues/124) [#125](https://github.com/KevinDeBenedetti/k3s-lab/issues/125) [#126](https://github.com/KevinDeBenedetti/k3s-lab/issues/126) [#127](https://github.com/KevinDeBenedetti/k3s-lab/issues/127) [#128](https://github.com/KevinDeBenedetti/k3s-lab/issues/128) [#129](https://github.com/KevinDeBenedetti/k3s-lab/issues/129) [#130](https://github.com/KevinDeBenedetti/k3s-lab/issues/130) [#131](https://github.com/KevinDeBenedetti/k3s-lab/issues/131) [#132](https://github.com/KevinDeBenedetti/k3s-lab/issues/132) [#133](https://github.com/KevinDeBenedetti/k3s-lab/issues/133) [#134](https://github.com/KevinDeBenedetti/k3s-lab/issues/134) [#140](https://github.com/KevinDeBenedetti/k3s-lab/issues/140) [#141](https://github.com/KevinDeBenedetti/k3s-lab/issues/141)
+
+
+### Bug Fixes
+
+* **argocd:** deploy on a machine with no Helm repositories ([aebdfeb](https://github.com/KevinDeBenedetti/k3s-lab/commit/aebdfeb8c1aaec8730c5e8a8bcfb9aea57c6652c))
+
 ## [0.25.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.24.1...v0.25.0) (2026-11-16)
 
 
