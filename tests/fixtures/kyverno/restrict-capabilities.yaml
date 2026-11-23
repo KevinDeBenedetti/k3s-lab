@@ -1,0 +1,135 @@
+# Fixtures for the restrict-capabilities policy (tests/bats/kyverno-policies.bats):
+# pods named pass-* must pass it, pods named fail-* must fail it.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pass-drop-all
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pass-add-net-bind
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+          add:
+            - NET_BIND_SERVICE
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-no-drop
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        capabilities: {}
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-drop-some
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - NET_RAW
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-add-sys-admin
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+          add:
+            - SYS_ADMIN
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-no-security-context
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi

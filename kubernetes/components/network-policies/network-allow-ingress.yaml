@@ -1,4 +1,6 @@
-# Allow ingress from Traefik IngressController (usually in kube-system or traefik namespace)
+# Allow ingress from the ingress controller: Traefik, installed by
+# charts/platform-traefik in the `ingress` namespace (kube-system kept for
+# k3s's own load-balancer pods).
 
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -11,14 +13,13 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-    # Allow from Traefik (typically in kube-system or traefik namespace)
     - from:
         - namespaceSelector:
             matchLabels:
-              name: kube-system
+              kubernetes.io/metadata.name: ingress
         - namespaceSelector:
             matchLabels:
-              name: traefik
+              kubernetes.io/metadata.name: kube-system
       ports:
         - protocol: TCP
           port: 8080      # Common app HTTP port

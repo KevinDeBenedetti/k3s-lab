@@ -21,7 +21,7 @@ This guide covers deploying [HashiCorp Vault](https://developer.hashicorp.com/va
 
 **Auth:** ESO authenticates to Vault via the Kubernetes auth method. ESO's own ServiceAccount token is exchanged for a scoped Vault token at sync time.
 
-**UI access:** Vault UI is behind the WireGuard `vpn-only` middleware. Bring up your WireGuard VPN connection before opening the browser.
+**UI access:** the chart exposes no ingress: the UI is the `vault` ClusterIP service. Use `kubectl -n vault port-forward svc/vault 8200` and open `https://localhost:8200`, or publish it yourself from your config repo (behind a VPN or an IP allow-list, preferably).
 
 ---
 
@@ -50,20 +50,31 @@ Add DNS A record: `vault.example.com → SERVER_IP`
 
 ## Step 1 — Deploy Vault
 
-Deploy the `platform-vault` OCI chart via ArgoCD or directly with Helm:
+**First, the `vault-tls` secret.** The listener terminates TLS itself and the
+chart mounts the `vault-tls` secret unconditionally: without it the pod never
+starts. Create it in the `vault` namespace before installing, with a
+cert-manager `Certificate` (see [cert-manager](./cert-manager.md)) or by hand.
+
+Then deploy the `platform-vault` OCI chart, via ArgoCD or directly with Helm:
 
 ```bash
 helm upgrade --install platform-vault \
   oci://ghcr.io/kevindebenedetti/charts/platform-vault \
-  --version 0.7.4 \
+  --version <k3s-lab release, e.g. 0.25.0> \
   --namespace vault --create-namespace \
-  --values platform/vault/values.yaml
+  --values <your config repo>/platform/vault/values.yaml   # optional overrides
 ```
 
-This installs Vault into the `vault` namespace with:
+This installs Vault into the `vault` namespace (StatefulSet `vault`, pod
+`vault-0`, the defaults of the `task vault:*` scripts) with:
 - Single-replica Raft storage (5 Gi PVC on `local-path`)
-- UI enabled (ClusterIP, exposed via Traefik IngressRoute)
-- VPN-only IngressRoute + Let's Encrypt TLS cert
+- TLS on the listener (`:8200`), from the `vault-tls` secret
+- The UI as a `ClusterIP` service only: the chart ships **no ingress**. Reach it
+  with `kubectl -n vault port-forward svc/vault 8200`, or expose it
+  deliberately from your config repo.
+
+See the [chart README](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-vault/README.md)
+for the full topology.
 
 > ⚠️ Vault starts **sealed and uninitialized** — proceed to Step 2.
 

@@ -11,14 +11,14 @@ Kyverno, plus six Kyverno cluster policies this chart owns.
 
 ## Installing on a cluster without the Kyverno CRDs
 
-The six ClusterPolicies below and the Kyverno engine that evaluates them
+The six ValidatingPolicies below and the Kyverno engine that evaluates them
 cannot be created by the same Helm release on a cluster that does not already
 have the Kyverno CRDs. Helm builds and validates **every** rendered manifest
-against the API server before applying any of it, so a `ClusterPolicy` whose
-kind is not yet registered fails the whole install:
+against the API server before applying any of it, so a `ValidatingPolicy`
+whose kind is not yet registered fails the whole install:
 
 ```
-no matches for kind "ClusterPolicy" in version "kyverno.io/v1"
+no matches for kind "ValidatingPolicy" in version "policies.kyverno.io/v1"
 ensure CRDs are installed first
 ```
 
@@ -55,17 +55,32 @@ its first install only, and its `NOTES.txt` says so every time.
 
 ## Kyverno policies
 
-All six are `ClusterPolicy`, gated collectively on `kyverno.enabled` **and**
-`kyvernoPolicies.enabled` — the engine and the policies are separate switches,
-for the reason above. Their failure action comes from a single value:
+All six are `ValidatingPolicy` (`policies.kyverno.io/v1`, CEL expressions),
+gated collectively on `kyverno.enabled` **and** `kyvernoPolicies.enabled` — the
+engine and the policies are separate switches, for the reason above. Their
+action comes from a single value:
 
 ```yaml
 kyvernoPolicies:
   failureAction: Audit   # or Enforce
 ```
 
-It renders into each rule's `validate.failureAction`, not the chart-level
-`spec.validationFailureAction` that Kyverno 3.8 deprecated. The old value key
+It renders into each policy's `spec.validationActions`: `[Audit]`, or `[Deny]`
+for `Enforce`. Until #140 they were legacy `kyverno.io/v1` `ClusterPolicy`
+objects, which Kyverno 1.20 no longer executes; the pinned Kyverno (1.18.1)
+already serves `policies.kyverno.io/v1`, so the move needed no engine bump.
+`tests/bats/kyverno-policies.bats` evaluates every policy with the Kyverno CLI
+against `tests/fixtures/kyverno/`, which is what proves they still run.
+
+> [!IMPORTANT]
+> **Upgrading from 0.25 or earlier:** a cluster whose ArgoCD AppProject
+> whitelists cluster-scoped kinds must add `policies.kyverno.io/ValidatingPolicy`
+> to `clusterResourceWhitelist`. Without it the policies are refused and the
+> Application stays `OutOfSync`/`Healthy` — the August 2026 failure below. The
+> old ClusterPolicies are removed by the upgrade, as resources the release no
+> longer renders.
+
+The old value key
 `kyvernoPolicies.validationFailureAction` was a deprecated alias until
 2026-08-20; it is now **rejected** with an explicit error rather than ignored,
 since Helm would otherwise drop the unknown key in silence and revert the
@@ -83,7 +98,7 @@ correct, the render valid, and the cluster still hold none of them — either
 because the Kyverno CRDs are not installed yet (the first-install order below),
 or because something upstream refused the kind. The second is not theoretical:
 in August 2026 the ArgoCD AppProject did not whitelist `kyverno.io/ClusterPolicy`
-and rejected all six for 32 hours, with the Application reporting
+(the kind they had then) and rejected all six for 32 hours, with the Application reporting
 `OutOfSync`/`Healthy` throughout. This script is the only check here that looks
 at a cluster, so it is the only one that can tell the difference.
 

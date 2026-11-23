@@ -10,23 +10,29 @@
 # =============================================================================
 version: '3'
 
+vars:
+  # The kube context, defaulted like the scripts (lib/vault.sh, uninstall.sh…):
+  # left unquoted and unset, `--context` used to read the next word as the
+  # context name (#131).
+  KUBECONFIG_CONTEXT: '{{.KUBECONFIG_CONTEXT | default "k3s-lab"}}'
+
 tasks:
   nodes:
     desc: Show cluster nodes
     cmds:
-      - kubectl --context $KUBECONFIG_CONTEXT get nodes -o wide
+      - kubectl --context "{{.KUBECONFIG_CONTEXT}}" get nodes -o wide
 
   all:
     desc: Show all non-completed pods across namespaces
     cmds:
-      - kubectl --context $KUBECONFIG_CONTEXT get pods -A --field-selector=status.phase!=Succeeded | grep -v Completed
+      - kubectl --context "{{.KUBECONFIG_CONTEXT}}" get pods -A --field-selector=status.phase!=Succeeded | grep -v Completed
 
   pods:
     desc: Show pod resource usage (requires metrics-server)
     cmds:
-      - cmd: kubectl --context $KUBECONFIG_CONTEXT top pods -A
+      - cmd: kubectl --context "{{.KUBECONFIG_CONTEXT}}" top pods -A
         ignore_error: true
-      - cmd: kubectl --context $KUBECONFIG_CONTEXT get pods -A
+      - cmd: kubectl --context "{{.KUBECONFIG_CONTEXT}}" get pods -A
         ignore_error: true
 
   certs:
@@ -35,7 +41,7 @@ tasks:
       - cmd: 'printf "\033[0;36m── Certificates ────────────────────────────────────────────────\033[0m\n"'
         silent: true
       - cmd: >-
-          kubectl --context $KUBECONFIG_CONTEXT get certificates -A
+          kubectl --context "{{.KUBECONFIG_CONTEXT}}" get certificates -A
           -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[0].status,EXPIRY:.status.notAfter'
           2>/dev/null || echo "  ❌ cert-manager not reachable"
         ignore_error: true
@@ -45,11 +51,11 @@ tasks:
     cmds:
       - cmd: 'printf "\033[0;36m── NetworkPolicies ──────────────────────────────────────────────\033[0m\n"'
         silent: true
-      - kubectl --context $KUBECONFIG_CONTEXT get networkpolicies -A
+      - kubectl --context "{{.KUBECONFIG_CONTEXT}}" get networkpolicies -A
       - cmd: 'echo ""'
         silent: true
       - cmd: 'printf "\033[0;36m── Pod Security Standards ───────────────────────────────────────\033[0m\n"'
         silent: true
       - >-
-        kubectl --context $KUBECONFIG_CONTEXT get namespaces
+        kubectl --context "{{.KUBECONFIG_CONTEXT}}" get namespaces
         -o custom-columns='NAMESPACE:.metadata.name,PSS-ENFORCE:.metadata.labels.pod-security\.kubernetes\.io/enforce'

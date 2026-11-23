@@ -6,8 +6,12 @@
 # - Service & ServiceAccount templates
 # - Namespace label selector
 #
-# NOTE: patchesStrategicMerge are applied at the APP level, not here.
-# This component provides the base templates only.
+# - Security hardening of every Deployment in the app (deployment-patch.yaml):
+#   the first container runs non-root, read-only, without privilege
+#   escalation or capabilities, under the RuntimeDefault seccomp profile, and
+#   the pod mounts no service-account token. The app's own patches run after
+#   the component's, so an app can still set runAsUser, mount an emptyDir for
+#   /tmp, or turn the token back on.
 #
 # Usage in app kustomization.yaml:
 #   components:
@@ -18,13 +22,18 @@
 #     - deployment-patch.yaml     # override resources, volumes, etc.
 # =============================================================================
 
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
 
 # Resources used by this component (templates)
 resources:
   - service.yaml
   - serviceaccount.yaml
+
+patches:
+  - path: deployment-patch.yaml
+    target:
+      kind: Deployment
 
 # Labels applied to ALL objects (including Deployments, Services, etc.)
 labels:

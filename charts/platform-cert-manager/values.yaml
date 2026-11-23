@@ -22,3 +22,11 @@ cert-manager:
         memory: 32Mi
       limits:
         memory: 64Mi
+  # Hook Job that waits for the webhook after install.
+  startupapicheck:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 64Mi

@@ -10,6 +10,13 @@
 #   PLAYBOOK_DIR      default: <taskfile_dir>/../ansible/playbooks
 #   TF_DIR            default: terraform (only for provision:inventory)
 #   CLUSTER_ENV       optional extra env file for provision:inventory
+#   ANSIBLE_CONFIG    default: <taskfile_dir>/../ansible/ansible.cfg
+#
+# ansible-playbook runs from the directory task runs in (your config repo, or
+# this repo's root), where no ansible.cfg is found on its own: without
+# ANSIBLE_CONFIG no role resolves, and new hosts hit an SSH host-key prompt
+# (StrictHostKeyChecking=accept-new lives in that file). Its paths resolve
+# against the file's own directory, so it works from any directory.
 #
 # provision:inventory is optional: it generates the inventory from Terraform
 # outputs (contract in scripts/generate-inventory.sh). Without Terraform, copy
@@ -23,6 +30,10 @@ vars:
   PLAYBOOK_DIR: '{{.PLAYBOOK_DIR | default (printf "%s/../ansible/playbooks" .TASKFILE_DIR)}}'
   TF_DIR: '{{.TF_DIR | default "terraform"}}'
   CLUSTER_ENV: '{{.CLUSTER_ENV | default ""}}'
+  ANSIBLE_CONFIG: '{{.ANSIBLE_CONFIG | default (printf "%s/../ansible/ansible.cfg" .TASKFILE_DIR)}}'
+
+env:
+  ANSIBLE_CONFIG: '{{.ANSIBLE_CONFIG}}'
 
 tasks:
   inventory:

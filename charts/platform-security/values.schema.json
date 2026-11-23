@@ -10,7 +10,7 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "Renders the six Kyverno ClusterPolicies. Needs kyverno.enabled for the CRDs/engine."
+          "description": "Renders the six Kyverno ValidatingPolicies. Needs kyverno.enabled for the CRDs/engine."
         },
         "failureAction": {
           "type": ["string", "null"],

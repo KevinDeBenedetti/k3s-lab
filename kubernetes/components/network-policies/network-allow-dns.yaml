@@ -11,19 +11,24 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # Allow DNS to kube-system
+    # Allow DNS to kube-system. `kubernetes.io/metadata.name` is the label
+    # Kubernetes sets on every namespace; nothing sets a bare `name:` one.
     - to:
         - namespaceSelector:
             matchLabels:
-              name: kube-system
+              kubernetes.io/metadata.name: kube-system
       ports:
         - protocol: UDP
           port: 53        # DNS UDP
         - protocol: TCP
           port: 53        # DNS TCP
-    # Allow external HTTPS (for external API calls if needed)
+    # Allow HTTPS to any pod in the cluster and to the outside world.
+    # A namespaceSelector only ever matches pods; addresses outside the
+    # cluster need an ipBlock.
     - to:
-        - namespaceSelector: {}  # Any namespace
+        - namespaceSelector: {}  # any pod, any namespace
+        - ipBlock:
+            cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
           port: 443

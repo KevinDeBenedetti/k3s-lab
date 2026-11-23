@@ -1,15 +1,10 @@
 {{- if and .Values.kyverno.enabled .Values.kyvernoPolicies.enabled }}
 ---
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
   name: restrict-capabilities
   annotations:
-    # Kyverno auto-generates this policy's rules for the Pod controllers listed
-    # here. Its default list adds ReplicaSet and ReplicationController: every
-    # Deployment rollout keeps old ReplicaSets at zero replicas, whose policy
-    # reports repeat the Deployment's failure until the next rollout.
-    pod-policies.kyverno.io/autogen-controllers: DaemonSet,Deployment,StatefulSet,Job,CronJob
     policies.kyverno.io/title: Restrict Linux Capabilities
     policies.kyverno.io/category: Pod Security Standards (Restricted)
     policies.kyverno.io/severity: high
@@ -19,35 +14,42 @@ metadata:
       dropping ALL capabilities and only allows adding NET_BIND_SERVICE if needed.
       Aligns with Pod Security Standards restricted profile.
 spec:
-  background: true
-  rules:
-    - name: drop-all-capabilities
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-      exclude:
-        any:
-          - resources:
-              namespaces:
-                - kube-system
-                - kyverno
-                - argocd
-                - vault
-                - ingress
-                - cert-manager
-                - monitoring
-      validate:
-        failureAction: {{ include "platform-security.failureAction" . }}
-        message: "Containers must drop ALL capabilities and may only add NET_BIND_SERVICE."
-        pattern:
-          spec:
-            containers:
-              - securityContext:
-                  capabilities:
-                    drop:
-                      - ALL
-                    =(add):
-                      - NET_BIND_SERVICE
+  validationActions: [{{ include "platform-security.validationAction" . }}]
+  evaluation:
+    background:
+      enabled: true
+  # Kyverno generates this policy's checks for the Pod controllers listed
+  # here. Its default list adds ReplicaSets: every Deployment rollout keeps
+  # old ReplicaSets at zero replicas, whose policy reports repeat the
+  # Deployment's failure until the next rollout.
+  autogen:
+    podControllers:
+      controllers: [daemonsets, deployments, statefulsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - kyverno
+            - argocd
+            - vault
+            - ingress
+            - cert-manager
+            - monitoring
+  validations:
+    - expression: >-
+        object.spec.containers.all(c,
+          has(c.securityContext) && has(c.securityContext.capabilities) &&
+          has(c.securityContext.capabilities.drop) &&
+          'ALL' in c.securityContext.capabilities.drop &&
+          (!has(c.securityContext.capabilities.add) ||
+           c.securityContext.capabilities.add.all(a, a == 'NET_BIND_SERVICE')))
+      message: "Containers must drop ALL capabilities and may only add NET_BIND_SERVICE."
 {{- end }}

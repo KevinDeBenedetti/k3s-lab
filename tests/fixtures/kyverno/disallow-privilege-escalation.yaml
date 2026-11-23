@@ -1,0 +1,124 @@
+# Fixtures for the disallow-privilege-escalation policy (tests/bats/kyverno-policies.bats):
+# pods named pass-* must pass it, pods named fail-* must fail it.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pass-escalation-false
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-escalation-true
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      securityContext:
+        allowPrivilegeEscalation: true
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-escalation-unset
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      securityContext:
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-no-security-context
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-second-container
+  namespace: apps
+spec:
+  containers:
+    - name: c
+      image: nginx:1.27
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+    - name: d
+      image: nginx:1.27
+      securityContext:
+        allowPrivilegeEscalation: true
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi

@@ -18,6 +18,10 @@
 version: '3'
 
 vars:
+  # The kube context, defaulted like the scripts (lib/vault.sh, uninstall.sh…):
+  # left unquoted and unset, `--context` used to read the next word as the
+  # context name (#131).
+  KUBECONFIG_CONTEXT: '{{.KUBECONFIG_CONTEXT | default "k3s-lab"}}'
   DASHBOARD_USER: '{{.DASHBOARD_USER | default "admin"}}'
   GRAFANA_USER: '{{.GRAFANA_USER | default "admin"}}'
 
@@ -32,30 +36,30 @@ tasks:
     cmds:
       - |
         # htpasswd -i reads the password from stdin — keeps it out of `ps` (unlike -b)
-        kubectl --context $KUBECONFIG_CONTEXT \
+        kubectl --context "{{.KUBECONFIG_CONTEXT}}" \
           create secret generic traefik-dashboard-auth \
           --from-literal=users="$(printf '%s\n' "$DASHBOARD_PASSWORD" | htpasswd -ni '{{.DASHBOARD_USER}}')" \
           -n ingress \
           --dry-run=client -o yaml \
-        | kubectl --context $KUBECONFIG_CONTEXT apply -f -
+        | kubectl --context "{{.KUBECONFIG_CONTEXT}}" apply -f -
 
   grafana-secret:
     desc: Create Grafana admin secret in monitoring namespace (requires GRAFANA_PASSWORD in .env)
     preconditions:
       - sh: test -n "$GRAFANA_PASSWORD"
         msg: "GRAFANA_PASSWORD is not set — add it to .env"
-      - sh: kubectl --context $KUBECONFIG_CONTEXT cluster-info --request-timeout=5s >/dev/null 2>&1
-        msg: "Cannot reach cluster $KUBECONFIG_CONTEXT — is k3s running?"
+      - sh: kubectl --context "{{.KUBECONFIG_CONTEXT}}" cluster-info --request-timeout=5s >/dev/null 2>&1
+        msg: "Cannot reach cluster {{.KUBECONFIG_CONTEXT}} — is k3s running?"
     cmds:
-      - kubectl --context $KUBECONFIG_CONTEXT create namespace monitoring --dry-run=client -o yaml | kubectl --context $KUBECONFIG_CONTEXT apply -f -
+      - kubectl --context "{{.KUBECONFIG_CONTEXT}}" create namespace monitoring --dry-run=client -o yaml | kubectl --context "{{.KUBECONFIG_CONTEXT}}" apply -f -
       - |
-        kubectl --context $KUBECONFIG_CONTEXT \
+        kubectl --context "{{.KUBECONFIG_CONTEXT}}" \
           create secret generic grafana-admin-secret \
           --from-literal=username={{.GRAFANA_USER}} \
           --from-literal=password="$GRAFANA_PASSWORD" \
           -n monitoring \
           --dry-run=client -o yaml \
-        | kubectl --context $KUBECONFIG_CONTEXT apply -f -
+        | kubectl --context "{{.KUBECONFIG_CONTEXT}}" apply -f -
 
   grafana-oauth:
     desc: Restart Grafana to pick up OAuth secret from Vault

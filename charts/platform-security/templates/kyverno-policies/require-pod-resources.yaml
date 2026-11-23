@@ -1,15 +1,10 @@
 {{- if and .Values.kyverno.enabled .Values.kyvernoPolicies.enabled }}
 ---
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
   name: require-pod-resources
   annotations:
-    # Kyverno auto-generates this policy's rules for the Pod controllers listed
-    # here. Its default list adds ReplicaSet and ReplicationController: every
-    # Deployment rollout keeps old ReplicaSets at zero replicas, whose policy
-    # reports repeat the Deployment's failure until the next rollout.
-    pod-policies.kyverno.io/autogen-controllers: DaemonSet,Deployment,StatefulSet,Job,CronJob
     policies.kyverno.io/title: Require Pod Resource Limits
     policies.kyverno.io/category: Best Practices
     policies.kyverno.io/severity: medium
@@ -26,43 +21,40 @@ metadata:
 # ephemeralContainers: Kubernetes forbids `resources` on them, so every
 # debug container would be refused.
 spec:
-  background: true
-  rules:
-    - name: require-cpu-memory-requests-limits
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-      exclude:
-        any:
-          - resources:
-              namespaces:
-                - kube-system
-                - kyverno
-                - argocd
-                - cert-manager
-                - external-secrets
-                - vault
-      validate:
-        failureAction: {{ include "platform-security.failureAction" . }}
-        message: "All containers must define CPU and memory requests and a memory limit (a CPU limit is optional)."
-        pattern:
-          spec:
-            =(initContainers):
-              - resources:
-                  requests:
-                    memory: "?*"
-                    cpu: "?*"
-                  limits:
-                    memory: "?*"
-                    =(cpu): "?*"
-            containers:
-              - resources:
-                  requests:
-                    memory: "?*"
-                    cpu: "?*"
-                  limits:
-                    memory: "?*"
-                    =(cpu): "?*"
+  validationActions: [{{ include "platform-security.validationAction" . }}]
+  evaluation:
+    background:
+      enabled: true
+  # Kyverno generates this policy's checks for the Pod controllers listed
+  # here. Its default list adds ReplicaSets: every Deployment rollout keeps
+  # old ReplicaSets at zero replicas, whose policy reports repeat the
+  # Deployment's failure until the next rollout.
+  autogen:
+    podControllers:
+      controllers: [daemonsets, deployments, statefulsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - kyverno
+            - argocd
+            - cert-manager
+            - external-secrets
+            - vault
+  validations:
+    - expression: >-
+        (object.spec.containers +
+         (has(object.spec.initContainers) ? object.spec.initContainers : [])).all(c,
+          has(c.resources) && has(c.resources.requests) &&
+          has(c.resources.requests.cpu) && has(c.resources.requests.memory) &&
+          has(c.resources.limits) && has(c.resources.limits.memory))
+      message: "All containers must define CPU and memory requests and a memory limit (a CPU limit is optional)."
 {{- end }}

@@ -15,6 +15,11 @@
 #   3. Atomically swaps the compacted copy in place
 #   4. Restarts k3s
 #
+# Whatever fails once k3s is stopped, the EXIT trap puts the original database
+# back if it was moved, and starts k3s again: this runs unattended every month,
+# and a failure must never leave the control plane down. It refuses to start
+# at all when the filesystem cannot hold the compacted copy.
+#
 # Safe to re-run: idempotent and a no-op when the DB is already small.
 #
 # Managed by Ansible (k3s-lab role: k3s_server). Do not edit by hand.
@@ -42,16 +47,40 @@ if (( size_bytes < THRESHOLD_BYTES )); then
   exit 0
 fi
 
+# VACUUM INTO writes the live data to a new file next to state.db; at most
+# the current size. A full disk is the likeliest failure, and the likeliest
+# moment for this script to run, so check before stopping anything.
+avail_bytes=$(df --output=avail -B1 "$DB_DIR" | tail -n 1 | tr -d ' ')
+if (( avail_bytes < size_bytes )); then
+  log "ERROR: only $(numfmt --to=iec --suffix=B "$avail_bytes") free in ${DB_DIR}, the compacted copy needs up to ${size_human} — not stopping ${SERVICE}"
+  exit 1
+fi
+
+tmp="${DB_FILE}.compacting.$$"
+backup="${DB_FILE}.pre-vacuum"
+restarted=0
+
+# Runs on every exit once k3s is stopped, success included.
+cleanup() {
+  rm -f "$tmp"
+  if [[ ! -f "$DB_FILE" && -f "$backup" ]]; then
+    log "restoring the original database from ${backup}"
+    mv "$backup" "$DB_FILE"
+  fi
+  if (( ! restarted )); then
+    log "starting ${SERVICE} again after a failure"
+    systemctl start "$SERVICE" || log "ERROR: could not start ${SERVICE}"
+  fi
+}
+
 log "stopping ${SERVICE}…"
 systemctl stop "$SERVICE"
+trap cleanup EXIT
 # give kine a moment to flush
 sleep 3
 
 # checkpoint WAL so all data is in the main DB file
 sqlite3 "$DB_FILE" 'PRAGMA wal_checkpoint(TRUNCATE);' >/dev/null || true
-
-tmp="${DB_FILE}.compacting.$$"
-trap 'rm -f "$tmp"' EXIT
 
 log "compacting via VACUUM INTO → ${tmp}"
 sqlite3 "$DB_FILE" "VACUUM INTO '${tmp}';"
@@ -60,11 +89,9 @@ new_size=$(stat -c%s "$tmp")
 new_human=$(numfmt --to=iec --suffix=B "$new_size")
 log "compacted size: ${new_human} (reclaimed $(numfmt --to=iec --suffix=B "$((size_bytes - new_size))"))"
 
-# atomic swap — any crash here leaves the old DB intact
-backup="${DB_FILE}.pre-vacuum"
+# swap — a failure between the two moves is undone by cleanup()
 mv "$DB_FILE" "$backup"
 mv "$tmp" "$DB_FILE"
-trap - EXIT
 # remove stale WAL/SHM so kine rebuilds them on start
 rm -f "${DB_DIR}/state.db-wal" "${DB_DIR}/state.db-shm"
 # keep the pre-vacuum file only until we confirm k3s is healthy
@@ -72,10 +99,11 @@ chown --reference="$backup" "$DB_FILE" 2>/dev/null || true
 chmod --reference="$backup" "$DB_FILE" 2>/dev/null || true
 
 log "starting ${SERVICE}…"
+restarted=1
 systemctl start "$SERVICE"
 
 # wait for k3s to come back (max 2 min)
-for i in $(seq 1 24); do
+for _ in $(seq 1 24); do
   if systemctl is-active --quiet "$SERVICE" && \
      k3s kubectl get --raw=/healthz >/dev/null 2>&1; then
     log "${SERVICE} healthy"

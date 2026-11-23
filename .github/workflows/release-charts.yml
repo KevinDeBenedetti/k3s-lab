@@ -4,7 +4,10 @@
 # Triggers:
 #   - workflow_run: automatically after CI passes on main (avoids GITHUB_TOKEN
 #     tag limitation — workflow_run is a platform event that always fires)
-#   - workflow_dispatch: manual re-run from Actions tab
+#   - workflow_dispatch: manual re-run from the Actions tab, from main only:
+#     publishing is first-writer-wins per version, so a run dispatched from
+#     another branch would publish its unreviewed charts under the next
+#     version and main's real release of it would be skipped (#127)
 #
 # Only publishes charts whose version is NOT already on GHCR (idempotent).
 # =============================================================================
@@ -32,7 +35,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push')
     steps:

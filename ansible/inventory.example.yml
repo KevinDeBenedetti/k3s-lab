@@ -5,7 +5,7 @@
 #   mkdir -p ansible/inventory
 #   cp ansible/inventory.example.yml ansible/inventory/hosts.yml
 #   # edit the hosts, then:
-#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/site.yml
+#   ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/site.yml
 #
 # ansible/inventory/ is gitignored on purpose (it holds your node addresses);
 # scripts/check-inventory-ignored.sh keeps it that way. This example lives

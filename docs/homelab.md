@@ -31,7 +31,7 @@ LAN CIDR).
 
 ```bash
 ansible-galaxy collection install -r ansible/requirements.yml
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/site.yml
+ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/site.yml
 ```
 
 `site.yml` runs `common` on every node, `k3s_server` (+ `wireguard` if enabled)

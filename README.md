@@ -50,7 +50,7 @@ From fresh Debian/Ubuntu machines to a running k3s cluster:
 
 ```bash
 ansible-galaxy install -r ansible/requirements.yml
-ansible-playbook -i <your-inventory> ansible/playbooks/site.yml
+ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook -i <your-inventory> ansible/playbooks/site.yml
 ```
 
 From your own repository, install the roles as the `kevindebenedetti.k3s_lab` collection, pinned to a release, instead of copying them ([collection README](ansible/README.md)):

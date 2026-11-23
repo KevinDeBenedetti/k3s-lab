@@ -23,7 +23,6 @@ This guide walks you through provisioning a production-ready k3s cluster from fr
 | `helm`        | Helm package manager               | `brew install helm`          |
 | `ssh` / `scp` | Node access                        | Pre-installed on macOS/Linux |
 | `htpasswd`    | BasicAuth secret generation        | `brew install httpd`         |
-| `envsubst`    | Variable substitution in manifests | `brew install gettext`       |
 | `bats`        | Optional: run tests locally        | `brew install bats-core`     |
 
 ### Nodes
@@ -73,7 +72,7 @@ GRAFANA_PASSWORD=your-secure-password
 KUBECONFIG_CONTEXT=k3s-lab
 ```
 
-See [Configuration](./configuration) for the full variable reference.
+See [Configuration](./configuration.md) for the full variable reference.
 
 ---
 
@@ -83,6 +82,7 @@ See [Configuration](./configuration) for the full variable reference.
 
 ```bash
 task provision:site
+task kubeconfig:fetch      # merge the kubeconfig into ~/.kube/config as `k3s-lab`
 ```
 
 This runs Ansible to configure all nodes:
@@ -90,7 +90,10 @@ This runs Ansible to configure all nodes:
 2. **k3s server** — installs k3s with Flannel VXLAN, disables Traefik/servicelb
 3. **WireGuard** — optional VPN (if `wireguard_enabled: true` in group_vars)
 4. **k3s agents** — joins agent nodes to the cluster
-5. **Kubeconfig** — saved locally for `kubectl` access
+5. **Kubeconfig** — written to `./kubeconfig.yaml` as k3s generates it (context
+   `default`). `task kubeconfig:fetch` is what merges it into `~/.kube/config`
+   under the `KUBECONFIG_CONTEXT` name (`k3s-lab` by default), which the next
+   step uses.
 
 ### Option B: Step by step
 
@@ -102,7 +105,7 @@ task kubeconfig:fetch      # Merge kubeconfig locally
 
 > Requires Ansible inventory at `ansible/inventory/hosts.yml` — start from
 > `cp ansible/inventory.example.yml ansible/inventory/hosts.yml` (see
-> [Running a homelab](./homelab.md) and [Configuration](./configuration)).
+> [Running a homelab](./homelab.md) and [Configuration](./configuration.md)).
 
 ---
 
@@ -169,16 +172,16 @@ mkdir -p apps/myapp/
 git add apps/myapp/ && git commit -m "feat: add myapp" && git push
 ```
 
-See [Traefik → Deploying your own services](./stack/traefik#deploying-your-own-services) for the IngressRoute pattern.
+See [Traefik → Deploying your own services](./stack/traefik.md#deploying-your-own-services) for the IngressRoute pattern.
 
 ---
 
 ## Next steps
 
-- [Configuration reference](./configuration) — all `.env` variables
-- [k3s details](./stack/k3s) — install flags, firewall, sysctl
-- [Traefik](./stack/traefik) — IngressRoute, middlewares, TLS
-- [cert-manager](./stack/cert-manager) — Let's Encrypt, staging vs production
-- [Monitoring](./stack/monitoring) — Grafana dashboards, LogQL, Prometheus
-- [Task targets](./operations/task-targets) — full reference
-- [Troubleshooting](./operations/troubleshooting) — common issues
+- [Configuration reference](./configuration.md) — all `.env` variables
+- [k3s details](./stack/k3s.md) — install flags, firewall, sysctl
+- [Traefik](./stack/traefik.md) — IngressRoute, middlewares, TLS
+- [cert-manager](./stack/cert-manager.md) — Let's Encrypt, staging vs production
+- [Monitoring](./stack/monitoring.md) — Grafana dashboards, LogQL, Prometheus
+- [Task targets](./operations/task-targets.md) — full reference
+- [Troubleshooting](./operations/troubleshooting.md) — common issues

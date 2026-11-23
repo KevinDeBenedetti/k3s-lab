@@ -162,3 +162,38 @@ YAML
   run chart_dep_names "${REPO_ROOT}/charts/platform-deployment/Chart.yaml"
   [ "${#lines[@]}" -eq 7 ]
 }
+
+@test "chart_deps_build registers each http repository once, then builds" {
+  mkdir -p "${BATS_TEST_TMPDIR}/mychart"
+  cat >"${BATS_TEST_TMPDIR}/mychart/Chart.yaml" <<'YAML'
+apiVersion: v2
+name: mychart
+version: 0.1.0
+dependencies:
+  - name: a
+    version: 1.0.0
+    repository: https://charts.example.test
+  - name: b
+    version: 2.0.0
+    repository: https://charts.example.test
+  - name: c
+    version: 3.0.0
+    repository: oci://ghcr.io/example/charts
+YAML
+  calls="${BATS_TEST_TMPDIR}/helm-calls"
+  printf '#!/usr/bin/env bash\necho "$*" >>%q\n' "$calls" >"${BATS_TEST_TMPDIR}/helm"
+  chmod +x "${BATS_TEST_TMPDIR}/helm"
+  HELM="${BATS_TEST_TMPDIR}/helm" chart_deps_build "${BATS_TEST_TMPDIR}/mychart"
+  [ "$(grep -c '^repo add' "$calls")" -eq 1 ]
+  grep -q '^repo add mychart-dep1 https://charts.example.test --force-update$' "$calls"
+  [ "$(tail -n 1 "$calls")" = "dependency build ${BATS_TEST_TMPDIR}/mychart" ]
+}
+
+@test "chart_deps_build returns helm's failure" {
+  mkdir -p "${BATS_TEST_TMPDIR}/mychart"
+  printf 'apiVersion: v2\nname: mychart\nversion: 0.1.0\n' >"${BATS_TEST_TMPDIR}/mychart/Chart.yaml"
+  printf '#!/usr/bin/env bash\n[ "$1" != dependency ]\n' >"${BATS_TEST_TMPDIR}/helm"
+  chmod +x "${BATS_TEST_TMPDIR}/helm"
+  run env HELM="${BATS_TEST_TMPDIR}/helm" bash -c "source '${REPO_ROOT}/lib/chart-deps.sh'; chart_deps_build '${BATS_TEST_TMPDIR}/mychart'"
+  [ "$status" -ne 0 ]
+}
