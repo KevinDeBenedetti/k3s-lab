@@ -224,8 +224,9 @@ spec:
       serviceAccountName: homepage
       containers:
         - name: homepage
-          runAsUser: 1000
-          runAsGroup: 1000
+          securityContext:  # merged into the one app-base sets
+            runAsUser: 1000
+            runAsGroup: 1000
           resources:
             requests:
               cpu: "10m"

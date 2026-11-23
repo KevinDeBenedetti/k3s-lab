@@ -23,21 +23,21 @@ cp .env.example .env
 
 | Variable       | Default             | Required | Description                                                              |
 | -------------- | ------------------- | -------- | ------------------------------------------------------------------------ |
-| `SSH_USER`     | `debian`            | ✅        | SSH user after bootstrap (regular user, not root)                        |
-| `SSH_KEY`      | `~/.ssh/id_ed25519` | ✅        | Path to your SSH private key                                             |
-| `INITIAL_USER` | `root`              | —        | User for the very first connection (before bootstrap creates `SSH_USER`) |
+| `SSH_USER`     | your local `$USER`  | —        | SSH user on the nodes (a regular user, not root), e.g. `debian`          |
+| `SSH_KEY`      | ssh's own keys      | —        | Path to your SSH private key, e.g. `~/.ssh/id_ed25519`                   |
 | `SSH_PORT`     | `22`                | —        | SSH port (default, not in `.env.example`)                                |
-
-> `INITIAL_USER` is only used for the initial Ansible connection. After the node is bootstrapped, `SSH_USER` takes over.
 
 ### k3s
 
-| Variable         | Example         | Required | Description                                                     |
-| ---------------- | --------------- | -------- | --------------------------------------------------------------- |
-| `K3S_VERSION`    | `v1.32.13+k3s1`  | ✅        | Pinned k3s version — must match on server and agent             |
-| `K3S_NODE_TOKEN` | *(auto-filled)* | ✅        | Shared secret for agent join — auto-read from server by Ansible |
+| Variable      | Example         | Required                        | Description                                                                 |
+| ------------- | --------------- | ------------------------------- | --------------------------------------------------------------------------- |
+| `K3S_VERSION` | `v1.32.13+k3s1` | for `task provision:inventory`  | Written as `k3s_version` into the generated inventory (Terraform path only) |
 
-> `K3S_NODE_TOKEN` is automatically read from the server by the Ansible `site.yml` playbook and passed to agents. You do not need to set it manually.
+The playbooks read `k3s_version` from the **inventory**, not from `.env`: when
+you write the inventory by hand, set it there (see
+[Ansible role variables](#ansible-role-variables-not-env)). The agent join token
+is read from the server by `site.yml` and passed to the agents; there is no
+`.env` variable for it.
 
 ### Helm chart versions
 
@@ -88,10 +88,14 @@ that pin by hand; it is gone.
 
 | Variable             | Example                 | Required | Description                                                 |
 | -------------------- | ----------------------- | -------- | ----------------------------------------------------------- |
-| `DASHBOARD_DOMAIN`   | `dashboard.example.com` | ✅        | Subdomain for the Traefik admin dashboard                   |
-| `DASHBOARD_PASSWORD` | *(htpasswd hash)*       | ✅        | BasicAuth password — set via `task deploy:dashboard-secret` |
+| `DASHBOARD_DOMAIN`   | `dashboard.example.com` | —        | Not read by k3s-lab: the host for your own dashboard IngressRoute |
+| `DASHBOARD_USER`     | `admin`                 | —        | BasicAuth user (default `admin`)                            |
+| `DASHBOARD_PASSWORD` | `a-long-passphrase`     | ✅        | BasicAuth password — set via `task deploy:dashboard-secret` |
 
-> `DASHBOARD_PASSWORD` is the **plain text** password. `task deploy:dashboard-secret` hashes it with `htpasswd -nb admin <password>` before storing it in the Kubernetes Secret.
+> `DASHBOARD_PASSWORD` is the **plain text** password. `task deploy:dashboard-secret`
+> hashes it with `htpasswd -ni "$DASHBOARD_USER"`, reading the password on stdin so
+> it never appears in `ps`, and stores the result in the `traefik-dashboard-auth`
+> Secret.
 
 ### Grafana
 
@@ -266,7 +270,7 @@ configuration is hardcoded in k3s-lab. Any OIDC-compatible provider works.
 
 ### How it works
 
-`kube-prometheus-values.yaml` declares an **optional** secret mount:
+[`charts/platform-monitoring/values.yaml`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-monitoring/values.yaml) declares an **optional** secret mount:
 
 ```yaml
 grafana:
@@ -323,8 +327,8 @@ kubectl create secret generic grafana-oauth-secret \
 Then restart Grafana to pick up the secret:
 
 ```bash
-kubectl rollout restart deployment/kube-prometheus-stack-grafana -n monitoring
-kubectl rollout status deployment/kube-prometheus-stack-grafana -n monitoring --timeout=120s
+kubectl rollout restart deployment/monitoring-grafana -n monitoring
+kubectl rollout status deployment/monitoring-grafana -n monitoring --timeout=120s
 ```
 
 ### With your own config repo (GitOps)

@@ -5,19 +5,15 @@
 # Usage (standalone):  task ssh:server
 # Usage (included):    includes: ssh: taskfile: <path-to-k3s-lab>/taskfiles/ssh.yml
 #
-# Required env (from .env or cluster.env):
-#   SERVER_IP    public IP of the server node
-#   SSH_USER     SSH username (default: debian)
-#   SSH_PORT     SSH port (default: 22)
-#   SSH_KEY      path to private key
+# Required env (from .env):
+#   SERVER_IP    address of the server node (AGENT_IP for ssh:agent)
 #
-# Optional env:
-#   AGENT_IP     public IP of the agent node
+# Optional env (applied by scripts/ssh-node.sh):
+#   SSH_USER     SSH username (default: your local $USER)
+#   SSH_PORT     SSH port (default: 22)
+#   SSH_KEY      path to the private key (default: ssh's own)
 # =============================================================================
 version: '3'
-
-vars:
-  SSH_SERVER_HOST: '{{.SSH_SERVER_HOST | default "$SERVER_IP"}}'
 
 tasks:
   server:
@@ -26,7 +22,7 @@ tasks:
       - sh: test -n "$SERVER_IP"
         msg: "SERVER_IP is not set — add it to .env"
     cmds:
-      - ssh -i $SSH_KEY -p $SSH_PORT $SSH_USER@$SERVER_IP
+      - bash {{.TASKFILE_DIR}}/../scripts/ssh-node.sh "$SERVER_IP"
 
   agent:
     desc: Open SSH shell on agent node
@@ -34,7 +30,7 @@ tasks:
       - sh: test -n "$AGENT_IP"
         msg: "AGENT_IP is not set — add it to .env"
     cmds:
-      - ssh -i $SSH_KEY -p $SSH_PORT $SSH_USER@$AGENT_IP
+      - bash {{.TASKFILE_DIR}}/../scripts/ssh-node.sh "$AGENT_IP"
 
   known-hosts-reset:
     desc: Remove stale known_hosts entries (run after a node reinstall)

@@ -47,7 +47,8 @@ FATA[0005] Node token or agent token is required
 
 ```bash
 ssh ubuntu@SERVER_IP "sudo cat /var/lib/rancher/k3s/server/node-token"
-# Add the output to .env: K3S_NODE_TOKEN=<token>
+# Pass it for one run: ansible-playbook … -e k3s_node_token=<token>
+# (there is no .env variable for it)
 ```
 
 ---

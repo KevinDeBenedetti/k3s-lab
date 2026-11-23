@@ -34,6 +34,12 @@ grafana:
       cpu: 100m
       memory: 300Mi
   sidecar:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 96Mi
     dashboards:
       enabled: true
       label: grafana_dashboard
@@ -103,6 +109,20 @@ loki:
     replicas: 0
   gateway:
     enabled: false
+  sidecar:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 96Mi
+  lokiCanary:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 16Mi
+      limits:
+        memory: 64Mi
 
 promtail:
   fullnameOverride: promtail
@@ -153,3 +173,26 @@ kube-prometheus-stack:
       limits:
         cpu: 200m
         memory: 256Mi
+    # The admission-create / admission-patch hook Jobs.
+    admissionWebhooks:
+      patch:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
+  prometheus-node-exporter:
+    resources:
+      requests:
+        cpu: 20m
+        memory: 32Mi
+      limits:
+        memory: 64Mi
+  kube-state-metrics:
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        memory: 192Mi

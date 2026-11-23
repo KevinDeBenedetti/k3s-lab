@@ -9,7 +9,8 @@
 #   kubernetes  — kubeconform + .env.example check
 #   security    — Gitleaks secret scanning
 #   helm-lint / helm-template — Helm chart lint and render dry-run (inline)
-#   resource-limits — Verify all charts define resource limits
+#   kyverno-policies — Kyverno CLI (subchart's version) against the policy fixtures
+#   resource-limits — Every rendered container has requests and a memory limit
 #   ansible     — Playbook syntax-check + ansible-lint (both blocking)
 #
 # Every `uses:` here is pinned to a 40-character commit SHA with the version in
@@ -80,9 +81,9 @@ jobs:
       run-env-example: true
       env-example-required-keys: >-
         SERVER_IP AGENT_IP DOMAIN EMAIL
-        DASHBOARD_DOMAIN DASHBOARD_PASSWORD
+        DASHBOARD_PASSWORD
         GRAFANA_DOMAIN GRAFANA_PASSWORD
-        KUBECONFIG_CONTEXT K3S_VERSION K3S_NODE_TOKEN
+        KUBECONFIG_CONTEXT K3S_VERSION
 
   # ─── Secret scanning ──────────────────────────────────────────────────────
   security:
@@ -185,12 +186,59 @@ jobs:
           fi
           echo "✅ $rendered chart(s) rendered"
 
+  # ─── Kyverno policies: executed, not just rendered ────────────────────────
+  # A Kyverno release can stop executing a policy type and the chart still
+  # renders and lints fine: kyverno.io/v1 ClusterPolicy went that way in 1.20
+  # (#126). This evaluates each policy with the Kyverno CLI against
+  # tests/fixtures/kyverno/, using the CLI of the release the kyverno subchart
+  # actually ships, read from Chart.lock (the vendored .tgz files are
+  # gitignored). A subchart bump therefore tests the new engine on its own.
+  kyverno-policies:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v3.17.0
+      - name: Install the Kyverno CLI the kyverno subchart ships
+        run: |
+          lock=charts/platform-security/Chart.lock
+          chart_version="$(yq -r '.dependencies[] | select(.name == "kyverno") | .version' "$lock")"
+          repo="$(yq -r '.dependencies[] | select(.name == "kyverno") | .repository' "$lock")"
+          app="$(helm show chart kyverno --repo "$repo" --version "$chart_version" | yq -r '.appVersion')"
+          echo "kyverno subchart ${chart_version} ships ${app}"
+          asset="kyverno-cli_${app}_linux_x86_64.tar.gz"
+          base="https://github.com/kyverno/kyverno/releases/download/${app}"
+          curl -fsSLO "${base}/${asset}"
+          curl -fsSLO "${base}/checksums.txt"
+          # The archive must be listed in the release's checksums, and match.
+          grep -q " ${asset}\$" checksums.txt
+          grep " ${asset}\$" checksums.txt | sha256sum -c -
+          tar -xzf "$asset" kyverno
+          sudo install -m 0755 kyverno /usr/local/bin/kyverno
+          kyverno version
+      - name: Install Bats
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq bats
+      - name: Evaluate the policies against their fixtures
+        env:
+          KYVERNO_REQUIRED: "1"   # a missing CLI fails instead of skipping
+        run: bats tests/bats/kyverno-policies.bats
+
   # ─── Resource limits check ────────────────────────────────────────────────
   resource-limits:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Check resource limits in chart values
+      # Renders every chart with its subcharts (vendored from Chart.lock) and
+      # judges each container, the rule of the require-pod-resources policy.
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v3.17.0
+      - name: Check every rendered container has requests and a memory limit
         run: ./scripts/check-resource-limits.sh
 
   # ─── Loop-body trap shape check ───────────────────────────────────────────
@@ -332,6 +380,23 @@ jobs:
           for playbook in playbooks/*.yml; do
             echo "::group::$playbook"
             ansible-playbook --syntax-check -i localhost, "$playbook" || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
+
+      # The step above runs from ansible/, where ansible.cfg is picked up on its
+      # own. Users do not: `task provision:*` and the README / docs/homelab.md
+      # commands run from the repository root (or from the config repo that
+      # includes the taskfile), where nothing loads ansible.cfg and every role
+      # fails to resolve (#121). Replay that exact way of running them.
+      - name: Syntax-check every playbook the way users run them (repo root, ANSIBLE_CONFIG)
+        env:
+          ANSIBLE_CONFIG: ansible/ansible.cfg
+        run: |
+          status=0
+          for playbook in ansible/playbooks/*.yml; do
+            echo "::group::$playbook"
+            ansible-playbook --syntax-check -i ansible/inventory.example.yml "$playbook" || status=1
             echo "::endgroup::"
           done
           exit "$status"

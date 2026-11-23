@@ -68,7 +68,9 @@ name = "kubeconform — Kubernetes schema validation"
 language = "system"
 entry = "bash -c 'which kubeconform >/dev/null 2>&1 && kubeconform -strict -summary -schema-location default -schema-location \"https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json\" \"$@\" || echo \"⚠️  kubeconform not installed — skipping (brew install kubeconform)\"' --"
 files = "^kubernetes/.*\\.yaml$"
-exclude = ".*(kustomization\\.yaml|-values\\.yaml)$"
+# Same exclusions as the CI job (ci.yml kubeconform-exclude): a -patch.yaml
+# file is a kustomize patch (app-base's is a JSON 6902 list), not a manifest.
+exclude = ".*(kustomization\\.yaml|-values\\.yaml|-patch\\.yaml)$"
 pass_filenames = true
 
 [[repos.hooks]]

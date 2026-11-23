@@ -6,7 +6,12 @@
 # published 12 days after we froze v3.7.8: nothing in the repository had
 # changed, so neither CI nor renovate (which tracks *chart* versions, not proxy
 # versions) had any reason to fire. Only a periodic check can see that — hence
-# this workflow, independent of any repository activity.
+# this workflow, which runs on a schedule rather than on commits.
+#
+# ⚠️ It is NOT independent of repository activity: GitHub disables scheduled
+# workflows in a public repository after 60 days without activity, which is
+# precisely when this watch is the only thing still looking. The `keepalive`
+# job re-enables the workflow on every run to prevent that (#128).
 #
 # Since 2026-07-30 there is no `traefik.image.tag` pin: the version is the
 # subchart's appVersion. That makes this watch *more* necessary, not less — an
@@ -142,3 +147,31 @@ jobs:
         run: |
           echo "::error::Traefik advisory watch failed — the proxy version this repository ships is covered by an advisory, or a range could not be evaluated. See the job summary and the tracking issue."
           exit 1
+
+  # Re-enables this workflow on every run, before GitHub can disable it for
+  # inactivity (#128). Through the REST endpoint: `gh workflow enable` only
+  # looks among workflows that are already disabled, and fails on an active one.
+  #
+  # GitHub does not document that this call resets the 60-day count; API
+  # keepalives such as liskin/gh-workflow-keepalive rely on it. A refused call
+  # fails the run; but should GitHub stop counting the call, nothing fails: the
+  # workflow just stops running, and the Actions tab shows it disabled.
+  # Re-enable it there.
+  #
+  # Its own job, so `actions: write` reaches no other step and nothing from the
+  # repository runs with it: no checkout. It does not wait on `watch`, which
+  # fails whenever it finds an advisory.
+  keepalive:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Re-enable this workflow before GitHub disables it for inactivity
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # GITHUB_WORKFLOW_REF is <owner>/<repo>/.github/workflows/<file>@<ref>.
+          workflow="${GITHUB_WORKFLOW_REF%%@*}"
+          workflow="${workflow##*/}"
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/enable"
+          echo "✅ ${workflow} re-enabled"

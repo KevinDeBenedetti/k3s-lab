@@ -2,7 +2,7 @@
 # tests/bats/platform-security-render.bats — Render contract for charts/platform-security
 #
 # Why this file exists: until 2026-08-05 this chart shipped six Kyverno
-# ClusterPolicies hardcoded to `Enforce` and was
+# policies hardcoded to `Enforce` and was
 # installed on no cluster at all (audit finding 1), so the single most
 # consequential value in it — whether a violating pod is *recorded* or
 # *rejected* — had never been exercised by anything. The rollout that fixed the
@@ -36,12 +36,10 @@ POLICIES=(
   require-pod-resources
 )
 
-# Six policies, seven rules: `disallow-latest-tag` carries two
-# (require-image-tag + require-tag-or-digest). Since 2026-08-14 the failure
-# action is set per rule rather than once per policy, so every action assertion
-# counts RULES, not policies — a 6 here would pass while one rule silently lost
-# its action.
-RULE_COUNT=7
+# Six ValidatingPolicies (policies.kyverno.io/v1, since #140). The action is
+# set once per policy, in `spec.validationActions`, so every action assertion
+# counts POLICIES. `disallow-latest-tag` carries two validations.
+POLICY_COUNT=6
 
 setup() {
   CHART="${BATS_TEST_TMPDIR}/chart"
@@ -59,7 +57,7 @@ render() {
   helm template ps "$CHART" "$@" 2>&1
 }
 
-# policy_docs — only the ClusterPolicy manifests this chart owns. Scoping by
+# policy_docs — only the policy manifests this chart owns. Scoping by
 # `# Source:` keeps the assertions honest if a subchart is ever reintroduced.
 policy_docs() {
   awk '
@@ -70,10 +68,10 @@ policy_docs() {
 }
 
 policy_count() {
-  policy_docs <<<"$1" | grep -c '^kind: ClusterPolicy$'
+  policy_docs <<<"$1" | grep -c '^kind: ValidatingPolicy$'
 }
 
-@test "renders all six ClusterPolicies by default" {
+@test "renders all six ValidatingPolicies by default" {
   local out
   out="$(render)"
   [ "$(policy_count "$out")" -eq 6 ]
@@ -94,16 +92,17 @@ policy_count() {
   # The whole point of the 2026-08-05 rollout.
   local out
   out="$(render | policy_docs)"
-  [ "$(grep -c 'failureAction: Audit' <<<"$out")" -eq "$RULE_COUNT" ]
-  [ "$(grep -c 'failureAction: Enforce' <<<"$out")" -eq 0 ]
+  [ "$(grep -c '^  validationActions: \[Audit\]$' <<<"$out")" -eq "$POLICY_COUNT" ]
+  [ "$(grep -c 'Deny' <<<"$out")" -eq 0 ]
 }
 
 @test "failureAction is overridable to Enforce" {
   # Audit is the default, not a ceiling — promoting a clean cluster must work.
   local out
   out="$(render --set kyvernoPolicies.failureAction=Enforce | policy_docs)"
-  [ "$(grep -c 'failureAction: Enforce' <<<"$out")" -eq "$RULE_COUNT" ]
-  [ "$(grep -c 'failureAction: Audit' <<<"$out")" -eq 0 ]
+  # Enforce maps to Deny, the ValidatingPolicy action that rejects at admission.
+  [ "$(grep -c '^  validationActions: \[Deny\]$' <<<"$out")" -eq "$POLICY_COUNT" ]
+  [ "$(grep -c 'Audit\]' <<<"$out")" -eq 0 ]
 }
 
 @test "the removed validationFailureAction value key fails the render" {
@@ -142,17 +141,15 @@ policy_count() {
   [[ "$output" == *"additional properties 'faliureAction' not allowed"* ]]
 }
 
-@test "the action is set per rule, not with the deprecated spec-level field" {
-  # Kyverno 3.8 marks spec.validationFailureAction "Deprecated, use
-  # validationFailureAction under the validate rule instead" in the ClusterPolicy
-  # CRD. It still works, so nothing in the cluster would report a regression —
-  # only this test would.
+@test "no legacy kyverno.io policy is rendered" {
+  # Kyverno 1.20 no longer executes kyverno.io/v1 ClusterPolicy (#126). It still
+  # renders and applies without error, so nothing in the cluster would report a
+  # policy that quietly stopped running — only this test would.
   local out
   out="$(render | policy_docs)"
-  # The spec-level field is a top-level key of spec:, i.e. two-space indented.
-  [ "$(grep -c '^  validationFailureAction:' <<<"$out")" -eq 0 ]
-  # …and every occurrence of the new one sits inside a validate: block.
-  [ "$(grep -c '^        failureAction:' <<<"$out")" -eq "$RULE_COUNT" ]
+  [ "$(grep -c '^apiVersion: kyverno.io/' <<<"$out")" -eq 0 ]
+  [ "$(grep -c '^kind: ClusterPolicy$' <<<"$out")" -eq 0 ]
+  [ "$(grep -c '^apiVersion: policies.kyverno.io/v1$' <<<"$out")" -eq "$POLICY_COUNT" ]
 }
 
 @test "an invalid failure action fails the render" {
@@ -171,9 +168,9 @@ policy_count() {
 }
 
 @test "policies are gated on the engine, not shipped without it" {
-  # Rendering ClusterPolicies while kyverno.enabled=false would produce
+  # Rendering ValidatingPolicies while kyverno.enabled=false would produce
   # manifests whose CRD is guaranteed absent — the install fails with
-  # 'no matches for kind "ClusterPolicy"'.
+  # 'no matches for kind "ValidatingPolicy"'.
   local out
   out="$(render --set kyverno.enabled=false)"
   [ "$(policy_count "$out")" -eq 0 ]
@@ -187,8 +184,8 @@ policy_count() {
   # green result while rendering nothing at all in CI.
   local out
   out="$(render | policy_docs)"
-  [ "$(grep -c '^kind: ClusterPolicy$' <<<"$out")" -eq 6 ]
-  [ "$(grep -c 'failureAction:[[:space:]]*$' <<<"$out")" -eq 0 ]
+  [ "$(grep -c '^kind: ValidatingPolicy$' <<<"$out")" -eq "$POLICY_COUNT" ]
+  [ "$(grep -c -E '^  validationActions: \[(Audit|Deny)\]$' <<<"$out")" -eq "$POLICY_COUNT" ]
 }
 
 @test "trivy-operator is off by default and its subchart is condition-gated" {
@@ -213,12 +210,13 @@ policy_count() {
 # something else the policies reject (CI runners, a vendor operator) adds a
 # PolicyException from its own repository — never a hardcoded exclusion here.
 
-# ns_for POLICY <<< render — the namespaces a policy's first rule excludes
+# ns_for POLICY <<< render — the namespaces a policy excludes (the NotIn values
+# of its matchConstraints.namespaceSelector)
 ns_for() {
   policy_docs | awk -v want="$1" '
-    /^kind: ClusterPolicy$/ { inpol = 0 }
+    /^kind: ValidatingPolicy$/ { inpol = 0 }
     $1 == "name:" && $2 == want && !seen { inpol = 1; seen = 1; next }
-    inpol && /namespaces:/ { grab = 1; next }
+    inpol && /^          values:$/ { grab = 1; next }
     grab && /^[[:space:]]*#/ { next }
     grab && /^[[:space:]]*$/ { next }
     grab && /^[[:space:]]*-[[:space:]]/ { gsub(/^[[:space:]]*-[[:space:]]*/, ""); print; next }

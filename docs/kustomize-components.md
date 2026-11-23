@@ -11,6 +11,28 @@ This guide explains how to use the reusable Kustomize components from k3s-lab to
 | `network-policies` | Default-deny + allow from ingress controller + DNS     | `network-deny-all.yaml`, `network-allow-ingress.yaml`, `network-allow-dns.yaml`      |
 | `vault-auth`       | ServiceAccount + RBAC for Vault authentication         | `serviceaccount-vault.yaml`, `role.yaml`, `rolebinding.yaml`                         |
 
+Each directory is a Kustomize **Component** (`kind: Component`), so it is
+listed under `components:` of the app's `kustomization.yaml`, never under
+`resources:`.
+
+### What `app-base` sets
+
+Every Deployment of the app gets, on its **first container** whatever its
+name: `allowPrivilegeEscalation: false`, all capabilities dropped,
+`readOnlyRootFilesystem: true`, `runAsNonRoot: true` and the
+`RuntimeDefault` seccomp profile. The pod and the `app` ServiceAccount mount
+no service-account token. The app's own patches run after the component's,
+so set `runAsUser`, mount an `emptyDir` on `/tmp`, or turn the token back on
+(`automountServiceAccountToken: true`) in your `deployment-patch.yaml`.
+
+### What `network-policies` allows
+
+Ingress from the `ingress` namespace (where `platform-traefik` runs) and
+`kube-system`, on ports 8080, 80 and 443; egress for DNS to `kube-system` and
+for HTTPS (443) to any pod or address. Everything else coming in is denied.
+Namespaces are selected by `kubernetes.io/metadata.name`, the label
+Kubernetes sets on every namespace.
+
 ## Quick Start: Create a New App
 
 ### 1. Create app directory
@@ -110,8 +132,9 @@ spec:
     spec:
       containers:
         - name: myapp  # must match container name in deployment.yaml
-          runAsUser: 1000
-          runAsGroup: 1000
+          securityContext:  # merged into the one app-base sets
+            runAsUser: 1000
+            runAsGroup: 1000
           resources:
             requests:
               cpu: "50m"

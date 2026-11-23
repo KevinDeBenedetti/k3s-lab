@@ -22,6 +22,10 @@
 version: '3'
 
 vars:
+  # The kube context, defaulted like the scripts (lib/vault.sh, uninstall.sh…):
+  # left unquoted and unset, `--context` used to read the next word as the
+  # context name (#131).
+  KUBECONFIG_CONTEXT: '{{.KUBECONFIG_CONTEXT | default "k3s-lab"}}'
   # Used by `status` only, which runs kubectl itself. Task resolves them from
   # the environment / .env too, so they follow the same values as the scripts.
   VAULT_POD: '{{.VAULT_POD | default "vault-0"}}'
@@ -75,7 +79,7 @@ tasks:
       - cmd: 'printf "\033[0;36m── Vault ──────────────────────────────────────────────────────\033[0m\n"'
         silent: true
       - cmd: >-
-          kubectl --context $KUBECONFIG_CONTEXT
+          kubectl --context "{{.KUBECONFIG_CONTEXT}}"
           exec -n {{.VAULT_NAMESPACE}} {{.VAULT_POD}} --
           env VAULT_SKIP_VERIFY=true vault status 2>/dev/null
           || echo "  ❌ Vault pod not reachable"
@@ -85,7 +89,7 @@ tasks:
       - cmd: 'printf "\033[0;36m── External Secrets ──────────────────────────────────────────\033[0m\n"'
         silent: true
       - cmd: >-
-          kubectl --context $KUBECONFIG_CONTEXT get externalsecrets -A
+          kubectl --context "{{.KUBECONFIG_CONTEXT}}" get externalsecrets -A
           -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[0].status,REFRESH:.status.refreshTime'
           2>/dev/null || echo "  ❌ ESO not installed"
         ignore_error: true
@@ -94,7 +98,7 @@ tasks:
       - cmd: 'printf "\033[0;36m── ClusterSecretStore ────────────────────────────────────────\033[0m\n"'
         silent: true
       - cmd: >-
-          kubectl --context $KUBECONFIG_CONTEXT get clustersecretstore
+          kubectl --context "{{.KUBECONFIG_CONTEXT}}" get clustersecretstore
           -o custom-columns='NAME:.metadata.name,READY:.status.conditions[0].status'
           2>/dev/null || echo "  (none)"
         ignore_error: true

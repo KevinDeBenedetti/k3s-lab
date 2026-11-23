@@ -14,8 +14,8 @@
 # without duplicating the same rules in each app namespace.
 # =============================================================================
 
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
 
 resources:
   - network-deny-all.yaml

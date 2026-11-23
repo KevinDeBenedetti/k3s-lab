@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# tests/bats/helpers/fake-gh — an adapter at the `gh` seam that behaves like
+# the GitHub CLI on the points the workflow steps under test depend on:
+#
+#   gh api [-X|--method M] <path>   appends "<METHOD> <path>" to $FAKE_GH_LOG
+#                                   (GET when no method is given) and
+#                                   succeeds; with FAKE_GH_FAIL set it fails
+#                                   the way a refused call does
+#   gh workflow enable …            fails, as real gh does on a workflow that
+#                                   is still active: it only looks among
+#                                   disabled workflows (pkg/cmd/workflow/enable)
+#
+# Like real gh in a GitHub Actions job, it refuses to run without GH_TOKEN or
+# GITHUB_TOKEN. Any other call is an error.
+set -euo pipefail
+
+log="${FAKE_GH_LOG:?FAKE_GH_LOG is not set}"
+
+if [[ -z "${GH_TOKEN:-}${GITHUB_TOKEN:-}" ]]; then
+  echo "gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable." >&2
+  exit 4
+fi
+
+case "${1:-} ${2:-}" in
+  "workflow enable")
+    echo "$*" >>"$log"
+    echo "there are no disabled workflows to enable" >&2
+    exit 1 ;;
+  "api "*) shift ;;
+  *)
+    echo "$*" >>"$log"
+    echo "fake gh: unexpected call: $*" >&2
+    exit 64 ;;
+esac
+
+method=GET path=
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -X|--method) method="$2"; shift 2 ;;
+    --method=*)  method="${1#--method=}"; shift ;;
+    -*) echo "fake gh: unsupported flag: $1" >&2; exit 64 ;;
+    *)  path="$1"; shift ;;
+  esac
+done
+echo "${method} ${path}" >>"$log"
+
+if [[ -n "${FAKE_GH_FAIL:-}" ]]; then
+  echo "gh: Resource not accessible by integration (HTTP 403)" >&2
+  exit 1
+fi

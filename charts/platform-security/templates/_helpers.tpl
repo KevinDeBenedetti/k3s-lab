@@ -21,7 +21,9 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
-Resolve the Kyverno validation failure action for a rule.
+Resolve the Kyverno failure action, Audit or Enforce (mapped to a
+ValidatingPolicy's validationActions by the next helper). The history below is
+from the legacy ClusterPolicy type the policies used until #140.
 
 Kyverno 3.8 deprecates `spec.validationFailureAction` in favour of the per-rule
 `spec.rules[].validate.failureAction` — the CRD shipped by the pinned kyverno
@@ -60,4 +62,18 @@ silently defaults, so a typo must break the render, not the cluster.
 {{- fail (printf "kyvernoPolicies.failureAction must be Audit or Enforce, got %q" ($action | toString)) -}}
 {{- end -}}
 {{- $action -}}
+{{- end }}
+
+{{/*
+The `validationActions` entry of a ValidatingPolicy (policies.kyverno.io/v1),
+from the same `kyvernoPolicies.failureAction` value: `Audit` records a
+violation in a PolicyReport and lets the pod through, `Enforce` becomes `Deny`
+and rejects it at admission. The value is validated by the helper above.
+*/}}
+{{- define "platform-security.validationAction" -}}
+{{- if eq (include "platform-security.failureAction" .) "Enforce" -}}
+Deny
+{{- else -}}
+Audit
+{{- end -}}
 {{- end }}

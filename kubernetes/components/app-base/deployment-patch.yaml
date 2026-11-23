@@ -1,47 +1,25 @@
-# Patch applied to all Deployments — enforces security best practices
-
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: __APP_NAME__  # Placeholder; will be replaced per-app
-spec:
-  template:
-    metadata:
-      labels:
-        version: "1.0"  # Will be overridden per-app if needed
-    spec:
-      automountServiceAccountToken: true
-      dnsPolicy: ClusterFirst
-      enableServiceLinks: true
-      # serviceAccountName: will be set per-app via name
-      containers:
-        - name: app  # Placeholder; will be replaced
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            # runAsUser: will be set per-app (e.g., 1000)
-            # runAsGroup: will be set per-app (e.g., 1000)
-            seccompProfile:
-              type: RuntimeDefault
-          # volumeMounts:
-          #   - name: tmp
-          #     mountPath: /tmp
-          #   - name: var-run
-          #     mountPath: /var/run
-          # resources:
-          #   requests:
-          #     cpu: "10m"
-          #     memory: "32Mi"
-          #   limits:
-          #     cpu: "500m"
-          #     memory: "256Mi"
-      # volumes:
-      #   - name: tmp
-      #     emptyDir: {}
-      #   - name: var-run
-      #     emptyDir: {}
+# Security hardening applied by the app-base component to every Deployment of
+# the app (see kustomization.yaml: `patches:` with `target: kind: Deployment`).
+#
+# A JSON 6902 patch rather than a strategic-merge one: strategic merge matches
+# containers by name, so it would only reach a container named exactly like
+# the patch's, and add a second, image-less container to every other app.
+# This one sets the securityContext of the FIRST container, whatever its name.
+#
+# It replaces that container's securityContext as a whole: set runAsUser /
+# runAsGroup (or relax a field) in the app's own patch, which runs after the
+# component's.
+- op: add
+  path: /spec/template/spec/automountServiceAccountToken
+  value: false
+- op: add
+  path: /spec/template/spec/containers/0/securityContext
+  value:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

@@ -47,7 +47,7 @@ platform-security:
   # the first dies on `Secret "sh.helm.release.v1…" is invalid: data: Too long`
   # before a single resource is applied.
   #
-  # The same `templates/` placement also means a ClusterPolicy cannot be
+  # The same `templates/` placement also means a ValidatingPolicy cannot be
   # created by the release that introduces its CRD, since Helm validates every
   # manifest against the API server before applying any of it. Two independent
   # walls, one cause — and upstream's own answer to it is to publish `kyverno`

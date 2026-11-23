@@ -14,6 +14,8 @@
 #   chart_oci_deps <Chart.yaml>   → the same, restricted to oci:// repositories
 #   chart_dep_names <Chart.yaml>  → just the names
 #   chart_name <Chart.yaml>       → the chart's own name
+#   chart_deps_build <chart-dir>  → register its http(s) repositories, then
+#                                   `helm dependency build` (scripts/check-resource-limits.sh)
 
 # chart_deps CHART_YAML — every declared dependency, as name/version/repository
 # triples. The repository field is printed as written, including an empty string
@@ -51,4 +53,24 @@ chart_dep_names() {
 # `# Source:` path with it, so the render check needs it to attribute manifests.
 chart_name() {
   awk '/^name:[[:space:]]*/ { print $2; exit }' "$1"
+}
+
+# chart_deps_build CHART_DIR — vendor the chart's dependencies at the versions
+# its Chart.lock pins. `helm dependency build` resolves Chart.lock against
+# *registered* repositories and fails with "no repository definition" on a
+# fresh machine, so each http(s) repository is registered first (oci:// needs
+# no registration). Run it with a throwaway HELM_REPOSITORY_CONFIG /
+# HELM_REPOSITORY_CACHE to keep the caller's `helm repo list` untouched.
+# Returns helm's status; HELM (default: helm) is the test seam.
+chart_deps_build() {
+  local dir="$1" n=0 _name _version url
+  while IFS=$'\t' read -r _name _version url; do
+    case "$url" in
+      http://*|https://*) ;;
+      *) continue ;;
+    esac
+    n=$((n + 1))
+    "${HELM:-helm}" repo add "$(basename "$dir")-dep${n}" "$url" --force-update >/dev/null || return
+  done < <(chart_deps "$dir/Chart.yaml" | sort -u -t"$(printf '\t')" -k3,3)
+  "${HELM:-helm}" dependency build "$dir" >/dev/null
 }

@@ -50,7 +50,7 @@ directory you run `ansible-playbook` from (`k3s_kubeconfig_dest` to change it,
 
 `ansible/` is the collection root: `roles/` and `playbooks/` sit where a
 collection expects them, so the same tree runs from a checkout
-(`ansible-playbook ansible/playbooks/site.yml`) and as an installed collection.
+(`ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook ansible/playbooks/site.yml`) and as an installed collection.
 Inside the collection, playbooks resolve their short role names to this
 collection's roles, because ansible-core makes a collection playbook's own
 collection the default one.

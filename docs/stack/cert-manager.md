@@ -30,15 +30,20 @@ Browser → Traefik (:443) → Service
 
 ## Helm install
 
+cert-manager is installed from the `platform-cert-manager` wrapper chart, which
+pins the upstream `cert-manager` chart (and so its version) in its
+[`Chart.yaml`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-cert-manager/Chart.yaml):
+
 ```bash
-helm upgrade --install cert-manager jetstack/cert-manager \
-  --version "${CERT_MANAGER_VERSION}" \
+helm upgrade --install cert-manager oci://ghcr.io/kevindebenedetti/charts/platform-cert-manager \
+  --version <k3s-lab release, e.g. 0.25.0> \
   --namespace cert-manager \
-  --create-namespace \
-  --set crds.enabled=true
+  --create-namespace
 ```
 
-> `crds.enabled=true` installs the CRDs (`Certificate`, `ClusterIssuer`, etc.) as part of the Helm release so they are versioned and upgradeable.
+The wrapper sets `crds.enabled: true`, so the CRDs (`Certificate`,
+`ClusterIssuer`, …) are part of the release and upgraded with it. With ArgoCD,
+point an Application at the same chart and version instead.
 
 ---
 
@@ -105,7 +110,8 @@ spec:
             ingressClassName: traefik
 ```
 
-> `${EMAIL}` and `${DOMAIN}` are substituted at deploy time from `.env` via `envsubst`.
+> Replace `${EMAIL}` and `${DOMAIN}` with your own values in your config repo:
+> nothing in k3s-lab substitutes them.
 
 ---
 
@@ -181,13 +187,31 @@ my-app-tls   True    my-app-tls   5m
 
 ---
 
-## HTTP-01 challenge gotcha
+## HTTP-01 and the HTTP→HTTPS redirect
 
-> ⚠️ **Do not configure a global HTTP→HTTPS redirect on Traefik's `web` entrypoint.**
+`platform-traefik` **does** redirect every request on the `web` entrypoint
+(port 80) to `websecure` (443), globally
+([`values.yaml`](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-traefik/values.yaml),
+`ports.web.http.redirections`).
 
-Let's Encrypt sends the HTTP-01 challenge to port `80`. If Traefik redirects all HTTP traffic to HTTPS before the challenge solver can respond, the validation fails and the certificate is never issued.
+Let's Encrypt sends HTTP-01 challenges to port 80, so with this chart a
+challenge request is redirected to HTTPS before it reaches cert-manager's
+solver. Whether it then succeeds depends on Traefik also serving the solver's
+route on `websecure`, which this repository does not test. If HTTP-01 orders
+stay `pending`, either:
 
-This is why `traefik-values.yaml` has no `redirectTo` on the `web` entrypoint. Use `redirectScheme` middleware on individual routes instead.
+- use DNS-01 (next section), which never goes through Traefik, or
+- turn the global redirect off in your values and redirect per route instead,
+  with a `redirectScheme` middleware:
+
+  ```yaml
+  # platform-traefik values in your config repo
+  traefik:
+    ports:
+      web:
+        http:
+          redirections: null
+  ```
 
 ---
 
@@ -239,7 +263,8 @@ solvers:
         ingressClassName: traefik  # fallback for other domains
 ```
 
-> `${DOMAIN}` is substituted at deploy time from your `.env` via `envsubst`.
+> Replace `${DOMAIN}` with your own domain in your config repo: nothing in
+> k3s-lab substitutes it.
 
 ### Wildcard certificate example
 

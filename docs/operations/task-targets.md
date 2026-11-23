@@ -29,10 +29,11 @@ ArgoCD — the tasks below cover provisioning, secrets, and day-2 operations.
 
 | Target                  | Required vars                                 | Description                                                          |
 | ----------------------- | --------------------------------------------- | -------------------------------------------------------------------- |
-| `task kubeconfig:fetch` | `SERVER_IP`, `SSH_USER`, `KUBECONFIG_CONTEXT` | Fetch `k3s.yaml` from the server and merge it into `~/.kube/config`. |
+| `task kubeconfig:fetch` | `SERVER_IP` (`SSH_USER`, `KUBECONFIG_CONTEXT` optional) | Fetch `k3s.yaml` from the server and merge it into `~/.kube/config` as `KUBECONFIG_CONTEXT` (default `k3s-lab`). |
 
-`task provision:site` already fetches the kubeconfig — use this task only to
-(re)fetch it standalone. After running:
+Run it after `task provision:site`, and again after a server reinstall.
+`provision:site` only writes the raw `./kubeconfig.yaml` (context `default`); this
+task is what creates the `k3s-lab` context. After running:
 
 ```bash
 kubectl config use-context k3s-lab
@@ -122,8 +123,10 @@ cp .env.example .env
 # Edit .env with your node IPs, domain, etc.
 
 # 2. Provision the cluster with Ansible
-task provision:inventory
-task provision:site        # common + k3s server + agents + kubeconfig
+task provision:inventory   # only when the nodes come from Terraform; otherwise
+                           # copy ansible/inventory.example.yml to ansible/inventory/hosts.yml
+task provision:site        # common + k3s server + agents
+task kubeconfig:fetch      # merge the kubeconfig as the k3s-lab context
 
 # 3. Configure kubectl
 kubectl config use-context k3s-lab

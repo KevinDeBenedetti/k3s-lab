@@ -5,9 +5,9 @@
 #
 # The gap this closes (audit finding 1, "add a live check in the spirit of the
 # existing Traefik jobs"): flipping `kyvernoPolicies.enabled: true` emits six
-# `kyverno.io/v1 ClusterPolicy` manifests. If the CRD backing them is absent, or
+# `policies.kyverno.io/v1 ValidatingPolicy` manifests. If the CRD backing them is absent, or
 # present but no longer serving v1, the Application does not degrade — it fails
-# to sync outright with `no matches for kind "ClusterPolicy"`. Everything else in
+# to sync outright with `no matches for kind "ValidatingPolicy"`. Everything else in
 # this repo is satisfied long before that point: the chart lints, the render is
 # valid YAML, and platform-security-render.bats proves the six policies exist as
 # manifests. None of them can see a cluster, so none of them can tell whether the
@@ -16,7 +16,8 @@
 # It also asks the second half, which the rollout learned the hard way: a policy
 # that renders and is installable can still be absent from the cluster because
 # something upstream refused it. On 2026-08-13 the ArgoCD AppProject `platform`
-# did not list `kyverno.io/ClusterPolicy` in its clusterResourceWhitelist, so all
+# did not list `kyverno.io/ClusterPolicy` (the kind they had then) in its
+# clusterResourceWhitelist, so all
 # six were rejected at sync for 32h while the Application sat `OutOfSync`/
 # `Healthy` — green enough to miss. `--crds-only` skips both halves below when
 # you only want the installability question.
@@ -130,8 +131,10 @@ if [ "$source_lines" -gt 0 ] && [ "${#policies[@]}" -eq 0 ]; then
   exit 2
 fi
 
-# "policy<TAB>rule<TAB>expected failureAction" for every rule of every policy
-# this chart owns. What "the expected action" was rendered with is the render
+# "policy<TAB>expected validationActions" for every policy this chart owns
+# (ValidatingPolicy, policies.kyverno.io/v1: the action is set per policy, as
+# `spec.validationActions: [Audit]` or `[Deny]`).
+# What "the expected action" was rendered with is the render
 # itself, not a second read of kyvernoPolicies.failureAction: this is the same
 # reasoning check-loop-trap-shape.sh's header gives for asserting on real
 # behaviour rather than re-deriving it — a second read can drift from what the
@@ -142,14 +145,16 @@ mapfile -t expected_actions < <(
   printf '%s\n' "$rendered" | awk '
     /^# Source: .*\/templates\/kyverno-policies\// { keep = 1; next }
     /^# Source: /                                  { keep = 0; next }
-    keep && /^  name:/                  { pname = $2 }
-    keep && $1 == "-" && $2 == "name:"  { rname = $3 }
-    keep && /^        failureAction:/   { print pname "\t" rname "\t" $2 }
+    keep && /^  name:/              { pname = $2 }
+    keep && /^  validationActions:/ {
+      v = $0; sub(/^  validationActions:[[:space:]]*\[/, "", v); sub(/\].*$/, "", v)
+      gsub(/,[[:space:]]*/, " ", v); print pname "\t" v
+    }
   '
 )
 
 if [ "${#policies[@]}" -gt 0 ] && [ "${#expected_actions[@]}" -eq 0 ]; then
-  log_error "${#policies[@]} polic(y|ies) rendered but no rule's failureAction could be parsed."
+  log_error "${#policies[@]} polic(y|ies) rendered but no validationActions could be parsed."
   log_error "That is a bug in this script, not a clean cluster — refusing to report success."
   exit 2
 fi
@@ -225,26 +230,22 @@ while IFS=$'\t' read -r apiversion kind; do
 
     # ─── Third half: does the live object enforce what was rendered? ────────
     # Existing is not sufficient: a sync can leave a policy installed with a
-    # STALE failureAction — ArgoCD out of sync, a manual `kubectl edit`, or the
+    # STALE action — ArgoCD out of sync, a manual `kubectl edit`, or the
     # 2026-08-20 alias removal this check was written for, where a silent
     # fallback to the chart default was precisely undetectable because the
     # value in play (Audit) already matched. Read from the live object, not
     # re-derived, for the same reason `expected_actions` reads the render.
-    live_actions="$("$KUBECTL" get "$plural.$group" "$name" \
-      -o jsonpath='{range .spec.rules[*]}{.name}{"="}{.validate.failureAction}{"\n"}{end}' 2>&1)"
-    if [ -z "$live_actions" ]; then
-      log_error "      could not read spec.rules[].validate.failureAction from the live object"
+    live="$("$KUBECTL" get "$plural.$group" "$name" \
+      -o jsonpath='{.spec.validationActions[*]}' 2>&1)"
+    if [ -z "$live" ]; then
+      log_error "      could not read spec.validationActions from the live object"
       errors=$((errors + 1))
       continue
     fi
-    while IFS=$'\t' read -r ep er expected; do
+    while IFS=$'\t' read -r ep expected; do
       [ "$ep" = "$name" ] || continue
-      live="$(printf '%s\n' "$live_actions" | awk -F= -v r="$er" '$1 == r { print $2; exit }')"
-      if [ -z "$live" ]; then
-        log_error "      rule '$er' — not found on the live object (rule renamed or removed?)"
-        errors=$((errors + 1))
-      elif [ "$live" != "$expected" ]; then
-        log_error "      rule '$er' — cluster has failureAction=$live, chart renders $expected"
+      if [ "$live" != "$expected" ]; then
+        log_error "      cluster has validationActions=[$live], chart renders [$expected]"
         log_error "          Application likely OutOfSync, or edited by hand — check ArgoCD."
         errors=$((errors + 1))
       fi
@@ -269,5 +270,5 @@ if [ "$CRDS_ONLY" -eq 1 ]; then
   log_ok "All $checked Kyverno CRD(s) required by the render are present and serving."
 else
   log_ok "All $checked Kyverno CRD(s) present, all ${#policies[@]} rendered policy(ies) exist in the"
-  log_ok "cluster, and every rule enforces the failureAction the chart rendered."
+  log_ok "cluster, and every policy enforces the validationActions the chart rendered."
 fi

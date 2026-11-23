@@ -32,11 +32,11 @@ Two things bite a first install, verified on a real blank cluster:
 
 2. **The Kyverno policies arrive in a second step.** Helm validates every
    rendered manifest against the API server *before* applying any of it, so a
-   `ClusterPolicy` cannot be created by the release that also introduces the
+   `ValidatingPolicy` cannot be created by the release that also introduces the
    Kyverno CRDs — upstream hits the same wall, which is why `kyverno` and
    `kyverno-policies` are two separate charts. This umbrella therefore ships
    `platform-security.kyvernoPolicies.enabled: false`: Falco, Tetragon, Trivy
-   and the Kyverno engine all install normally, only the six ClusterPolicies
+   and the Kyverno engine all install normally, only the six ValidatingPolicies
    wait. The CRDs exist once the release is in place, so turn them on with:
 
    ```bash

@@ -11,6 +11,22 @@ falco:
     limits:
       cpu: 400m
       memory: 512Mi
+  falcoctl:
+    artifact:
+      install:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+      follow:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
 
 falcosidekick:
   enabled: false
@@ -28,13 +44,24 @@ falcosidekick:
 tetragon:
   enabled: true
   fullnameOverride: tetragon
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 100m
-      memory: 128Mi
+  # The agent container. Under `tetragon:` in the subchart's values: a
+  # top-level `resources:` here (as until #129) is read by nothing.
+  tetragon:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  # The export-stdout sidecar that streams events to the logs.
+  export:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 16Mi
+      limits:
+        memory: 64Mi
 
 # Opt-in. trivy-operator scans every image in the cluster, which is heavy on a
 # small homelab node, and many setups install the upstream aquasecurity
@@ -117,7 +144,7 @@ kyverno:
   generateSuccessEvents: false  # Only generate events for failures to reduce noise
 
 # =============================================================================
-# Kyverno ClusterPolicies shipped by this chart (templates/kyverno-policies/)
+# Kyverno ValidatingPolicies shipped by this chart (templates/kyverno-policies/)
 #
 # Separate from `kyverno.enabled` on purpose: the engine and the policies it
 # evaluates cannot always be installed in the same Helm release.
@@ -126,10 +153,10 @@ kyverno:
 # `templates/`, not in a `crds/` directory — a deliberate upstream choice, since
 # Helm never upgrades what it finds in `crds/`. But Helm builds and validates
 # *every* rendered manifest against the API server before applying any of them,
-# so on a cluster where the Kyverno CRDs do not exist yet, these ClusterPolicies
+# so on a cluster where the Kyverno CRDs do not exist yet, these ValidatingPolicies
 # fail the build:
 #
-#   no matches for kind "ClusterPolicy" in version "kyverno.io/v1"
+#   no matches for kind "ValidatingPolicy" in version "policies.kyverno.io/v1"
 #   ensure CRDs are installed first
 #
 # Upstream hits the same wall and answers it the same way: `kyverno` and
