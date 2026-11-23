@@ -5,7 +5,7 @@ Kyverno, plus six Kyverno cluster policies this chart owns.
 
 | | |
 |---|---|
-| Subcharts | `falco` `9.0.0`, `falcosidekick` `0.13.1`, `tetragon` `1.7.0`, `trivy-operator` `0.32.1`, `kyverno` `3.8.1` |
+| Subcharts | `falco` [`9.0.0`](https://falcosecurity.github.io/charts), `falcosidekick` [`0.13.1`](https://falcosecurity.github.io/charts), `tetragon` [`1.7.0`](https://helm.cilium.io), `trivy-operator` [`0.32.1`](https://aquasecurity.github.io/helm-charts), `kyverno` [`3.8.1`](https://kyverno.github.io/kyverno/) |
 | Namespace (convention) | `security` — set at install time; this chart neither creates nor enforces it |
 | Per-cluster overrides | `<your-repo>/platform/security/values.yaml` |
 

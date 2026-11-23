@@ -1,0 +1,136 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "k3s-lab on the shared preset github>KevinDeBenedetti/renovate-config: Monday-morning schedule, 3-day soak, labels, github-workflows pins left to its propagate-release job. Renovate replaced Dependabot, which bumped the actions only, on 2026-11-23: it also moves the upstream subcharts with the copies of their versions in the chart READMEs, the Vault image of platform-vault, the Ansible collections, the Helm CLI and the Python linters of the workflows, and the prek hooks. semanticCommits is forced on rather than detected: the commit type decides what release-please releases.",
+  "extends": ["github>KevinDeBenedetti/renovate-config"],
+  "semanticCommits": "enabled",
+  "enabledManagers": ["ansible-galaxy", "custom.regex", "github-actions", "helm-values", "helmv3"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Subchart versions restated in the Subchart(s) row of each chart's README, written `name` [`version`](repository) like the Chart.yaml dependency they copy. Same name and repository, so the copy moves in the PR of the Chart.yaml. Not platform-traefik's: disabled below.",
+      "managerFilePatterns": ["/^charts/[^/]+/README\\.md$/"],
+      "matchStringsStrategy": "recursive",
+      "matchStrings": [
+        "\\n\\| Subcharts? \\|[^\\n]*",
+        "`(?<depName>[a-z0-9-]+)` \\[`(?<currentValue>[^`]+)`\\]\\((?<registryUrl>https://[^)\\s]+)\\)"
+      ],
+      "datasourceTemplate": "helm"
+    },
+    {
+      "customType": "regex",
+      "description": "The Vault image tag platform-vault's README restates twice (its `Vault image` row and its values table): moved in the vault PR with the values.yaml pin. The row still said 1.21.2 after the pin moved to 1.21.4 on 2026-08-06.",
+      "managerFilePatterns": ["/^charts/platform-vault/README\\.md$/"],
+      "matchStrings": [
+        "\\| Vault image \\| `hashicorp/vault:(?<currentValue>[^`]+)`",
+        "\\| `vault\\.server\\.image\\.tag` \\| `(?<currentValue>[^`]+)`"
+      ],
+      "depNameTemplate": "hashicorp/vault",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Python tools pinned as 'name==version' in the `pip install` of a workflow (ansible-core and ansible-lint in the ansible job of ci.yml): no manager reads a run step.",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": ["pip install[^\\n]*?'(?<depName>[A-Za-z0-9._-]+)==(?<currentValue>[^']+)'"],
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "pep440"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "The third-party actions in one PR, as Dependabot's `actions` group did: one CI run and one review instead of one per action. A major still gets a PR of its own (separateMajorMinor).",
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["action"],
+      "groupName": "actions"
+    },
+    {
+      "description": "The Helm CLI of setup-helm, every `version:` of the workflows in one PR. CI lints and renders the charts with it, but release-charts.yml also logs in to GHCR, packages and pushes them with it, on main only, after the merge: no PR runs those commands.",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["helm"],
+      "matchUpdateTypes": ["major"],
+      "prBodyNotes": [
+        "⚠️ release-charts.yml runs `helm registry login`, `helm package` and `helm push` with this Helm, on main only: no pull request exercises them. Read this major's notes on those commands before merging, and watch the next Release Charts run."
+      ]
+    },
+    {
+      "description": "The platform-* pins of the umbrella (charts/platform-deployment) are release-please's: an extra-file of its config, moved in its release PR and guarded by check-umbrella-pins.sh. Renovate must never propose them.",
+      "matchManagers": ["helmv3"],
+      "matchDepNames": ["platform-*"],
+      "enabled": false
+    },
+    {
+      "description": "What charts/ holds is what a published chart deploys: its upstream subcharts (Renovate rewrites the Chart.lock next to the Chart.yaml in the same PR; the kyverno-policies CI job reads the kyverno version from it), the images its values pin, the README copies of their versions. `fix(deps)`, so release-please lists the bump under Bug Fixes and proposes the release that publishes it.",
+      "matchFileNames": ["charts/**"],
+      "semanticCommitType": "fix",
+      "addLabels": ["helm"]
+    },
+    {
+      "description": "A major of a subchart or of an image can break the values or the resources of the chart that wraps it, for whoever installs that chart: the reviewer decides, and marks the commit breaking when it does (commit-types: `!` bumps the minor while on 0.x).",
+      "matchFileNames": ["charts/**"],
+      "matchUpdateTypes": ["major"],
+      "prBodyNotes": [
+        "⚠️ A major. If it changes the values or the resources this chart renders for its users, merge it as `fix(deps)!: …`, so release-please records a breaking change and bumps the minor."
+      ]
+    },
+    {
+      "description": "Lock file maintenance (config:best-practices, weekly) rewrites Chart.lock files only, and opens nothing when just their `generated:` line would change: the pins are exact. release-charts.yml regenerates each Chart.lock before packaging anyway, so no published chart changes: `chore(deps)`, no release.",
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "semanticCommitType": "chore"
+    },
+    {
+      "description": "No digest on the images of charts/ (the Vault server of platform-vault, and the README copies of its tag): check-rendered-images.sh compares what follows the last ':' of the rendered image with the pinned tag, so `tag: \"1.21.4@sha256:…\"` would fail it.",
+      "matchDatasources": ["docker"],
+      "matchFileNames": ["charts/**"],
+      "pinDigests": false
+    },
+    {
+      "description": "The vault subchart and the Vault image platform-vault pins in one PR: the image overrides the appVersion of that same subchart.",
+      "matchPackageNames": ["vault", "hashicorp/vault"],
+      "groupName": "vault"
+    },
+    {
+      "description": "kube-prometheus-stack ships a major almost every month, most of them for a prometheus-operator CRD update: one PR to its latest major, not the preset's one per major, which proposed seven at once from 86.x (dry run, 2026-11-23).",
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["kube-prometheus-stack"],
+      "separateMultipleMajor": false
+    },
+    {
+      "description": "platform-traefik's README states, next to the subchart version, facts of that subchart Renovate cannot know (the proxy it deploys, the annotations of its Chart.yaml), and check-traefik-image.sh verifies them together: those copies stay verified, not generated. A human writes the page in the traefik PR.",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["charts/platform-traefik/README.md"],
+      "enabled": false
+    },
+    {
+      "description": "What CI refuses in a traefik PR until a human does it.",
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["traefik"],
+      "prBodyNotes": [
+        "⚠️ CI fails until `charts/platform-traefik/README.md` agrees with this subchart. Run `./scripts/check-traefik-image.sh` and update what it reports: the `| Subchart |` row, the `| Deployed proxy |` row (the new subchart's appVersion) and the annotation block under `# charts/traefik/Chart.yaml (subchart …)`, with the prose that cites them. Check the advisory table, then push that commit to this branch."
+      ]
+    },
+    {
+      "description": "The `>=` floors of ansible/galaxy.yml are what the collection asks of its consumers: raised on purpose, never to each new release. requirements.yml holds the exact versions CI installs.",
+      "matchManagers": ["ansible-galaxy"],
+      "matchFileNames": ["ansible/galaxy.yml"],
+      "enabled": false
+    },
+    {
+      "description": "The collections of ansible/requirements.yml: CI and local runs install them, the published collection does not ship the file (build_ignore), hence the default `chore(deps)`. CI's syntax-check resolves every module, so a major that drops one the roles call fails the PR.",
+      "matchManagers": ["ansible-galaxy"],
+      "addLabels": ["ansible"]
+    },
+    {
+      "description": "The pip pins of the workflows are CI tooling: `ci(deps)`, like the actions.",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": [".github/workflows/**"],
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": "ansible-lint supports only some ansible-core releases: both in one PR, so CI never runs an unsupported pair.",
+      "matchDatasources": ["pypi"],
+      "matchPackageNames": ["ansible-core", "ansible-lint"],
+      "groupName": "ansible lint tooling"
+    }
+  ]
+}

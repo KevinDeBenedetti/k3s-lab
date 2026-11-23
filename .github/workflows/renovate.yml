@@ -1,0 +1,54 @@
+# =============================================================================
+# Renovate — dependency update pull requests
+#
+# Runs Renovate on this repository through the reusable renovate.yml of
+# KevinDeBenedetti/github-workflows, with a token of the GitHub App that
+# already opens this repository's github-workflows bumps (release-please-global).
+# This repository must hold the App's client ID as the RELEASE_APP_CLIENT_ID
+# variable and its private key as the RELEASE_APP_PRIVATE_KEY secret: without
+# them every run fails at "Mint the App token". renovate.json, on top of the
+# shared preset KevinDeBenedetti/renovate-config, decides what is updated and
+# when. Replaces the version updates of .github/dependabot.yml; Dependabot's
+# security updates stay on in the repository settings.
+#
+# Every day at 01:17 UTC. On Mondays that is inside the preset's schedule
+# (before 6am Europe/Paris), with room for GitHub to start a scheduled run
+# late: a run after 6am opens nothing that week. The other days keep the open
+# pull requests and the Dependency Dashboard issue current, act on the
+# dashboard's checkboxes, and open security fixes, which skip the schedule.
+#
+# A manual run is a dry run unless its box is unticked: the log lists the
+# updates Renovate found, nothing changes on GitHub.
+# =============================================================================
+name: Renovate
+
+on:
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Look the updates up and log them, change nothing on GitHub
+        type: boolean
+        default: true
+      log-level:
+        description: Renovate log level
+        type: choice
+        options: [info, debug, warn]
+        default: info
+
+# Deny-all: Renovate works with the App's token, never with GITHUB_TOKEN.
+permissions: {}
+
+jobs:
+  renovate:
+    name: Renovate
+    uses: KevinDeBenedetti/github-workflows/.github/workflows/renovate.yml@91e0486cf281ba5b353daff772ac04622392b45d # v0.56.0
+    permissions: {}
+    with:
+      app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+      # False on a schedule, where there are no inputs.
+      dry-run: ${{ inputs.dry-run == true }}
+      log-level: ${{ inputs.log-level || 'info' }}
+    secrets:
+      APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
