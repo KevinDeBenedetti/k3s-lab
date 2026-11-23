@@ -1,6 +1,6 @@
 namespace: kevindebenedetti
 name: k3s_lab
-version: 0.25.0
+version: 0.26.0
 readme: README.md
 authors:
   - Kevin De Benedetti
