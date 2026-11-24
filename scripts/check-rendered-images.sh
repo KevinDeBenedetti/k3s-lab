@@ -165,12 +165,11 @@ chart_image_pins() {
 }
 
 # ─── Dependency resolution ──────────────────────────────────────────────────
-# Same reasoning as check-traefik-image.sh: `helm dependency build` resolves
-# Chart.lock against *registered* repos and fails with "no repository
-# definition" on a fresh runner, so register them first. `build` rather than
-# `update` so the check validates the version this repo committed, not whatever
-# upstream serves today. A throwaway HELM_REPOSITORY_CONFIG keeps the caller's
-# own `helm repo list` untouched.
+# chart_deps_build (lib/chart-deps.sh) registers each chart's http(s)
+# repositories, then runs `helm dependency build`: `build` rather than `update`
+# so the check validates the version this repo committed, not whatever upstream
+# serves today. A throwaway HELM_REPOSITORY_CONFIG keeps the caller's own
+# `helm repo list` untouched.
 helm_home=""
 if [ "$UPDATE_DEPS" -eq 1 ]; then
   helm_home="$(mktemp -d "${TMPDIR:-/tmp}/rendered-image-check.XXXXXX")"
@@ -198,22 +197,12 @@ for chart in "${CHARTS[@]}"; do
 
   log_step "$chart — ${#pins[@]} image pin(s)"
 
-  if [ "$UPDATE_DEPS" -eq 1 ]; then
-    n=0
-    while IFS=$'\t' read -r _name _version url; do
-      case "$url" in
-        http://*|https://*) ;;
-        *) continue ;;   # oci:// needs no `repo add`
-      esac
-      n=$((n + 1))
-      helm repo add "${chart}-dep${n}" "$url" --force-update >/dev/null
-    done < <(chart_deps "$chart_dir/Chart.yaml" | sort -u -t"$(printf '\t')" -k3,3)
-
-    helm dependency build "$chart_dir" >/dev/null 2>&1 || {
-      log_error "$chart — helm dependency build failed"
-      errors=$((errors + 1))
-      continue
-    }
+  if [ "$UPDATE_DEPS" -eq 1 ] && ! deps_err="$(chart_deps_build "$chart_dir" 2>&1)"; then
+    log_error "$chart — helm dependency build failed:"
+    # One sed, no `| head`: under pipefail a SIGPIPE would abort the whole run.
+    printf '%s\n' "$deps_err" | sed -n '1,20s/^/    /p'
+    errors=$((errors + 1))
+    continue
   fi
 
   if ! rendered="$(helm template "$chart" "$chart_dir" 2>&1)"; then

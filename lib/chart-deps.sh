@@ -4,10 +4,12 @@
 # Exists for the two umbrella checks:
 #   scripts/check-umbrella-pins.sh    — do the pins match the subcharts in the repo?
 #   scripts/check-umbrella-render.sh  — did every subchart actually contribute?
+# and, through chart_deps_build, for the checks that render a chart with its
+# subcharts vendored (that one runs helm).
 #
 # platform-deployment pins its 7 subcharts, and those pins are what a consumer
 # resolves. release-please bumps them together with the charts (one shared
-# version), so this file only ever reads.
+# version), so this file only ever reads them.
 #
 # Source this file, then use:
 #   chart_deps <Chart.yaml>       → one "name<TAB>version<TAB>repository" per line
@@ -15,7 +17,9 @@
 #   chart_dep_names <Chart.yaml>  → just the names
 #   chart_name <Chart.yaml>       → the chart's own name
 #   chart_deps_build <chart-dir>  → register its http(s) repositories, then
-#                                   `helm dependency build` (scripts/check-resource-limits.sh)
+#                                   `helm dependency build` (the checks that render
+#                                   a chart with its subcharts: check-resource-limits.sh,
+#                                   check-rendered-images.sh, check-traefik-image.sh)
 
 # chart_deps CHART_YAML — every declared dependency, as name/version/repository
 # triples. The repository field is printed as written, including an empty string
@@ -61,7 +65,13 @@ chart_name() {
 # fresh machine, so each http(s) repository is registered first (oci:// needs
 # no registration). Run it with a throwaway HELM_REPOSITORY_CONFIG /
 # HELM_REPOSITORY_CACHE to keep the caller's `helm repo list` untouched.
-# Returns helm's status; HELM (default: helm) is the test seam.
+#
+# A Chart.yaml that declares an http(s) repository while none was parsed fails
+# here, before helm runs. Registering nothing is how a parsing bug once
+# surfaced three steps later as helm's "no repository definition": the first
+# check-traefik-image.sh matched the URL with an awk regex that read nothing
+# on the CI runner, and its job never passed.
+# Returns 1 for that, otherwise helm's status; HELM (default: helm) is the test seam.
 chart_deps_build() {
   local dir="$1" n=0 _name _version url
   while IFS=$'\t' read -r _name _version url; do
@@ -72,5 +82,9 @@ chart_deps_build() {
     n=$((n + 1))
     "${HELM:-helm}" repo add "$(basename "$dir")-dep${n}" "$url" --force-update >/dev/null || return
   done < <(chart_deps "$dir/Chart.yaml" | sort -u -t"$(printf '\t')" -k3,3)
+  if [ "$n" -eq 0 ] && grep -qE '^[[:space:]]*(-[[:space:]]+)?repository:[[:space:]]*["'"'"']?https?://' "$dir/Chart.yaml"; then
+    echo "chart_deps_build: $dir/Chart.yaml declares an http(s) repository, but none could be parsed, so none was registered" >&2
+    return 1
+  fi
   "${HELM:-helm}" dependency build "$dir" >/dev/null
 }

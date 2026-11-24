@@ -189,6 +189,29 @@ YAML
   [ "$(tail -n 1 "$calls")" = "dependency build ${BATS_TEST_TMPDIR}/mychart" ]
 }
 
+@test "chart_deps_build refuses an http repository it could not read, before helm runs" {
+  # The parser keeps a quoted URL as written, quotes included, so it is not
+  # registered. Building anyway would fail later with helm's cryptic "no
+  # repository definition": registering nothing is the bug, not a valid state.
+  mkdir -p "${BATS_TEST_TMPDIR}/mychart"
+  cat >"${BATS_TEST_TMPDIR}/mychart/Chart.yaml" <<'YAML'
+apiVersion: v2
+name: mychart
+version: 0.1.0
+dependencies:
+  - name: a
+    version: 1.0.0
+    repository: "https://charts.example.test"
+YAML
+  calls="${BATS_TEST_TMPDIR}/helm-calls"
+  printf '#!/usr/bin/env bash\necho "$*" >>%q\n' "$calls" >"${BATS_TEST_TMPDIR}/helm"
+  chmod +x "${BATS_TEST_TMPDIR}/helm"
+  run env HELM="${BATS_TEST_TMPDIR}/helm" bash -c "source '${REPO_ROOT}/lib/chart-deps.sh'; chart_deps_build '${BATS_TEST_TMPDIR}/mychart'"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mychart/Chart.yaml declares an http(s) repository"* ]]
+  [ ! -e "$calls" ]
+}
+
 @test "chart_deps_build returns helm's failure" {
   mkdir -p "${BATS_TEST_TMPDIR}/mychart"
   printf 'apiVersion: v2\nname: mychart\nversion: 0.1.0\n' >"${BATS_TEST_TMPDIR}/mychart/Chart.yaml"
