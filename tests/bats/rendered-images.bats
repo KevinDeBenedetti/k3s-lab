@@ -8,7 +8,8 @@
 # the ones where values.yaml looks entirely correct and is not.
 #
 # Fixtures are local charts with no dependencies, so `--no-update` keeps the
-# whole file offline — no `helm repo add`, no network.
+# whole file offline — no `helm repo add`, no network. The one test of the
+# dependency path puts a helm on PATH that answers `repo add` itself.
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
 SCRIPT="${REPO_ROOT}/scripts/check-rendered-images.sh"
@@ -299,4 +300,50 @@ EOF
   [ "$status" -eq 1 ]
   [[ "$output" == *"acme/worker:1.0.0"* ]]
   [[ "$output" == *"pins tag 2.0.0"* ]]
+}
+
+# ─── Dependency vendoring (without --no-update) ─────────────────────────────
+
+@test "a chart whose dependencies cannot be fetched is reported, the others still checked" {
+  # Each chart's subcharts are vendored before its render (chart_deps_build).
+  # An unreachable repository fails that chart, with helm's reason, and not
+  # the run: a-broken sorts before demo, so an abort would leave demo unchecked.
+  values acme/api 1.4.2
+  template '{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}'
+  mkdir -p "${CHARTS}/a-broken/templates"
+  cat > "${CHARTS}/a-broken/Chart.yaml" <<'EOF'
+apiVersion: v2
+name: a-broken
+version: 0.1.0
+dependencies:
+  - name: sub
+    version: 1.0.0
+    repository: https://charts.example.test
+EOF
+  cat > "${CHARTS}/a-broken/values.yaml" <<'EOF'
+app:
+  image:
+    repository: acme/worker
+    tag: "2.0.0"
+EOF
+
+  # `repo add` fails as it does for an unreachable repository; every other
+  # call reaches the real helm (no dependency to fetch for demo).
+  command -v helm >/dev/null || skip "helm is not installed"
+  mkdir -p "${BATS_TEST_TMPDIR}/bin"
+  cat > "${BATS_TEST_TMPDIR}/bin/helm" <<EOF
+#!/usr/bin/env bash
+if [ "\$1 \$2" = "repo add" ]; then
+  echo "Error: looks like \"\$4\" is not a valid chart repository or cannot be reached" >&2
+  exit 1
+fi
+exec "$(command -v helm)" "\$@"
+EOF
+  chmod +x "${BATS_TEST_TMPDIR}/bin/helm"
+
+  run env PATH="${BATS_TEST_TMPDIR}/bin:$PATH" "$SCRIPT" --charts-dir "$CHARTS"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"a-broken — helm dependency build failed"* ]]
+  [[ "$output" == *"https://charts.example.test\" is not a valid chart repository"* ]]
+  [[ "$output" == *"acme/api:1.4.2"* ]]
 }
