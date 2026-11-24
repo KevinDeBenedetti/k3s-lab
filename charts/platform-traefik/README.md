@@ -6,8 +6,8 @@ disabled, resource limits sized for a small node.
 
 | | |
 |---|---|
-| Subchart | `traefik` [`42.4.0`](https://traefik.github.io/charts) |
-| Deployed proxy | `docker.io/traefik:v3.7.18` (subchart `appVersion`, no pin — see below) |
+| Subchart | `traefik` [`42.4.3`](https://traefik.github.io/charts) |
+| Deployed proxy | `docker.io/traefik:v3.7.20` (subchart `appVersion`, no pin — see below) |
 | Per-cluster overrides | `<your-repo>/platform/traefik/values.yaml` |
 
 > The two versions in that table are copies of `Chart.lock` and of the value
@@ -30,11 +30,11 @@ The upstream Traefik chart declares, **in its `Chart.yaml` annotations**, the
 range of proxy versions it knows how to configure:
 
 ```yaml
-# charts/traefik/Chart.yaml (subchart 42.4.0)
+# charts/traefik/Chart.yaml (subchart 42.4.3)
 annotations:
   traefik.io/proxy-min-version: v3.6.0
-  traefik.io/proxy-max-version: v3.7.18
-appVersion: v3.7.18
+  traefik.io/proxy-max-version: v3.7.20
+appVersion: v3.7.20
 ```
 
 `templates/requirements.yaml` compares the proxy version against that range on
@@ -49,10 +49,10 @@ it does not download dependencies.
 
 1. `versionOverride` if set — **it short-circuits everything else**;
 2. otherwise `image.tag`;
-3. otherwise the subchart's `.Chart.AppVersion` (`v3.7.18` with 42.4.0).
+3. otherwise the subchart's `.Chart.AppVersion` (`v3.7.20` with 42.4.3).
 
-Since 2026-10-23 we sit on step 3 again (subchart 42.4.0 ships `v3.7.18`
-since 2026-11-12), the `traefik.image.tag` pin carried since 2026-10-08 having
+Since 2026-10-23 we sit on step 3 again (subchart 42.4.3 ships `v3.7.20`
+since 2026-11-24), the `traefik.image.tag` pin carried since 2026-10-08 having
 been dropped. Re-add it
 (step 2) only when an advisory lands before upstream publishes the fix. The pinless
 state is also a trap in the other direction: *forgetting* `image.tag` back
@@ -183,6 +183,9 @@ July 2026 the upstream chart lagged behind the proxy's own fixes, so
 | `GHSA-ccgh-9g52-6vwg` (HIGH) — ingress-nginx provider: `auth-tls-secret` verification bypass and `Ssl-Client-*` header spoofing on shared hosts | v3.7.15 – v3.7.17 | v3.7.18 |
 | `GHSA-cp28-5662-543f` (HIGH) — `sanitizePath` keeps path-parameter dot-segments (`/..;x/`), bypassing path-based authorization | v3.0.0 – v3.7.17 | v3.7.18 |
 | `GHSA-rr42-h8r2-f28g` (medium) — unbounded BasicAuth password length, CPU amplification through MD5-crypt before authentication | v3.0.0 – v3.7.17 | v3.7.18 |
+| `GHSA-3rh5-223h-cpwr` (HIGH) — unauthenticated memory exhaustion: the Compress middleware's Brotli writer holds megabytes per in-flight response, unbounded | v3.0.0 – v3.7.19 | v3.7.20 |
+| `GHSA-42x2-976f-ph52` (medium) — provider credentials exposed in debug logs, support dumps and anonymous usage statistics | v3.0.0 – v3.7.19 | v3.7.20 |
+| `GHSA-9657-c2gv-wjpj` (medium) — trailing-dot hosts evade TLS-option conflict detection | v3.0.0 – v3.7.19 | v3.7.20 |
 
 `GHSA-8rxv-jg7p-wvg3`, which motivated the original pin, **does not concern
 us**: it targets the `kubernetesIngressNGINX` provider, which we do not enable.
@@ -232,6 +235,13 @@ same day, ships `v3.7.18`, so the subchart was bumped rather than pinned. Its
 stricter values schema also rejected our top-level `service.type`, a key the
 chart never read: it moved to `service.spec.type`. The render otherwise only
 gains upstream's new 5s `requestAcceptGraceTimeout` on both entry points.
+
+On 2026-11-24 three advisories (one HIGH, two medium) were published against
+`v3.7.19` and earlier, all patched in `v3.7.20`. Chart **42.4.3**, published
+the same day, ships `v3.7.20`, so the subchart was bumped rather than pinned.
+The render only changes the image tag and the chart labels (the pod template
+no longer carries `helm.sh/chart`). Chart 43.0.0 (`v3.8.0`), also out that
+day, is a major and was left for a separate bump.
 
 > [!WARNING]
 > Dropping the pin removed a redundancy, **not** the risk. The version still
