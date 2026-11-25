@@ -174,21 +174,32 @@ The kubelet retries the pod on its own once the secret exists.
 
 ### Prometheus not scraping Traefik
 
-1. Verify `traefik.metrics.prometheus.serviceMonitor.enabled: true` in the
-   values you install `charts/platform-traefik` with: the chart's own
-   `values.yaml` leaves it at the subchart default, off
+1. Verify `traefik.metrics.prometheus.serviceMonitor.enabled: true` and
+   `traefik.metrics.prometheus.service.enabled: true` in the values you
+   install `charts/platform-traefik` with: the chart's own `values.yaml` leaves
+   both at the subchart default, off (see
+   [Traefik — Prometheus metrics](../stack/traefik.md#prometheus-metrics))
 2. Check ServiceMonitor exists: `kubectl get servicemonitor -n ingress`
 3. In Grafana → Explore → Prometheus, run: `up{job="traefik"}`
 
 ---
 
-### Promtail pods CrashLoopBackOff
+### Alloy pods CrashLoopBackOff, or no logs in Loki
 
 ```bash
-kubectl logs -n monitoring daemonset/promtail --tail=30
+kubectl logs -n monitoring daemonset/alloy --tail=30
 ```
 
-Common cause: permission to read `/var/log/pods/`. Check Promtail DaemonSet hostPath mounts.
+Common causes:
+
+- A syntax error in `alloy.alloy.configMap.content`: Alloy names the line and
+  exits.
+- Permission to read `/var/log/pods/`: check the DaemonSet's `pods` hostPath
+  mount, and that the container still runs as root (the kubelet writes the
+  files `0640 root:root`).
+- Loki refuses the push (`401`, `no org id`): with `loki.loki.auth_enabled:
+  true` the client must send a tenant. Set `tenant_id` in the `loki.write`
+  block of the config, or turn `auth_enabled` off.
 
 ---
 

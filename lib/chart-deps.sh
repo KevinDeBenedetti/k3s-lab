@@ -16,25 +16,30 @@
 #   chart_oci_deps <Chart.yaml>   → the same, restricted to oci:// repositories
 #   chart_dep_names <Chart.yaml>  → just the names
 #   chart_name <Chart.yaml>       → the chart's own name
+#   chart_deps_isolate <name>     → point helm at a throwaway repository config,
+#                                   removed on exit; call it once, before chart_deps_build
 #   chart_deps_build <chart-dir>  → register its http(s) repositories, then
 #                                   `helm dependency build` (the checks that render
 #                                   a chart with its subcharts: check-resource-limits.sh,
 #                                   check-rendered-images.sh, check-traefik-image.sh)
 
 # chart_deps CHART_YAML — every declared dependency, as name/version/repository
-# triples. The repository field is printed as written, including an empty string
-# when a dependency declares none.
+# triples. Each field is printed without the quotes YAML allows around it
+# (`repository: "https://…"` is the same URL to Helm), and the repository as an
+# empty string when a dependency declares none.
 chart_deps() {
   awk '
     function flush() {
       if (name != "") print name "\t" version "\t" repo
       name = ""; version = ""; repo = ""
     }
+    # \047 is the single quote, which this single-quoted program cannot hold.
+    function unquote(v) { gsub(/^["\047]|["\047]$/, "", v); return v }
     /^dependencies:/            { deps = 1; next }
     deps && /^[^[:space:]]/     { flush(); deps = 0 }
-    deps && $1 == "-" && $2 == "name:" { flush(); name = $3; next }
-    deps && $1 == "version:"    { version = $2; next }
-    deps && $1 == "repository:" { repo = $2; next }
+    deps && $1 == "-" && $2 == "name:" { flush(); name = unquote($3); next }
+    deps && $1 == "version:"    { version = unquote($2); next }
+    deps && $1 == "repository:" { repo = unquote($2); next }
     END                         { flush() }
   ' "$1"
 }
@@ -59,14 +64,36 @@ chart_name() {
   awk '/^name:[[:space:]]*/ { print $2; exit }' "$1"
 }
 
+# chart_deps_isolate NAME — give helm a throwaway repository config and cache,
+# so that chart_deps_build's `helm repo add` never reaches the caller's own
+# `helm repo list`. Creates "$TMPDIR/NAME.XXXXXX", exports
+# HELM_REPOSITORY_CONFIG / HELM_REPOSITORY_CACHE into it, sets CHART_DEPS_HOME
+# to it, and removes it on exit.
+#
+# It owns the script's EXIT trap: a second `trap … EXIT` would replace this one
+# and leave the directory behind, so a caller that needs more cleanup adds it
+# to this trap rather than setting its own. Call it from the script's top level,
+# never in a $(…) subshell: the exports and the trap would end with it.
+#
+# Explicit template: BSD mktemp (macOS) ignores TMPDIR for the bare `-d` form
+# and goes through confstr instead, which GNU mktemp does not.
+chart_deps_isolate() {
+  CHART_DEPS_HOME="$(mktemp -d "${TMPDIR:-/tmp}/$1.XXXXXX")" || return
+  # shellcheck disable=SC2064 # expanded now on purpose: the path is fixed
+  trap "rm -rf '$CHART_DEPS_HOME'" EXIT
+  export HELM_REPOSITORY_CONFIG="$CHART_DEPS_HOME/repositories.yaml"
+  export HELM_REPOSITORY_CACHE="$CHART_DEPS_HOME/cache"
+}
+
 # chart_deps_build CHART_DIR — vendor the chart's dependencies at the versions
 # its Chart.lock pins. `helm dependency build` resolves Chart.lock against
 # *registered* repositories and fails with "no repository definition" on a
 # fresh machine, so each http(s) repository is registered first (oci:// needs
-# no registration). Run it with a throwaway HELM_REPOSITORY_CONFIG /
-# HELM_REPOSITORY_CACHE to keep the caller's `helm repo list` untouched.
+# no registration). Run chart_deps_isolate first, to keep the caller's
+# `helm repo list` untouched.
 #
-# A Chart.yaml that declares an http(s) repository while none was parsed fails
+# A Chart.yaml that declares an http(s) repository while none was parsed (a
+# flow-style `dependencies: [{…}]` list, which chart_deps cannot read) fails
 # here, before helm runs. Registering nothing is how a parsing bug once
 # surfaced three steps later as helm's "no repository definition": the first
 # check-traefik-image.sh matched the URL with an awk regex that read nothing
@@ -82,7 +109,7 @@ chart_deps_build() {
     n=$((n + 1))
     "${HELM:-helm}" repo add "$(basename "$dir")-dep${n}" "$url" --force-update >/dev/null || return
   done < <(chart_deps "$dir/Chart.yaml" | sort -u -t"$(printf '\t')" -k3,3)
-  if [ "$n" -eq 0 ] && grep -qE '^[[:space:]]*(-[[:space:]]+)?repository:[[:space:]]*["'"'"']?https?://' "$dir/Chart.yaml"; then
+  if [ "$n" -eq 0 ] && grep -qE '(^|[[:space:],{])repository:[[:space:]]*["'"'"']?https?://' "$dir/Chart.yaml"; then
     echo "chart_deps_build: $dir/Chart.yaml declares an http(s) repository, but none could be parsed, so none was registered" >&2
     return 1
   fi

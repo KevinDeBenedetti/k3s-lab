@@ -8,7 +8,7 @@ The observability stack provides dashboards and centralized logging for the enti
 | -------------------------------------------------------------------- | ------------------------- | ------------------ |
 | [Grafana](https://grafana.com/grafana/)                              | Visualization dashboards  | `grafana/grafana`  |
 | [Loki](https://grafana.com/oss/loki/)                                | Centralized log storage   | `grafana/loki`     |
-| [Promtail](https://grafana.com/docs/loki/latest/send-data/promtail/) | Log collector (DaemonSet) | `grafana/promtail` |
+| [Alloy](https://grafana.com/docs/alloy/latest/)                      | Log collector (DaemonSet) | `grafana/alloy`    |
 
 ---
 
@@ -24,7 +24,7 @@ The observability stack provides dashboards and centralized logging for the enti
 │  └──────────────┘                    └──────▲───────┘   │
 │                                             │           │
 │                                      ┌──────┴──────┐   │
-│                                      │   Promtail  │   │
+│                                      │    Alloy    │   │
 │                                      │  (DaemonSet)│   │
 │                                      └─────────────┘   │
 │                                                          │
@@ -148,15 +148,15 @@ http://loki.monitoring.svc.cluster.local:3100
 
 ---
 
-## Promtail
+## Alloy
 
-[Promtail](https://grafana.com/docs/loki/latest/send-data/promtail/) is deployed as a `DaemonSet` — one pod per node. It:
+[Grafana Alloy](https://grafana.com/docs/alloy/latest/) is deployed as a `DaemonSet` — one pod per node. It:
 
 1. Reads container logs from `/var/log/pods/`
 2. Attaches Kubernetes labels (namespace, pod, container, app)
 3. Pushes log streams to Loki
 
-Configuration (`charts/platform-monitoring/values.yaml` under the `promtail:` key): uses the default pipeline stages to extract structured labels from Kubernetes metadata.
+It replaced Promtail, which is end of life. Configuration (`charts/platform-monitoring/values.yaml` under the `alloy:` key): the pipeline is Promtail's default `kubernetes-pods` job, so the stream labels did not change. The [chart README](https://github.com/KevinDeBenedetti/k3s-lab/blob/main/charts/platform-monitoring/README.md) covers the upgrade from a release that shipped Promtail.
 
 ---
 
@@ -190,5 +190,5 @@ Update the chart version in `charts/platform-monitoring/Chart.yaml` and let Argo
 
 - [Grafana documentation](https://grafana.com/docs/grafana/latest/)
 - [Loki documentation](https://grafana.com/docs/loki/latest/)
-- [Promtail documentation](https://grafana.com/docs/loki/latest/send-data/promtail/)
+- [Alloy documentation](https://grafana.com/docs/alloy/latest/)
 - [LogQL query language](https://grafana.com/docs/loki/latest/query/)
