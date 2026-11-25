@@ -34,8 +34,14 @@ traefik:
   # v3.7.18: 6 advisories (5 high, 1 medium) against v3.7.16, patched in
   # v3.7.17/v3.7.18 (GHSA-xv5x-242w-7hf7, GHSA-p956-6gvv-mxqp,
   # GHSA-x5pf-cqh3-2gv8, GHSA-ccgh-9g52-6vwg, GHSA-cp28-5662-543f,
-  # GHSA-rr42-h8r2-f28g). Still no pin. If one has to come back, set
-  # `image.tag` here — never `versionOverride`, see README.md.
+  # GHSA-rr42-h8r2-f28g). Still no pin.
+  #
+  # SUBCHART BUMPED 2026-11-24 — 42.4.0 -> 42.4.3, which ships appVersion
+  # v3.7.20: 3 advisories (1 high, 2 medium) published 2026-11-24 against
+  # <= v3.7.19, all patched in v3.7.20 (GHSA-3rh5-223h-cpwr,
+  # GHSA-42x2-976f-ph52, GHSA-9657-c2gv-wjpj). 42.4.3 was published the same
+  # day, so still no pin. If one has to come back, set `image.tag` here —
+  # never `versionOverride`, see README.md.
 
   ingressRoute:
     dashboard:
