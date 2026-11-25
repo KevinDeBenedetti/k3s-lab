@@ -1,11 +1,11 @@
 # platform-monitoring
 
-Observability stack — Grafana, Loki, Promtail and Prometheus — assembled from
+Observability stack — Grafana, Loki, Alloy and Prometheus — assembled from
 four upstream charts and trimmed to fit an 8 GB single node.
 
 | | |
 |---|---|
-| Subcharts | `grafana` [`10.5.15`](https://grafana.github.io/helm-charts), `loki` [`7.0.0`](https://grafana.github.io/helm-charts), `promtail` [`6.17.1`](https://grafana.github.io/helm-charts), `kube-prometheus-stack` [`86.1.0`](https://prometheus-community.github.io/helm-charts) |
+| Subcharts | `grafana` [`10.5.15`](https://grafana.github.io/helm-charts), `loki` [`7.0.0`](https://grafana.github.io/helm-charts), `alloy` [`1.16.0`](https://grafana.github.io/helm-charts), `kube-prometheus-stack` [`86.1.0`](https://prometheus-community.github.io/helm-charts) |
 | Namespace (convention) | `monitoring` — set at install time; this chart neither creates nor enforces it |
 | Per-cluster overrides | `<your-repo>/platform/monitoring/values.yaml` |
 
@@ -33,7 +33,34 @@ zero, the gateway and both caches are disabled. It is one pod with an 8Gi PVC an
 a filesystem object store — not a scalable deployment, and not intended to be.
 `auth_enabled: true` means queries must carry a tenant header.
 
-**Promtail** ships node logs to `http://loki.monitoring.svc.cluster.local:3100`.
+**Alloy ships the pod logs** to `http://loki:3100`: a DaemonSet (`alloy`)
+tailing the kubelet's files under `/var/log/pods` on every node. Its pipeline in
+`values.yaml` is Promtail's `kubernetes-pods` job rule for rule, so the streams
+carry the same labels: `namespace`, `pod`, `container`, `node_name`, `app`,
+`instance`, `component`, `job`, `filename` and `stream`. Its read positions
+live on the node, under `/var/lib/alloy`, so a restarted pod resumes where it
+stopped.
+
+The chart trims Alloy to that one job: no PodLogs CRD, no config-reloader
+sidecar (a config change rolls the DaemonSet instead), no Service, no usage
+report, and a ServiceAccount that can only read pods, where the upstream
+default reads every Secret and ConfigMap of the cluster.
+
+### Upgrading from a release that shipped Promtail
+
+Alloy replaced the `promtail` subchart, which is end of life. The upgrade
+removes the `promtail` DaemonSet, ServiceAccount, ClusterRole and Secret and
+creates the `alloy` ones, so:
+
+- **Values under `promtail:` are ignored.** Move what you had overridden to the
+  `alloy:` key. A custom Loki client (URL, tenant) or pipeline stage now lives
+  in `alloy.alloy.configMap.content`, which replaces the default as a whole.
+- **Alloy starts from its own positions**, not Promtail's: on its first start it
+  reads every log file still on the node from the beginning, so the lines
+  Promtail had already shipped reach Loki a second time, or are rejected as too
+  old.
+- **Anything that names the promtail pods** (a NetworkPolicy, a policy
+  exception, an alert on `daemonset="promtail"`) has to follow.
 
 ## Dashboards and datasources
 
@@ -81,7 +108,8 @@ workload gets dropped lines rather than filling the disk.
 | `loki.deploymentMode` | `SingleBinary` | one pod, filesystem store |
 | `loki.singleBinary.persistence` | `8Gi` | |
 | `loki.loki.limits_config.retention_period` | `168h` | |
-| `promtail.config.clients[0].url` | in-cluster Loki | |
+| `alloy.alloy.configMap.content` | Promtail's `kubernetes-pods` pipeline, pushing to in-cluster Loki | rendered through `tpl`: no double braces in it |
+| `alloy.alloy.resources` | `128Mi` requested, `256Mi` limit | per node |
 | `kube-prometheus-stack.grafana.enabled` | `false` | avoids a second Grafana |
 | `kube-prometheus-stack.alertmanager.enabled` | `false` | no alert routing |
 | `kube-prometheus-stack.prometheus.prometheusSpec.retention` | `7d` | |

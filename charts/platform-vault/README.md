@@ -55,7 +55,7 @@ vault audit enable file file_path=stdout
 
 A file device on a volume grows without rotation until the disk fills, and
 Vault then refuses every request because no audit device can write. On stdout
-the log collector (Promtail → Loki in `platform-monitoring`) ships and rotates
+the log collector (Alloy → Loki in `platform-monitoring`) ships and rotates
 it.
 
 **Upgrading an install that still has the audit PVC** (charts before this

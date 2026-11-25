@@ -66,14 +66,9 @@ if [ "$UPDATE_DEPS" -eq 1 ]; then
   # repo serves today rather than the version this repo committed. For a pin
   # whose whole point is reproducibility, `build` is the right verb.
   #
-  # The repos are registered in a throwaway helm config so that running this
-  # script never mutates the caller's own `helm repo list`.
-  # Explicit template: BSD mktemp (macOS) ignores TMPDIR for the bare `-d` form
-  # and goes through confstr instead, which GNU mktemp does not.
-  helm_home="$(mktemp -d "${TMPDIR:-/tmp}/traefik-image-check.XXXXXX")"
-  trap 'rm -rf "$helm_home"' EXIT
-  export HELM_REPOSITORY_CONFIG="$helm_home/repositories.yaml"
-  export HELM_REPOSITORY_CACHE="$helm_home/cache"
+  # The repos are registered in a throwaway helm config (chart_deps_isolate)
+  # so that running this script never mutates the caller's own `helm repo list`.
+  chart_deps_isolate traefik-image-check
 
   log_info "helm dependency build $CHART_DIR"
   chart_deps_build "$CHART_DIR"

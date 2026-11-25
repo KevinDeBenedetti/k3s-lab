@@ -168,6 +168,24 @@ EOF
   run_check
   [ "$status" -eq 1 ]
   [[ "$output" == *"helm template failed"* ]]
+  # A chart that does not render says nothing about its pins.
+  [[ "$output" == *"1 chart(s) could not be vendored or rendered"* ]]
+  [[ "$output" != *"do not match the render"* ]]
+}
+
+@test "the summary counts chart failures and stale pins apart" {
+  # One chart that does not render, one with a stale pin: each closing line
+  # counts its own kind, so neither is blamed on the other.
+  values acme/api 1.4.2
+  template '{{ .Values.does.not.exist }}'
+  mkdir -p "${CHARTS}/second/templates"
+  printf 'apiVersion: v2\nname: second\nversion: 0.1.0\n' > "${CHARTS}/second/Chart.yaml"
+  printf 'app:\n  image:\n    repository: acme/worker\n    tag: "2.0.0"\n' > "${CHARTS}/second/values.yaml"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: second\nspec:\n  containers:\n    - name: app\n      image: acme/worker:1.0.0\n' > "${CHARTS}/second/templates/deploy.yaml"
+  run_check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"1 chart(s) could not be vendored or rendered"* ]]
+  [[ "$output" == *"1 image pin(s) do not match the render"* ]]
 }
 
 # ─── Tag-only pins (the traefik shape) ──────────────────────────────────────
@@ -346,4 +364,7 @@ EOF
   [[ "$output" == *"a-broken — helm dependency build failed"* ]]
   [[ "$output" == *"https://charts.example.test\" is not a valid chart repository"* ]]
   [[ "$output" == *"acme/api:1.4.2"* ]]
+  # The closing summary blames the chart, not its pins: no pin was compared.
+  [[ "$output" == *"1 chart(s) could not be vendored or rendered"* ]]
+  [[ "$output" != *"do not match the render"* ]]
 }
