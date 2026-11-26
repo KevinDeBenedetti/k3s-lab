@@ -74,7 +74,7 @@ hooks = [
 [[repos]]
 repo = "https://github.com/KevinDeBenedetti/github-workflows"
 # renovate: datasource=github-tags depName=KevinDeBenedetti/github-workflows
-rev = "v0.56.2"
+rev = "v0.57.0"
 hooks = [
   { id = "check-docs-links" },
 ]
