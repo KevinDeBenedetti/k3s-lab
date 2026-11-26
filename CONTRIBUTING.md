@@ -8,7 +8,7 @@ this page covers what is **specific to k3s-lab**.
 ## Development setup
 
 ```bash
-brew install bats-core shellcheck actionlint prek helm
+brew install bats-core shellcheck actionlint prek helm yq
 ```
 
 Run the checks CI will run:

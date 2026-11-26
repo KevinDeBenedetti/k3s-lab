@@ -32,9 +32,19 @@ Common causes:
 Unable to connect to server: x509: certificate is valid for 127.0.0.1, not 1.2.3.4
 ```
 
-**Cause:** `--tls-san` was not set with the public IP during install.
+**Cause:** kubectl reaches the API server on an address that is not in its
+certificate. k3s adds the node's own addresses; any other one (a public IP in
+front of the node, a WireGuard tunnel IP, a DNS name) must be listed as an extra
+SAN.
 
-**Fix:** Re-run `task provision:server` with the correct server IP in the Ansible inventory.
+**Fix:** List the address in `k3s_tls_sans` (default `[]`, in
+`ansible/roles/k3s_server/defaults/main.yml`; set it in your inventory), then
+re-run `task provision:server`. The role writes it to
+`/etc/rancher/k3s/config.yaml.d/10-tls-san.yaml` and restarts k3s, no reinstall:
+
+```yaml
+k3s_tls_sans: ["1.2.3.4"]
+```
 
 
 ### Agent can't join cluster
@@ -143,35 +153,53 @@ kubectl logs -n cert-manager deploy/cert-manager-webhook --tail=20
 
 ---
 
-### grafana-admin-secret not found
+### Grafana pod stuck in `CreateContainerConfigError`
 
-```
-grafana-admin-secret not found in monitoring namespace.
-Run first: task deploy:grafana-secret
+Grafana reads its admin credentials from `grafana-admin-secret`
+(`grafana.admin.existingSecret` in `charts/platform-monitoring/values.yaml`),
+and the chart does not create it. Until it exists, the pod does not start:
+
+```bash
+kubectl describe pod -n monitoring -l app.kubernetes.io/name=grafana
+# Error: secret "grafana-admin-secret" not found
 ```
 
-**Fix:**
+**Fix:** create it (`GRAFANA_PASSWORD` in `.env`), or let your ExternalSecret
+sync it from Vault (`secret/grafana/admin`, see [Vault](../stack/vault.md)):
 ```bash
 task deploy:grafana-secret
 ```
-Then let ArgoCD reconcile the monitoring stack (or trigger a sync).
+The kubelet retries the pod on its own once the secret exists.
 
 
 ### Prometheus not scraping Traefik
 
-1. Verify `serviceMonitor.enabled: true` in `traefik-values.yaml`
+1. Verify `traefik.metrics.prometheus.serviceMonitor.enabled: true` and
+   `traefik.metrics.prometheus.service.enabled: true` in the values you
+   install `charts/platform-traefik` with: the chart's own `values.yaml` leaves
+   both at the subchart default, off (see
+   [Traefik — Prometheus metrics](../stack/traefik.md#prometheus-metrics))
 2. Check ServiceMonitor exists: `kubectl get servicemonitor -n ingress`
 3. In Grafana → Explore → Prometheus, run: `up{job="traefik"}`
 
 ---
 
-### Promtail pods CrashLoopBackOff
+### Alloy pods CrashLoopBackOff, or no logs in Loki
 
 ```bash
-kubectl logs -n monitoring daemonset/promtail --tail=30
+kubectl logs -n monitoring daemonset/alloy --tail=30
 ```
 
-Common cause: permission to read `/var/log/pods/`. Check Promtail DaemonSet hostPath mounts.
+Common causes:
+
+- A syntax error in `alloy.alloy.configMap.content`: Alloy names the line and
+  exits.
+- Permission to read `/var/log/pods/`: check the DaemonSet's `pods` hostPath
+  mount, and that the container still runs as root (the kubelet writes the
+  files `0640 root:root`).
+- Loki refuses the push (`401`, `no org id`): with `loki.loki.auth_enabled:
+  true` the client must send a tenant. Set `tenant_id` in the `loki.write`
+  block of the config, or turn `auth_enabled` off.
 
 ---
 

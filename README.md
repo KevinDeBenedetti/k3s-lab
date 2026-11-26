@@ -24,7 +24,7 @@ There are two ways to use it, and the rest of this page is organized around them
 - **Ansible roles** — common (node base), k3s_server, k3s_agent, wireguard
 - Lightweight Kubernetes via [k3s](https://k3s.io) with automated control-plane and agent bootstrap
 - Ingress + automatic HTTPS via [Traefik](https://traefik.io) and [cert-manager](https://cert-manager.io)
-- Full observability: Prometheus, Grafana, Loki, Promtail (sized for a small single node)
+- Full observability: Prometheus, Grafana, Loki, Alloy (sized for a small single node)
 - Runtime security: Falco, Tetragon, Trivy Operator, Kyverno
 - Secret management: HashiCorp Vault + External Secrets Operator
 - GitOps: ArgoCD
@@ -89,7 +89,7 @@ k3s-lab/
 │   ├── platform-base/             # Namespaces, LimitRange, shared RBAC
 │   ├── platform-cert-manager/     # TLS certificates (cert-manager)
 │   ├── platform-external-secrets/ # External Secrets Operator
-│   ├── platform-monitoring/       # Prometheus + Grafana + Loki + Promtail
+│   ├── platform-monitoring/       # Prometheus + Grafana + Loki + Alloy
 │   ├── platform-security/         # Falco + Tetragon + Trivy + Kyverno
 │   ├── platform-traefik/          # Ingress controller (Traefik)
 │   ├── platform-vault/            # HashiCorp Vault

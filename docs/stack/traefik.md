@@ -77,7 +77,29 @@ Traefik runs as a non-root user (`runAsUser: 65532`) with a read-only filesystem
 
 ### Prometheus metrics
 
-The `serviceMonitor` is enabled so the kube-prometheus-stack Prometheus Operator auto-discovers and scrapes Traefik metrics.
+Traefik serves its Prometheus metrics on the `metrics` entry point (port `9100`, path `/metrics`).
+
+The chart renders **no `ServiceMonitor`**: `traefik.metrics.prometheus.serviceMonitor.enabled` stays at the subchart's default, `false`, so the kube-prometheus-stack Prometheus Operator does not discover Traefik on its own. A Traefik-only cluster has no `monitoring.coreos.com` CRDs, and the subchart refuses to render a ServiceMonitor without them.
+
+To have Prometheus scrape Traefik, turn it on in the values you install the chart with:
+
+```yaml
+traefik:
+  metrics:
+    prometheus:
+      # The ServiceMonitor selects this dedicated `traefik-metrics` Service.
+      service:
+        enabled: true
+      serviceMonitor:
+        enabled: true
+        # The label your Prometheus selects ServiceMonitors by. With
+        # kube-prometheus-stack's defaults it is the Helm release name of
+        # that chart; platform-security's Kyverno ServiceMonitor uses the same.
+        additionalLabels:
+          release: prometheus
+```
+
+The subchart fails the render (`You have to deploy monitoring.coreos.com/v1 first`) when the Prometheus Operator CRDs are not installed yet. Install `platform-monitoring` first, or set `traefik.metrics.prometheus.disableAPICheck: true` when the CRDs arrive in the same sync.
 
 ---
 

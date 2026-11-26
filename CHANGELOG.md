@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.27.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.26.0...v0.27.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* platform-monitoring no longer renders the promtail DaemonSet. Values set under `promtail:` are ignored; move them to `alloy:`.
+
+### Features
+
+* replace Promtail with Grafana Alloy and harden the chart checks ([60f61c0](https://github.com/KevinDeBenedetti/k3s-lab/commit/60f61c0c7db6d9ccbe7fe6383da33ddfd0ea785e)), closes [#150](https://github.com/KevinDeBenedetti/k3s-lab/issues/150) [#151](https://github.com/KevinDeBenedetti/k3s-lab/issues/151) [#152](https://github.com/KevinDeBenedetti/k3s-lab/issues/152) [#153](https://github.com/KevinDeBenedetti/k3s-lab/issues/153) [#154](https://github.com/KevinDeBenedetti/k3s-lab/issues/154) [#155](https://github.com/KevinDeBenedetti/k3s-lab/issues/155)
+
+
+### Bug Fixes
+
+* **charts/platform-traefik:** bump traefik subchart to 42.4.3 (proxy v3.7.20) ([1ad9e1e](https://github.com/KevinDeBenedetti/k3s-lab/commit/1ad9e1eb010683550b80e8fd331dd49925625152))
+
 ## [0.26.0](https://github.com/KevinDeBenedetti/k3s-lab/compare/v0.25.0...v0.26.0) (2026-11-23)
 
 

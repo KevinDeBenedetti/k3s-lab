@@ -48,10 +48,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "$UPDATE_DEPS" -eq 1 ]; then
-  helm_home="$(mktemp -d "${TMPDIR:-/tmp}/resource-limits.XXXXXX")"
-  trap 'rm -rf "$helm_home"' EXIT
-  export HELM_REPOSITORY_CONFIG="$helm_home/repositories.yaml"
-  export HELM_REPOSITORY_CACHE="$helm_home/cache"
+  chart_deps_isolate resource-limits
 fi
 
 # violations <rendered manifests> — "<Kind>/<name>  <container>: missing <fields>"

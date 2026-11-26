@@ -124,28 +124,214 @@ loki:
       limits:
         memory: 64Mi
 
-promtail:
-  fullnameOverride: promtail
-  config:
-    logLevel: info
-    clients:
-      # Short name on purpose: promtail and loki are both subcharts of
-      # platform-monitoring, so they always land in the same namespace, and the
-      # pod's search domain resolves this wherever the chart is installed. The
-      # fully-qualified form used until 2026-08-04 hardcoded `monitoring`, which
-      # only held when the chart was deployed into a namespace of that name —
-      # under the platform-deployment umbrella everything shares the release
-      # namespace, so promtail could not reach Loki at all and log shipping was
-      # silently broken (found on a k3d install, promtail stuck NotReady with
-      # "no such host").
-      - url: http://loki:3100/loki/api/v1/push
-  resources:
-    requests:
-      cpu: 25m
-      memory: 64Mi
-    limits:
-      cpu: 150m
-      memory: 128Mi
+# Grafana Alloy ships the pod logs to Loki. It replaced the promtail subchart
+# (end of life, no release since 2025-10-31) on 2026-11-25. The pipeline below
+# is Promtail's `kubernetes-pods` job rule for rule, so the streams keep their
+# labels.
+alloy:
+  fullnameOverride: alloy
+  # The PodLogs CRD (monitoring.grafana.com): nothing here uses it.
+  crds:
+    create: false
+  # The chart's default lets the ServiceAccount get/list/watch every Secret
+  # and ConfigMap of the cluster. Discovering this node's pods needs pods
+  # only. The template appends clusterRules to rules, and an empty list there
+  # renders invalid YAML, hence the split of the verbs across the two.
+  rbac:
+    rules:
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["get", "list"]
+    clusterRules:
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["watch"]
+  # No reloader sidecar (a second image to pin and scan): with it off and the
+  # config inline, the chart stamps a checksum/config annotation on the pods,
+  # so a config change rolls the DaemonSet, as it does for Promtail. The
+  # positions live on the node (below): a restarted pod resumes where it was.
+  configReloader:
+    enabled: false
+  # Off by default, as the ServiceMonitor: a cluster that scrapes Alloy turns
+  # both on in its values.
+  service:
+    enabled: false
+  controller:
+    type: daemonset
+    # Promtail's tolerations: one pod on every node.
+    tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+    volumes:
+      extra:
+        - name: pods
+          hostPath:
+            path: /var/log/pods
+        # Alloy's --storage.path, on the node so the positions outlive the pod
+        # (and a reboot, unlike Promtail's /run/promtail tmpfs).
+        - name: storage
+          hostPath:
+            path: /var/lib/alloy
+            type: DirectoryOrCreate
+  alloy:
+    storagePath: /var/lib/alloy
+    # No usage report to stats.grafana.org.
+    enableReporting: false
+    mounts:
+      extra:
+        - name: pods
+          mountPath: /var/log/pods
+          readOnly: true
+        - name: storage
+          mountPath: /var/lib/alloy
+    # Root as Promtail, for the same reason: the kubelet writes the log files
+    # 0640 root:root. Root without any capability reads them as their owner;
+    # the rest is the hardening Promtail's container has.
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
+    # Memory request sized on a small two-node cluster's use (86Mi to 103Mi per
+    # pod, `kubectl top`), plus a quarter. The limit keeps room for a burst of
+    # new log files.
+    resources:
+      requests:
+        cpu: 25m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    configMap:
+      # The chart passes this through `tpl`: no double braces in it.
+      content: |
+        // This node's pods only. HOSTNAME is the node name (the chart sets it
+        // from spec.nodeName); Promtail added the same selector by itself.
+        discovery.kubernetes "pods" {
+          role = "pod"
+          selectors {
+            role  = "pod"
+            field = "spec.nodeName=" + coalesce(sys.env("HOSTNAME"), constants.hostname)
+          }
+        }
+
+        // Promtail's relabel_configs for the kubernetes-pods job, in order.
+        discovery.relabel "pods" {
+          targets = discovery.kubernetes.pods.targets
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_controller_name"]
+            regex         = "([0-9a-z-.]+?)(-[0-9a-f]{8,10})?"
+            target_label  = "__tmp_controller_name"
+          }
+          rule {
+            source_labels = [
+              "__meta_kubernetes_pod_label_app_kubernetes_io_name",
+              "__meta_kubernetes_pod_label_app",
+              "__tmp_controller_name",
+              "__meta_kubernetes_pod_name",
+            ]
+            regex        = "^;*([^;]+)(;.*)?$"
+            target_label = "app"
+          }
+          rule {
+            source_labels = [
+              "__meta_kubernetes_pod_label_app_kubernetes_io_instance",
+              "__meta_kubernetes_pod_label_instance",
+            ]
+            regex        = "^;*([^;]+)(;.*)?$"
+            target_label = "instance"
+          }
+          rule {
+            source_labels = [
+              "__meta_kubernetes_pod_label_app_kubernetes_io_component",
+              "__meta_kubernetes_pod_label_component",
+            ]
+            regex        = "^;*([^;]+)(;.*)?$"
+            target_label = "component"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_node_name"]
+            target_label  = "node_name"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_namespace"]
+            target_label  = "namespace"
+          }
+          rule {
+            source_labels = ["namespace", "app"]
+            separator     = "/"
+            replacement   = "$1"
+            target_label  = "job"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_name"]
+            target_label  = "pod"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_container_name"]
+            target_label  = "container"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+            separator     = "/"
+            replacement   = "/var/log/pods/*$1/*.log"
+            target_label  = "__path__"
+          }
+          rule {
+            source_labels = [
+              "__meta_kubernetes_pod_annotationpresent_kubernetes_io_config_hash",
+              "__meta_kubernetes_pod_annotation_kubernetes_io_config_hash",
+              "__meta_kubernetes_pod_container_name",
+            ]
+            separator    = "/"
+            regex        = "true/(.*)"
+            replacement  = "/var/log/pods/*$1/*.log"
+            target_label = "__path__"
+          }
+        }
+
+        // Expands each __path__ glob to the files on this node (every 10s, as
+        // Promtail did).
+        local.file_match "pods" {
+          path_targets = discovery.relabel.pods.output
+        }
+
+        // Labels starting with __ are dropped here; `filename` is added.
+        loki.source.file "pods" {
+          targets    = local.file_match.pods.targets
+          forward_to = [loki.process.pods.receiver]
+        }
+
+        // Promtail's `cri: {}`: timestamp from the line, `stream` label,
+        // partial lines joined.
+        loki.process "pods" {
+          forward_to = [loki.write.loki.receiver]
+
+          stage.cri {}
+        }
+
+        // Short name on purpose: alloy and loki are both subcharts of
+        // platform-monitoring, so they always land in the same namespace, and
+        // the pod's search domain resolves this wherever the chart is
+        // installed. A fully-qualified name would hardcode the namespace (the
+        // promtail client did until 2026-08-04, and could not reach Loki under
+        // the platform-deployment umbrella). No tenant_id, as Promtail's
+        // client had none.
+        loki.write "loki" {
+          endpoint {
+            url = "http://loki:3100/loki/api/v1/push"
+          }
+        }
 
 kube-prometheus-stack:
   # Disable components already provided by this chart or not needed on a single node

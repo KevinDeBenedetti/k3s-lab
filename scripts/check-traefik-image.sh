@@ -57,52 +57,21 @@ if [ "$UPDATE_DEPS" -eq 1 ]; then
   # `helm dependency build` resolves Chart.lock against the *registered* repos,
   # and fails with "no repository definition for <url>" when a dependency's
   # repository is unknown — which is exactly the state of a fresh CI runner.
-  # So register them first.
+  # So chart_deps_build (lib/chart-deps.sh) registers them first, and fails
+  # before helm runs when the chart declares an http(s) repository it could
+  # not parse.
   #
   # `helm dependency update` would sidestep the registration, but it re-resolves
   # and rewrites Chart.lock: the check would then validate whatever the upstream
   # repo serves today rather than the version this repo committed. For a pin
   # whose whole point is reproducibility, `build` is the right verb.
   #
-  # The repos are registered in a throwaway helm config so that running this
-  # script never mutates the caller's own `helm repo list`.
-  # Explicit template: BSD mktemp (macOS) ignores TMPDIR for the bare `-d` form
-  # and goes through confstr instead, which GNU mktemp does not.
-  helm_home="$(mktemp -d "${TMPDIR:-/tmp}/traefik-image-check.XXXXXX")"
-  trap 'rm -rf "$helm_home"' EXIT
-  export HELM_REPOSITORY_CONFIG="$helm_home/repositories.yaml"
-  export HELM_REPOSITORY_CACHE="$helm_home/cache"
-
-  # Dependencies are read by field comparison (lib/chart-deps.sh), not by
-  # matching the URL with a regex. The previous version used
-  #   /^[[:space:]]*repository:[[:space:]]*https?:\/\//
-  # which matches under BSD awk and yielded **nothing** under the runner's awk.
-  # No repository was registered, `helm dependency build` then failed with
-  # "no repository definition for https://traefik.github.io/charts", and this
-  # job had never once passed since it was introduced (2026-07-30, 11e0865).
-  n=0
-  while IFS=$'\t' read -r _name _version url; do
-    case "$url" in
-      http://*|https://*) ;;
-      *) continue ;;   # oci:// needs no `repo add`
-    esac
-    n=$((n + 1))
-    log_info "helm repo add dep${n} $url"
-    helm repo add "dep${n}" "$url" --force-update >/dev/null
-  done < <(chart_deps "$CHART_DIR/Chart.yaml" | sort -u -t"$(printf '\t')" -k3,3)
-
-  # Registering nothing is what turned a parsing bug into a cryptic helm error
-  # three steps later. If the chart declares an HTTP dependency, it has to have
-  # been registered here; silence is the bug, not a valid state.
-  if [ "$n" -eq 0 ] && grep -qE 'repository:[[:space:]]*["'"'"']?http' "$CHART_DIR/Chart.yaml"; then
-    log_error "$CHART_DIR/Chart.yaml declares an HTTP(S) dependency repository,"
-    log_error "but none could be parsed — so none was registered."
-    log_error "helm dependency build would fail with 'no repository definition'."
-    exit 1
-  fi
+  # The repos are registered in a throwaway helm config (chart_deps_isolate)
+  # so that running this script never mutates the caller's own `helm repo list`.
+  chart_deps_isolate traefik-image-check
 
   log_info "helm dependency build $CHART_DIR"
-  helm dependency build "$CHART_DIR" >/dev/null
+  chart_deps_build "$CHART_DIR"
 fi
 
 # ─── Expected tag ───────────────────────────────────────────────────────────
